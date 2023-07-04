@@ -1,0 +1,20 @@
+- name: Setup Ansible Controller
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - ansible-core
+          - bash-completion
+        state: present
+        update-cache: true
+
+    - name: Add Ansible bash completion
+      blockinfile:
+        path: /etc/bash.bashrc
+        block: |
+          source /usr/share/bash-completion/completions/ansible
+
