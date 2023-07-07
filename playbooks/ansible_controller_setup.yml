@@ -7,14 +7,19 @@
       become: true
       apt:
         name:
-          - ansible-core
+          - python3-pip
           - bash-completion
         state: present
         update-cache: true
 
-    - name: Add Ansible bash completion
-      blockinfile:
-        path: /etc/bash.bashrc
-        block: |
-          source /usr/share/bash-completion/completions/ansible
+    - name: Install argcomplete for Ansible Bash Completion
+      pip:
+        name:
+          - argcomplete
+        state: present
+        extra_args: --user
 
+    - name: Activate global argcomplete 
+      shell: activate-global-python-argcomplete3 --user
+      args:
+        executable: /bin/bash
