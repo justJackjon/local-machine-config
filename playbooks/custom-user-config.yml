@@ -26,7 +26,7 @@
       args:
         executable: /bin/bash
 
-    - name: "Install Kinto.sh: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
+    - name: "Configure Kinto.sh: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
       replace:
         path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
         regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
@@ -34,13 +34,13 @@
         backup: yes
       when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
 
-    - name: "Install Kinto.sh: Restart xkeysnail service after making changes to kinto.py"
+    - name: "Configure Kinto.sh: Restart xkeysnail service after making changes to kinto.py"
       systemd:
         name: xkeysnail
         state: restarted
       become: true
 
-    - name: "Install Kinto.sh: Remove files downloaded by Kinto install script"
+    - name: "Cleanup Kinto.sh: Remove files downloaded by Kinto install script"
       file:
         path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
         state: absent
