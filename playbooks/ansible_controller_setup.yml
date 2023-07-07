@@ -1,10 +1,10 @@
 - name: Setup Ansible Controller
   hosts: localhost
   connection: local
-  become: true
   gather_facts: false
   tasks:
     - name: Install required packages
+      become: true
       apt:
         name:
           - ansible-core
