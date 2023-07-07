@@ -1,0 +1,50 @@
+- name: Install custom user configuration
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: "Install Kinto.sh: Install Kinto dependencies"
+      apt:
+        name: gir1.2-vte-2.91
+        state: present
+      become: true
+
+    - name: "Install Kinto.sh: Create a temporary directory for the Kinto install script"
+      tempfile:
+        state: directory
+        suffix: _install_kinto
+      register: tempdir
+
+    - name: "Install Kinto.sh: Download Kinto install script"
+      get_url:
+        url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
+        dest: "{{ tempdir.path }}/install_kinto.sh"
+        mode: 0755
+
+    - name: "Install Kinto.sh: Run Kinto install script"
+      shell: "{{ tempdir.path }}/install_kinto.sh"
+      args:
+        executable: /bin/bash
+
+    - name: "Install Kinto.sh: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
+      replace:
+        path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
+        regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
+        replace: '\1\3'
+        backup: yes
+      when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
+
+    - name: "Install Kinto.sh: Restart xkeysnail service after making changes to kinto.py"
+      systemd:
+        name: xkeysnail
+        state: restarted
+      become: true
+
+    - name: "Install Kinto.sh: Remove files downloaded by Kinto install script"
+      file:
+        path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
+        state: absent
+      loop:
+        - kinto-master
+        - kinto.zip
+      become: true
