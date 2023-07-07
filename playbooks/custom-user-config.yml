@@ -48,3 +48,12 @@
         - kinto-master
         - kinto.zip
       become: true
+
+    - name: "Configure XFCE: Set custom keyboard shortcuts in XFCE"
+      command:
+        cmd: "{{ item }}"
+      with_items:
+        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary>Tab" --create --type string --set "cycle_windows_key"
+        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
+      when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
+
