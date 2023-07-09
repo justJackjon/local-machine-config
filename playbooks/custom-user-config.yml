@@ -34,12 +34,29 @@
         backup: yes
       when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
 
-    - name: "Configure Kinto.sh: Modify terminal related shortcuts for GB Chromebook keyboard layouts in kinto.py"
+    - name: "Configure Kinto.sh: Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
         block: |
-          # Map 'Left Ctrl + 3' to 'Alt Gr + 3' to produce the numbersign (#) symbol:
-          # NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebar we will sub left Ctrl on Chromebook.
+          # Map 'Left Alt + 3' to 'Right Alt + 3' to produce the numbersign (#) symbol:
+          # NOTE: For general GUIs, Kinto swaps 'Left Ctrl' and 'Left Alt' around on Chromebooks, so this needs to be accounted for in any 'General GUI' keyboard remaps.
+          # NOTE: Kinto also swaps the 'Right Alt' and 'Right Ctrl' keys around to reflect the, 'Spacebar -> Command -> Option', layout for UK Macs.
+          # NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebbar, we will replicate the same.
+          K("LAlt-KEY_3"): K("RAlt-KEY_3"),
+        marker: "# {mark}: ANSIBLE MANAGED GENERAL GUI SHORTCUTS"
+        insertbefore: '\s*\},\s*\"General GUI\"\s*'
+      when: 
+        - ansible_facts.env.LANGUAGE == 'en_GB:en'
+        - ansible_facts.system_vendor == 'GOOGLE'
+        - ansible_facts.os_family == 'Debian'
+
+    - name: "Configure Kinto.sh: Modify terminal related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
+      blockinfile:
+        path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
+        block: |
+          # Map 'Left Ctrl + 3' to 'Right Alt + 3' to produce the numbersign (#) symbol:
+          # NOTE: Kinto swaps the 'Right Alt' and 'Right Ctrl' keys around to reflect the, 'Spacebar -> Command -> Option', layout for UK Macs.
+          # NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebbar, we will replicate the same.
           K("LC-KEY_3"): K("RAlt-KEY_3"),
         marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
         insertbefore: '\s*\},\s*\"terminals\"\s*'
