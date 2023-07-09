@@ -3,6 +3,29 @@
   connection: local
   gather_facts: true
   tasks:
+    - name: "Configure Keyboard: Create ~/.Xmodmap with custom key mappings"
+      copy:
+        content: |
+          keycode 11 = 2 at
+          keycode 12 = 3 sterling numbersign
+          keycode 48 = apostrophe quotedbl
+          keycode 49 = section plusminus
+          keycode 51 = backslash bar
+          keycode 94 = grave asciitilde
+          keycode 108 = Mode_switch Mode_switch Mode_switch Mode_switch
+        dest: "/home/{{ ansible_user_id }}/.Xmodmap"
+        mode: 0644
+      when: 
+        - ansible_facts.env.LANGUAGE == 'en_GB:en'
+        - ansible_facts.system_vendor == 'GOOGLE'
+        - ansible_facts.os_family == 'Debian'
+      register: xmodmap_copy_result
+
+    - name: "Configure Keyboard: Apply custom key mappings with xmodmap"
+      shell:
+        cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
+      when: xmodmap_copy_result.changed
+
     - name: "Install Kinto.sh: Install Kinto dependencies"
       apt:
         name: gir1.2-vte-2.91
