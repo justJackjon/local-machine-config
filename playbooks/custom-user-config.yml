@@ -34,6 +34,20 @@
         backup: yes
       when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
 
+    - name: "Configure Kinto.sh: Modify terminal related shortcuts for GB Chromebook keyboard layouts in kinto.py"
+      blockinfile:
+        path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
+        block: |
+          # Map 'Left Ctrl + 3' to 'Alt Gr + 3' to produce the numbersign (#) symbol:
+          # NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebar we will sub left Ctrl on Chromebook.
+          K("LC-KEY_3"): K("RAlt-KEY_3"),
+        marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
+        insertbefore: '\s*\},\s*\"terminals\"\s*'
+      when: 
+        - ansible_facts.env.LANGUAGE == 'en_GB:en'
+        - ansible_facts.system_vendor == 'GOOGLE'
+        - ansible_facts.os_family == 'Debian'
+
     - name: "Configure Kinto.sh: Restart xkeysnail service after making changes to kinto.py"
       systemd:
         name: xkeysnail
@@ -56,4 +70,3 @@
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary>Tab" --create --type string --set "cycle_windows_key"
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
       when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
-
