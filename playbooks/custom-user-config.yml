@@ -58,7 +58,7 @@
         name: gir1.2-vte-2.91
         state: present
       become: true
-      when: ansible_facts.pkg_mgr == "apt"
+      when: ansible_facts.pkg_mgr == 'apt'
 
     - name: "Create a temporary directory for the Kinto install script"
       tempfile:
@@ -72,7 +72,7 @@
         dest: "{{ tempdir.path }}/install_kinto.sh"
         mode: 0755
       register: kinto_download_result
-      when: ansible_facts.system == "Linux"
+      when: ansible_facts.system == 'Linux'
 
     - name: "Run Kinto install script"
       shell: "{{ tempdir.path }}/install_kinto.sh"
