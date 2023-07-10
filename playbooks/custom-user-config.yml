@@ -1,55 +1,79 @@
-- name: Install custom user configuration
+- name: Gather Facts
   hosts: localhost
   connection: local
   gather_facts: true
+  tasks: []
+
+- name: Apply Custom Keyboard Mappings
+  hosts: localhost
+  connection: local
+  gather_facts: false
   tasks:
-    - name: "Configure Keyboard: Create ~/.Xmodmap with custom key mappings"
-      copy:
-        content: |
-          keycode 11 = 2 at
-          keycode 12 = 3 sterling numbersign
-          keycode 48 = apostrophe quotedbl
-          keycode 49 = section plusminus
-          keycode 51 = backslash bar
-          keycode 94 = grave asciitilde
-          keycode 108 = Mode_switch Mode_switch Mode_switch Mode_switch
-        dest: "/home/{{ ansible_user_id }}/.Xmodmap"
-        mode: 0644
-      when: 
-        - ansible_facts.env.LANGUAGE == 'en_GB:en'
-        - ansible_facts.system_vendor == 'GOOGLE'
-        - ansible_facts.os_family == 'Debian'
-      register: xmodmap_copy_result
+  - name: "Create ~/.Xmodmap with custom key mappings"
+    copy:
+      content: |
+        keycode 11 = 2 at
+        keycode 12 = 3 sterling numbersign
+        keycode 48 = apostrophe quotedbl
+        keycode 49 = section plusminus
+        keycode 51 = backslash bar
+        keycode 94 = grave asciitilde
+        keycode 108 = Mode_switch Mode_switch Mode_switch Mode_switch
+      dest: "/home/{{ ansible_user_id }}/.Xmodmap"
+      mode: 0644
+    when: 
+      - ansible_facts.env.LANGUAGE == 'en_GB:en'
+      - ansible_facts.system_vendor == 'GOOGLE'
+      - ansible_facts.os_family == 'Debian'
+    register: xmodmap_copy_result
 
-    - name: "Configure Keyboard: Apply custom key mappings with xmodmap"
-      shell:
-        cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
-      when: xmodmap_copy_result.changed
+  - name: "Apply custom key mappings with xmodmap"
+    shell:
+      cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
+    when: xmodmap_copy_result.changed
 
-    - name: "Install Kinto.sh: Install Kinto dependencies"
+- name: Configure Desktop Shortcuts 
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Set custom Kinto compatible keyboard shortcuts in XFCE"
+      command:
+        cmd: "{{ item }}"
+      with_items:
+        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary>Tab" --create --type string --set "cycle_windows_key"
+        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
+      when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
+
+- name: Install and Configure Kinto.sh 
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Install Kinto dependencies"
       apt:
         name: gir1.2-vte-2.91
         state: present
       become: true
 
-    - name: "Install Kinto.sh: Create a temporary directory for the Kinto install script"
+    - name: "Create a temporary directory for the Kinto install script"
       tempfile:
         state: directory
         suffix: _install_kinto
       register: tempdir
 
-    - name: "Install Kinto.sh: Download Kinto install script"
+    - name: "Download Kinto install script"
       get_url:
         url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
         dest: "{{ tempdir.path }}/install_kinto.sh"
         mode: 0755
 
-    - name: "Install Kinto.sh: Run Kinto install script"
+    - name: "Run Kinto install script"
       shell: "{{ tempdir.path }}/install_kinto.sh"
       args:
         executable: /bin/bash
 
-    - name: "Configure Kinto.sh: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
+    - name: "Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
       replace:
         path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
         regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
@@ -57,7 +81,7 @@
         backup: yes
       when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
 
-    - name: "Configure Kinto.sh: Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
+    - name: "Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
         block: |
@@ -73,7 +97,7 @@
         - ansible_facts.system_vendor == 'GOOGLE'
         - ansible_facts.os_family == 'Debian'
 
-    - name: "Configure Kinto.sh: Modify terminal related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
+    - name: "Modify terminal related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
         block: |
@@ -88,13 +112,13 @@
         - ansible_facts.system_vendor == 'GOOGLE'
         - ansible_facts.os_family == 'Debian'
 
-    - name: "Configure Kinto.sh: Restart xkeysnail service after making changes to kinto.py"
+    - name: "Restart xkeysnail service after making changes to kinto.py"
       systemd:
         name: xkeysnail
         state: restarted
       become: true
 
-    - name: "Cleanup Kinto.sh: Remove files downloaded by Kinto install script"
+    - name: "Remove files downloaded by Kinto install script"
       file:
         path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
         state: absent
@@ -102,11 +126,3 @@
         - kinto-master
         - kinto.zip
       become: true
-
-    - name: "Configure XFCE: Set custom Kinto compatible keyboard shortcuts in XFCE"
-      command:
-        cmd: "{{ item }}"
-      with_items:
-        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary>Tab" --create --type string --set "cycle_windows_key"
-        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
-      when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
