@@ -43,7 +43,7 @@
       with_items:
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary>Tab" --create --type string --set "cycle_windows_key"
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
-      when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
 - name: Install and Configure Kinto.sh 
   hosts: localhost
@@ -79,7 +79,7 @@
         regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
         replace: '\1\3'
         backup: yes
-      when: ansible_facts['env']['XDG_CURRENT_DESKTOP'] == 'XFCE'
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
     - name: "Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
