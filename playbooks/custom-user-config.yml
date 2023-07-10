@@ -55,6 +55,7 @@
         name: gir1.2-vte-2.91
         state: present
       become: true
+      when: ansible_facts.pkg_mgr == "apt"
 
     - name: "Create a temporary directory for the Kinto install script"
       tempfile:
@@ -67,19 +68,23 @@
         url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
         dest: "{{ tempdir.path }}/install_kinto.sh"
         mode: 0755
+      register: kinto_download_result
+      when: ansible_facts.system == "Linux"
 
     - name: "Run Kinto install script"
       shell: "{{ tempdir.path }}/install_kinto.sh"
       args:
         executable: /bin/bash
+      register: kinto_install_result
+      when: kinto_download_result is success
 
     - name: "Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
       replace:
         path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
         regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
         replace: '\1\3'
-        backup: yes
-      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
+        backup: true
+      when: kinto_install_result is success and ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
     - name: "Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
