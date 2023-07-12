@@ -12,7 +12,7 @@
   connection: local
   gather_facts: false
   tasks:
-  - name: "Create ~/.Xmodmap with custom key mappings"
+  - name: Create ~/.Xmodmap with custom key mappings
     when: 
       - ansible_facts.env.LANGUAGE == 'en_GB:en'
       - ansible_facts.system_vendor == 'GOOGLE'
@@ -30,7 +30,7 @@
       mode: 0644
     register: xmodmap_copy_result
 
-  - name: "Apply custom key mappings with xmodmap"
+  - name: Apply custom key mappings with xmodmap
     when: xmodmap_copy_result.changed
     shell:
       cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
@@ -40,7 +40,7 @@
   connection: local
   gather_facts: false
   tasks:
-    - name: "Set custom Kinto compatible keyboard shortcuts in XFCE"
+    - name: Set custom Kinto compatible keyboard shortcuts in XFCE
       when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
       command:
         cmd: "{{ item }}"
@@ -63,16 +63,16 @@
     - name: Configure XFCE workspace shortcuts
       when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
       block:
-      - name: "Ensure there are 10 workspaces"
+      - name: Ensure there are 10 workspaces
         command:
           cmd: xfconf-query -c xfwm4 -p /general/workspace_count -s 10
 
-      - name: "Execute XFCE4 workspace switching shortcut deletion script"
+      - name: Execute XFCE4 workspace switching shortcut deletion script
         shell: |
           chmod 0744 {{ remove_script_path }}
           {{ remove_script_path }}
 
-      - name: "Execute XFCE4 workspace switching shortcut creation script"
+      - name: Execute XFCE4 workspace switching shortcut creation script
         shell: |
           chmod 0744 {{ create_script_path }}
           {{ create_script_path }}
@@ -83,20 +83,20 @@
   gather_facts: false
   tags: kinto_install
   tasks:
-    - name: "Install Kinto dependencies"
+    - name: Install Kinto dependencies
       when: ansible_facts.pkg_mgr == 'apt'
       apt:
         name: gir1.2-vte-2.91
         state: present
       become: true
 
-    - name: "Create a temporary directory for the Kinto install script"
+    - name: Create a temporary directory for the Kinto install script
       tempfile:
         state: directory
         suffix: _install_kinto
       register: tempdir
 
-    - name: "Download Kinto install script"
+    - name: Download Kinto install script
       when: ansible_facts.system == 'Linux'
       get_url:
         url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
@@ -104,7 +104,7 @@
         mode: 0755
       register: kinto_download_result
 
-    - name: "Run Kinto install script"
+    - name: Run Kinto install script
       when: kinto_download_result is success
       shell: "{{ tempdir.path }}/install_kinto.sh"
       args:
@@ -116,7 +116,7 @@
   connection: local
   gather_facts: false
   tasks:
-    - name: "Remove files downloaded by Kinto install script"
+    - name: Remove files downloaded by Kinto install script
       when: kinto_install_result is success
       file:
         path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
@@ -132,7 +132,7 @@
   gather_facts: false
   tags: kinto_config
   tasks:
-    - name: "Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4"
+    - name: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4
       when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
       replace:
         path: "{{ kinto_config_path }}"
@@ -146,20 +146,20 @@
         - ansible_facts.system_vendor == 'GOOGLE'
         - ansible_facts.os_family == 'Debian'
       block:
-      - name: "Modify general GUI related shortcuts"
+      - name: Modify general GUI related shortcuts
         blockinfile:
           path: "{{ kinto_config_path }}"
           block: "{{ lookup('file', '../snippets/kinto/gui_shortcuts') }}"
           marker: "# {mark}: ANSIBLE MANAGED GENERAL GUI SHORTCUTS"
           insertbefore: '\s*\},\s*\"General GUI\"\s*'
-      - name: "Modify terminal related shortcuts"
+      - name: Modify terminal related shortcuts
         blockinfile:
           path: "{{ kinto_config_path }}"
           block: "{{ lookup('file', '../snippets/kinto/terminal_shortcuts') }}"
           marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
           insertbefore: '\s*\},\s*\"terminals\"\s*'
 
-    - name: "Restart xkeysnail service after making changes to kinto.py"
+    - name: Restart xkeysnail service after making changes to kinto.py
       systemd:
         name: xkeysnail
         state: restarted
