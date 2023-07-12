@@ -13,6 +13,10 @@
   gather_facts: false
   tasks:
   - name: "Create ~/.Xmodmap with custom key mappings"
+    when: 
+      - ansible_facts.env.LANGUAGE == 'en_GB:en'
+      - ansible_facts.system_vendor == 'GOOGLE'
+      - ansible_facts.os_family == 'Debian'
     copy:
       content: |
         keycode 11 = 2 at
@@ -24,16 +28,12 @@
         keycode 108 = Mode_switch Mode_switch Mode_switch Mode_switch
       dest: "/home/{{ ansible_user_id }}/.Xmodmap"
       mode: 0644
-    when: 
-      - ansible_facts.env.LANGUAGE == 'en_GB:en'
-      - ansible_facts.system_vendor == 'GOOGLE'
-      - ansible_facts.os_family == 'Debian'
     register: xmodmap_copy_result
 
   - name: "Apply custom key mappings with xmodmap"
+    when: xmodmap_copy_result.changed
     shell:
       cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
-    when: xmodmap_copy_result.changed
 
 - name: Configure General Keyboard Shortcuts 
   hosts: localhost
@@ -41,6 +41,7 @@
   gather_facts: false
   tasks:
     - name: "Set custom Kinto compatible keyboard shortcuts in XFCE"
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
       command:
         cmd: "{{ item }}"
       with_items:
@@ -48,7 +49,6 @@
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Super>l" --reset
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Primary><Alt>q" --create --type string --set "xflock4"
-      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
 - name: Configure Workspace Switching Shortcuts 
   hosts: localhost
@@ -60,7 +60,9 @@
         remove_script_path: "../scripts/remove_xfce4_workspace_switch_shortcuts.sh"
         create_script_path: "../scripts/create_xfce4_workspace_switch_shortcuts.sh"
 
-    - block:
+    - name: Configure XFCE workspace shortcuts
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
+      block:
       - name: "Ensure there are 10 workspaces"
         command:
           cmd: xfconf-query -c xfwm4 -p /general/workspace_count -s 10
@@ -74,7 +76,6 @@
         shell: |
           chmod 0744 {{ create_script_path }}
           {{ create_script_path }}
-      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
 - name: Install Kinto.sh 
   hosts: localhost
