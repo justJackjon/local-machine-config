@@ -35,7 +35,7 @@
       cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
     when: xmodmap_copy_result.changed
 
-- name: Configure Desktop Shortcuts 
+- name: Configure XFCE4 General Keyboard Shortcuts 
   hosts: localhost
   connection: local
   gather_facts: false
@@ -46,6 +46,8 @@
       with_items:
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary>Tab" --create --type string --set "cycle_windows_key"
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/xfwm4/custom/<Primary><Shift>Tab" --create --type string --set "cycle_reverse_windows_key"
+        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Super>l" --reset
+        - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Primary><Alt>q" --create --type string --set "xflock4"
       when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
 - name: Install and Configure Kinto.sh 
