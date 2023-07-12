@@ -137,7 +137,7 @@
     - name: "Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "{{ kinto_config_path }}"
-        block: "{{ lookup('file', '../snippets/kinto_gui_shortcuts') }}"
+        block: "{{ lookup('file', '../snippets/kinto/gui_shortcuts') }}"
         marker: "# {mark}: ANSIBLE MANAGED GENERAL GUI SHORTCUTS"
         insertbefore: '\s*\},\s*\"General GUI\"\s*'
       when: 
@@ -148,7 +148,7 @@
     - name: "Modify terminal related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "{{ kinto_config_path }}"
-        block: "{{ lookup('file', '../snippets/kinto_terminal_shortcuts') }}"
+        block: "{{ lookup('file', '../snippets/kinto/terminal_shortcuts') }}"
         marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
         insertbefore: '\s*\},\s*\"terminals\"\s*'
       when: 
