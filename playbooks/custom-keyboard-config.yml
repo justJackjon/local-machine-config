@@ -35,7 +35,7 @@
       cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
     when: xmodmap_copy_result.changed
 
-- name: Configure XFCE4 General Keyboard Shortcuts 
+- name: Configure General Keyboard Shortcuts 
   hosts: localhost
   connection: local
   gather_facts: false
