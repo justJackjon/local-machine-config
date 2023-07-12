@@ -1,0 +1,41 @@
+# NOTE: Kinto swaps the 'Right Alt' and 'Right Ctrl' keys around to reflect the, 'Spacebar -> Command -> Option', layout for UK Macs.
+
+# Map 'Left Ctrl + 3' to 'Right Alt + 3' to produce the numbersign (#) symbol:
+# NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebbar, we will replicate the same.
+K("LC-KEY_3"): K("RAlt-KEY_3"),
+
+# Map 'Ctrl + Alt + H/J/K/L' to 'Super + Alt + H/J/K/L' (Switching to numbered desktops)
+K("RC-M-H"): K("Super-LC-H"),
+K("RC-M-J"): K("Super-LC-J"),
+K("RC-M-K"): K("Super-LC-K"),
+K("RC-M-L"): K("Super-LC-L"),
+
+# Map 'Ctrl + Alt + 4..9' to 'Super + Alt + 4..9' (Switching to numbered desktops)
+K("RC-M-KEY_4"): K("Super-LC-KEY_4"),
+K("RC-M-KEY_5"): K("Super-LC-KEY_5"),
+K("RC-M-KEY_6"): K("Super-LC-KEY_6"),
+K("RC-M-KEY_7"): K("Super-LC-KEY_7"),
+K("RC-M-KEY_8"): K("Super-LC-KEY_8"),
+K("RC-M-KEY_9"): K("Super-LC-KEY_9"),
+
+# Map 'Ctrl + Alt + Left/Right' to 'Super + Alt + Left/Right' (Switching to adjacent desktops)
+K("RC-M-Left"): K("Super-LC-Left"),
+K("RC-M-Right"): K("Super-LC-Right"),
+
+# Map 'Ctrl + Alt + H/J/K/L' to 'Super + Alt + H/J/K/L' (Move the active window to a numbered desktop)
+K("RC-LShift-M-H"): K("Super-LShift-LC-H"),
+K("RC-LShift-M-J"): K("Super-LShift-LC-J"),
+K("RC-LShift-M-K"): K("Super-LShift-LC-K"),
+K("RC-LShift-M-L"): K("Super-LShift-LC-L"),
+
+# Map 'Ctrl + Alt + 4..9' to 'Super + Alt + 4..9' (Move the active window to a numbered desktop)
+K("RC-LShift-M-KEY_4"): K("Super-LShift-LC-KEY_4"),
+K("RC-LShift-M-KEY_5"): K("Super-LShift-LC-KEY_5"),
+K("RC-LShift-M-KEY_6"): K("Super-LShift-LC-KEY_6"),
+K("RC-LShift-M-KEY_7"): K("Super-LShift-LC-KEY_7"),
+K("RC-LShift-M-KEY_8"): K("Super-LShift-LC-KEY_8"),
+K("RC-LShift-M-KEY_9"): K("Super-LShift-LC-KEY_9"),
+
+# Map 'Ctrl + Alt + Left/Right' to 'Super + Alt + Left/Right' (Move the active window to the adjacent desktop)
+K("RC-LShift-M-Left"): K("Super-LShift-LC-Left"),
+K("RC-LShift-M-Right"): K("Super-LShift-LC-Right"),

@@ -137,12 +137,7 @@
     - name: "Modify general GUI related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "{{ kinto_config_path }}"
-        block: |
-          # Map 'Left Alt + 3' to 'Right Alt + 3' to produce the numbersign (#) symbol:
-          # NOTE: For general GUIs, Kinto swaps 'Left Ctrl' and 'Left Alt' around on Chromebooks, so this needs to be accounted for in any 'General GUI' keyboard remaps.
-          # NOTE: Kinto also swaps the 'Right Alt' and 'Right Ctrl' keys around to reflect the, 'Spacebar -> Command -> Option', layout for UK Macs.
-          # NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebbar, we will replicate the same.
-          K("LAlt-KEY_3"): K("RAlt-KEY_3"),
+        block: "{{ lookup('file', '../snippets/kinto_gui_shortcuts') }}"
         marker: "# {mark}: ANSIBLE MANAGED GENERAL GUI SHORTCUTS"
         insertbefore: '\s*\},\s*\"General GUI\"\s*'
       when: 
@@ -153,11 +148,7 @@
     - name: "Modify terminal related shortcuts for en_GB Chromebook keyboard layouts in kinto.py"
       blockinfile:
         path: "{{ kinto_config_path }}"
-        block: |
-          # Map 'Left Ctrl + 3' to 'Right Alt + 3' to produce the numbersign (#) symbol:
-          # NOTE: Kinto swaps the 'Right Alt' and 'Right Ctrl' keys around to reflect the, 'Spacebar -> Command -> Option', layout for UK Macs.
-          # NOTE: In a Mac layout, 'Option + 3' produces the numbersign. Since the option key is the second physical key left of the spacebbar, we will replicate the same.
-          K("LC-KEY_3"): K("RAlt-KEY_3"),
+        block: "{{ lookup('file', '../snippets/kinto_terminal_shortcuts') }}"
         marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
         insertbefore: '\s*\},\s*\"terminals\"\s*'
       when: 
