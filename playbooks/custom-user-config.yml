@@ -50,6 +50,49 @@
         - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Primary><Alt>q" --create --type string --set "xflock4"
       when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
 
+- name: Configure XFCE4 Workspace Switching Shortcuts 
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Create a temporary directory for the scripts"
+      tempfile:
+        state: directory
+        suffix: _xfce4_shortcuts
+      register: tempdir
+
+    - name: "Ensure there are 10 workspaces"
+      command:
+        cmd: xfconf-query -c xfwm4 -p /general/workspace_count -s 10
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
+
+    - name: "Copy XFCE4 workspace switching shortcut deletion script"
+      copy:
+        src: "../scripts/remove_xfce4_workspace_switch_shortcuts.sh"
+        dest: "{{ tempdir.path }}/remove_xfce4_workspace_switch_shortcuts.sh"
+        mode: 0744
+
+    - name: "Execute XFCE4 workspace switching shortcut deletion script"
+      command:
+        cmd: "{{ tempdir.path }}/remove_xfce4_workspace_switch_shortcuts.sh"
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
+
+    - name: "Copy XFCE4 workspace switching shortcut creation script"
+      copy:
+        src: "../scripts/create_xfce4_workspace_switch_shortcuts.sh"
+        dest: "{{ tempdir.path }}/create_xfce4_workspace_switch_shortcuts.sh"
+        mode: 0744
+
+    - name: "Execute XFCE4 workspace switching shortcut creation script"
+      command:
+        cmd: "{{ tempdir.path }}/create_xfce4_workspace_switch_shortcuts.sh"
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
+
+    - name: Cleanup temporary scripts
+      file:
+        path: "{{ tempdir.path }}"
+        state: absent
+
 - name: Install and Configure Kinto.sh 
   hosts: localhost
   connection: local
