@@ -1,0 +1,113 @@
+- name: "Install + Configure Vim"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: Install SpaceVim and Nerd Font on Xubuntu
+      when: ansible_os_family == "Debian"
+      block:
+        - name: Install dependencies
+          apt:
+            name:
+              - git
+              - curl
+              - fonts-powerline
+              - unzip
+            state: present
+          become: true
+
+        - name: Install SpaceVim
+          shell: curl -sLf https://spacevim.org/install.sh | bash
+          args:
+            creates: "~/.SpaceVim"
+
+        - name: Install CaskaydiaCove Nerd Font
+          get_url:
+            url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.zip
+            dest: "/tmp/CascadiaCode.zip"
+          register: download
+          # NOTE: Check mode is set to false, as the following unarchive step will fail otherwise in --check mode.
+          check_mode: false
+
+        - name: Unzip font
+          unarchive:
+            src: "/tmp/CascadiaCode.zip"
+            dest: "~/.local/share/fonts/"
+            remote_src: yes
+          when: download.changed
+
+        - name: Update font cache
+          command: fc-cache -fv
+          args:
+            warn: false
+          when: download.changed
+
+    - name: Configure SpaceVim on Xubuntu
+      when: ansible_os_family == "Debian"
+      block:
+        - name: Install Dracula theme for SpaceVim
+          shell: git clone https://github.com/dracula/vim.git ~/.SpaceVim/bundle/dracula
+          args:
+            creates: "~/.SpaceVim/bundle/dracula"
+
+        - name: Configure Dracula theme for SpaceVim
+          copy:
+            content: |
+              [options]
+              colorscheme = "dracula"
+            dest: "~/.SpaceVim.d/init.toml"
+
+    - name: Install SpaceVim and Nerd Font on Windows (MSYS2)
+      when: ansible_os_family == "Windows"
+      block:
+        - name: Check if MSYS2 is installed
+          stat:
+            path: 'C:\msys64\usr\bin\pacman'
+          register: msys2
+
+        - name: Fail if MSYS2 is not installed
+          fail:
+            msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
+          when: not msys2.stat.exists
+
+        - name: Install dependencies
+          shell: pacman -S --noconfirm git curl unzip
+          args:
+            executable: 'C:\msys64\usr\bin\bash'
+
+        - name: Install SpaceVim
+          shell: curl -sLf https://spacevim.org/install.sh | bash
+          args:
+            executable: 'C:\msys64\usr\bin\bash'
+            creates: "~/AppData/Local/SpaceVim"
+
+        - name: Install CaskaydiaCove Nerd Font
+          get_url:
+            url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.zip
+            dest: 'C:\msys64\home\{{ ansible_user_id }}\CascadiaCode.zip'
+          register: download
+          # NOTE: Check mode is set to false, as the following unarchive step will fail otherwise in --check mode.
+          check_mode: false
+
+        - name: Unzip font
+          unarchive:
+            src: 'C:\msys64\home\{{ ansible_user_id }}\CascadiaCode.zip'
+            dest: 'C:\msys64\home\{{ ansible_user_id }}\.local\share\fonts'
+            creates: 'C:\msys64\home\{{ ansible_user_id }}\.local\share\fonts\CaskaydiaCove Nerd Font Complete.ttf'
+          when: download.changed
+
+    - name: Configure SpaceVim on Windows (MSYS2)
+      when: ansible_os_family == "Windows"
+      block:
+        - name: Install Dracula theme for SpaceVim
+          shell: git clone https://github.com/dracula/vim.git ~/AppData/Local/SpaceVim/bundle/dracula
+          args:
+            executable: 'C:\msys64\usr\bin\bash'
+            creates: "~/AppData/Local/SpaceVim/bundle/dracula"
+
+        - name: Configure Dracula theme for SpaceVim
+          copy:
+            content: |
+              [options]
+              colorscheme = "dracula"
+            dest: "~/AppData/Local/SpaceVim.d/init.toml"
