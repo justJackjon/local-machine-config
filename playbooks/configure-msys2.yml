@@ -1,0 +1,120 @@
+# NOTE: This playbook requires Ansible to be run locally on a Windows machine. 
+# To use Ansible on Windows, the easiest way is to have MSYS2 already installed (so this is a chicken and egg scenario, sorry!). 
+# Therefore, before running this playbook, you either need to manually install MSYS2 and Ansible, or, run a pre-installation script. 
+# 
+# If you want to do this manually, here are the steps:
+# a) Install Chocolatey by running the following command in PowerShell as an administrator:
+#    # SEE: https://chocolatey.org/install
+#    Set-ExecutionPolicy Bypass -Scope Process -Force;
+#    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
+#    iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+# b) Install MSYS2 using Chocolatey by running the following command in PowerShell as an administrator:
+#    choco install msys2
+# c) Open MSYS2 terminal and install Ansible by running the following commands:
+#    pacman -Syu
+#    pacman -S ansible python-pip
+#    pip install resolvelib
+#    ansible-galaxy collection install ansible.windows
+# d) Run this playbook in MSYS2 to ensure everything is set up correctly and configured.
+#    You may have to locate the executable. Depending upon the method of installation you can try /c/msys64 or /c/tools.
+#    Alternatively, you can try the following command: `find /c -name "mingw64.exe" -print -quit 2>/dev/null`.
+
+- name: Configure MSYS2 and Install Dracula Theme on Windows
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: Check if playbook is run with administrative privileges
+      when: ansible_env.OS == 'Windows_NT'
+      block:
+        - name: Attempt to create a file in a system directory
+          file:
+            path: "C:/Windows/Temp/test"
+            state: touch
+          register: admin_check
+          ignore_errors: true
+
+    - name: Fail if playbook is not run with administrative privileges
+      when: admin_check.failed
+      fail:
+        msg: "This playbook must be run with administrative privileges. Please re-run the playbook as an administrator."
+
+    - name: Configure MSYS2
+      when: ansible_env.OS == 'Windows_NT'
+      block:
+        - name: Update nsswitch.conf file
+          lineinfile:
+            path: '/etc/nsswitch.conf'
+            line: 'db_home: windows'
+
+        - name: Update mingw64.ini file
+          lineinfile:
+            path: '/mingw64.ini'
+            regexp: '^#MSYS2_PATH_TYPE=inherit'
+            line: 'MSYS2_PATH_TYPE=inherit'
+
+        - name: Locate mingw64.exe
+          shell: 'find /c -name "mingw64.exe" -print -quit 2>/dev/null'
+          register: found_mingw64_path
+
+        - name: Set mingw64 path as a fact
+          set_fact:
+            mingw64_path: "{{ found_mingw64_path.stdout_lines[0] }}"
+
+    - name: Set up local configuration files if none are present
+      when: ansible_env.OS == 'Windows_NT'
+      block:
+        - name: Check if .bash_profile exists
+          stat:
+            path: '~/.bash_profile'
+          register: bash_profile_exists
+
+        - name: Create .bash_profile
+          when: not bash_profile_exists.stat.exists
+          copy:
+            content: |
+              if [ -f ~/.bashrc ]; then
+                source ~/.bashrc
+              fi
+            dest: '~/.bash_profile'
+
+        - name: Check if .bashrc exists
+          stat:
+            path: '~/.bashrc'
+          register: bashrc_exists
+
+        - name: Create .bashrc
+          when: not bashrc_exists.stat.exists
+          copy:
+            content: ''
+            dest: '~/.bashrc'
+
+    - name: Check if Dracula theme is installed
+      shell: 'grep -q "Dracula" ~/.minttyrc'
+      register: dracula_installed
+      ignore_errors: true
+
+    - name: Install Dracula Theme for MINTTY
+      when: dracula_installed.rc != 0
+      block:
+        # We're using mingw64.exe to launch a new shell because we need access to the full Windows PATH.
+        # This is necessary for tasks that require git, as git might not be in the MSYS2 PATH by default (until after the completion of this playbook!).
+        - name: Check if Git is installed
+          shell: '{{ mingw64_path }} -c "git --version"'
+          register: git_installed
+          ignore_errors: true
+
+        - name: Fail if Git is not installed
+          when: git_installed.rc != 0
+          fail:
+            msg: "Git is not installed. Please install Git before running this playbook."
+
+        - name: Clone Dracula MINTTY theme repository
+          shell: '{{ mingw64_path }} -c "git clone https://github.com/dracula/mintty.git ~/mintty"'
+
+        - name: Append Dracula theme configuration to .minttyrc
+          shell: '{{ mingw64_path }} -c "cat ~/mintty/dracula.mintty >> ~/.minttyrc"'
+
+        - name: Cleanup Dracula MINTTY theme repository
+          shell: '{{ mingw64_path }} -c "rm -rf ~/mintty"'
+
