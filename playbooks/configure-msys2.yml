@@ -107,7 +107,7 @@
           shell: '"{{ found_git_path.stdout }}" clone https://github.com/dracula/mintty.git /c/Users/{{ ansible_user_id }}/mintty'
 
         - name: Append Dracula theme configuration to .minttyrc
-          shell: 'cat /c/Users/{{ ansible_user_id }}/mintty/dracula.mintty >> /c/Users/{{ ansible_user_id }}/.minttyrc'
+          shell: 'cat /c/Users/{{ ansible_user_id }}/mintty/dracula.minttyrc >> /c/Users/{{ ansible_user_id }}/.minttyrc'
 
         - name: Cleanup Dracula MINTTY theme repository
           shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty' 
