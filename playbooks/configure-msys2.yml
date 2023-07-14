@@ -53,14 +53,6 @@
             regexp: '^#MSYS2_PATH_TYPE=inherit'
             line: 'MSYS2_PATH_TYPE=inherit'
 
-        - name: Locate mingw64.exe
-          shell: 'find /c -name "mingw64.exe" -print -quit 2>/dev/null'
-          register: found_mingw64_path
-
-        - name: Set mingw64 path as a fact
-          set_fact:
-            mingw64_path: "{{ found_mingw64_path.stdout_lines[0] }}"
-
     - name: Set up local configuration files if none are present
       when: ansible_env.OS == 'Windows_NT'
       block:
