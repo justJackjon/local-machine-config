@@ -82,12 +82,14 @@
             dest: '~/.bashrc'
 
     - name: Check if Dracula theme is installed
+      tags: dracula_theme
       stat:
         path: '/usr/share/mintty/themes/dracula'
       register: dracula_installed
 
     - name: Install Dracula Theme for MINTTY
       when: not dracula_installed.stat.exists
+      tags: dracula_theme
       block:
         # NOTE: Whilst the 'Update mingw64.ini file' task in this playbook is responsible for ensuring we inherit from the full Windows PATH on future executions of MSYS2,
         # at this point in the execution flow, we won't have access to the full Windows PATH. Therefore, we must locate the git executable before executing it.
