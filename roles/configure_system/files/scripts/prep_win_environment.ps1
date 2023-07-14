@@ -1,4 +1,4 @@
-# NOTE: This script must be run with Administrator privileges
+# NOTE: This script must be run with Administrator privileges.
 
 # Check if Chocolatey is installed
 if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
@@ -9,9 +9,12 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
 }
 
 # Check if MSYS2 is installed
-if (-not (Test-Path -Path "C:\tools\msys64" -or Test-Path -Path "C:\msys64")) {
+$msys2Paths = @("C:\tools\msys64", "C:\msys64")
+$msys2Installed = $msys2Paths | ForEach-Object { if (Test-Path -Path $_) { $true; break } }
+
+if (-not $msys2Installed) {
     # Install MSYS2
-    choco install msys2
+    choco install msys2 -y
 }
 
 # Open MSYS2 terminal and install Ansible
@@ -25,3 +28,11 @@ if (-not $ansibleCheck) {
     & $msys2Shell -lc "pacman -Syu --noconfirm"
     & $msys2Shell -lc "pacman -S --noconfirm ansible"
 }
+
+# Create a shortcut to the MSYS2 terminal on the desktop
+$WshShell = New-Object -comObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("$Home\Desktop\MSYS2 Terminal.lnk")
+$Shortcut.TargetPath = Join-Path -Path $msys2Path -ChildPath "mingw64.exe"
+$Shortcut.Save()
+
+Write-Host "MSYS2 and Ansible have been installed successfully. A shortcut to the MSYS2 terminal has been created on your desktop. You can now use this terminal to run Ansible playbooks."
