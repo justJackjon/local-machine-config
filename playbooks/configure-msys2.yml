@@ -34,10 +34,10 @@
           register: admin_check
           ignore_errors: true
 
-    - name: Fail if playbook is not run with administrative privileges
-      when: admin_check.failed
-      fail:
-        msg: "This playbook must be run with administrative privileges. Please re-run the playbook as an administrator."
+        - name: Fail if playbook is not run with administrative privileges
+          fail:
+            msg: "This playbook must be run with administrative privileges. Please re-run the playbook as an administrator."
+          when: admin_check.failed
 
     - name: Configure MSYS2
       when: ansible_env.OS == 'Windows_NT'
