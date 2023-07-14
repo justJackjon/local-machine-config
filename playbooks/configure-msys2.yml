@@ -90,31 +90,32 @@
             dest: '~/.bashrc'
 
     - name: Check if Dracula theme is installed
-      shell: 'grep -q "Dracula" ~/.minttyrc'
+      shell: 'grep -iq "dracula" ~/.minttyrc'
       register: dracula_installed
       ignore_errors: true
 
     - name: Install Dracula Theme for MINTTY
       when: dracula_installed.rc != 0
       block:
-        # We're using mingw64.exe to launch a new shell because we need access to the full Windows PATH.
-        # This is necessary for tasks that require git, as git might not be in the MSYS2 PATH by default (until after the completion of this playbook!).
-        - name: Check if Git is installed
-          shell: '{{ mingw64_path }} -c "git --version"'
-          register: git_installed
+        # NOTE: Whilst the 'Update mingw64.ini file' task in this playbook is responsible for ensuring we inherit from the full Windows PATH on future executions of MSYS2,
+        # at this point in the execution flow, we won't have access to the full Windows PATH. Therefore, we must locate the git executable before executing it.
+        - name: Find Git executable
+          shell: 'find /c/Program\ Files/Git /c/Users/{{ ansible_user_id }}/AppData/Local/Programs/Git -name "git.exe" -print -quit 2>/dev/null'
+          register: found_git_path
           ignore_errors: true
 
-        - name: Fail if Git is not installed
-          when: git_installed.rc != 0
+        - name: Fail if Git is not found
           fail:
-            msg: "Git is not installed. Please install Git before running this playbook."
+            msg: "Git is not found. Please install Git before running this playbook."
+          when: found_git_path.stdout == ""
 
+        # NOTE: Whilst the 'Update nsswitch.conf' task in this playbook is responsible for updating the default `home` location, at this point in the execution flow,
+        # the value of the tilde `~` operator will not be updated to reflect the new value yet. Therefore, we will use the full path to the home directory instead.
         - name: Clone Dracula MINTTY theme repository
-          shell: '{{ mingw64_path }} -c "git clone https://github.com/dracula/mintty.git ~/mintty"'
+          shell: '{{ found_git_path.stdout }} clone https://github.com/dracula/mintty.git /c/Users/{{ ansible_user_id }}/mintty'
 
         - name: Append Dracula theme configuration to .minttyrc
-          shell: '{{ mingw64_path }} -c "cat ~/mintty/dracula.mintty >> ~/.minttyrc"'
+          shell: 'cat /c/Users/{{ ansible_user_id }}/mintty/dracula.mintty >> /c/Users/{{ ansible_user_id }}/.minttyrc'
 
         - name: Cleanup Dracula MINTTY theme repository
-          shell: '{{ mingw64_path }} -c "rm -rf ~/mintty"'
-
+          shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty' 
