@@ -12,9 +12,7 @@
 #    choco install msys2
 # c) Open MSYS2 terminal and install Ansible by running the following commands:
 #    pacman -Syu
-#    pacman -S ansible python-pip
-#    pip install resolvelib
-#    ansible-galaxy collection install ansible.windows
+#    pacman -S ansible
 # d) Run this playbook in MSYS2 to ensure everything is set up correctly and configured.
 #    You may have to locate the executable. Depending upon the method of installation you can try /c/msys64 or /c/tools.
 #    Alternatively, you can try the following command: `find /c -name "mingw64.exe" -print -quit 2>/dev/null`.
