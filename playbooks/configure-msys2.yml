@@ -1,7 +1,10 @@
 # NOTE: This playbook requires Ansible to be run locally on a Windows machine. 
 # To use Ansible on Windows, the easiest way is to have MSYS2 already installed (so this is a chicken and egg scenario, sorry!). 
-# Therefore, before running this playbook, you either need to manually install MSYS2 and Ansible, or, run a pre-installation script. 
-# 
+# Therefore, before running this playbook, you either need to manually install MSYS2 and Ansible, or, run the preo_win_environment.ps1 script. 
+#
+# IMPORTANT: If you would like to automate the steps below to set up your windows localhost environment,
+# you can run the <REPOSITORY_ROOT>/scripts/prep_win_environment.ps1 script from an **elevated** PowerShell.
+#
 # If you want to do this manually, here are the steps:
 # a) Install Chocolatey by running the following command in PowerShell as an administrator:
 #    # SEE: https://chocolatey.org/install
