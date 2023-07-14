@@ -82,12 +82,12 @@
             dest: '~/.bashrc'
 
     - name: Check if Dracula theme is installed
-      shell: 'grep -iq "dracula" ~/.minttyrc'
+      stat:
+        path: '/usr/share/mintty/themes/dracula'
       register: dracula_installed
-      ignore_errors: true
 
     - name: Install Dracula Theme for MINTTY
-      when: dracula_installed.rc != 0
+      when: not dracula_installed.stat.exists
       block:
         # NOTE: Whilst the 'Update mingw64.ini file' task in this playbook is responsible for ensuring we inherit from the full Windows PATH on future executions of MSYS2,
         # at this point in the execution flow, we won't have access to the full Windows PATH. Therefore, we must locate the git executable before executing it.
@@ -106,9 +106,16 @@
         - name: Clone Dracula MINTTY theme repository
           shell: '"{{ found_git_path.stdout }}" clone https://github.com/dracula/mintty.git /c/Users/{{ ansible_user_id }}/mintty'
 
-        - name: Append Dracula theme configuration to .minttyrc
-          shell: 'cat /c/Users/{{ ansible_user_id }}/mintty/dracula.minttyrc >> /c/Users/{{ ansible_user_id }}/.minttyrc'
-
+        - name: Copy Dracula theme to Mintty themes directory
+          copy:
+            src: '/c/Users/{{ ansible_user_id }}/mintty/dracula.minttyrc'
+            dest: '/usr/share/mintty/themes/dracula'
       always:
         - name: Cleanup Dracula MINTTY theme repository
-          shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty' 
+          shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty'
+
+    - name: Update .minttyrc to use Dracula theme
+      lineinfile:
+        path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+        regexp: '^ThemeFile='
+        line: 'ThemeFile=dracula'
