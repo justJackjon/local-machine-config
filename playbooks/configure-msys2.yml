@@ -104,7 +104,7 @@
         # NOTE: Whilst the 'Update nsswitch.conf' task in this playbook is responsible for updating the default `home` location, at this point in the execution flow,
         # the value of the tilde `~` operator will not be updated to reflect the new value yet. Therefore, we will use the full path to the home directory instead.
         - name: Clone Dracula MINTTY theme repository
-          shell: '{{ found_git_path.stdout }} clone https://github.com/dracula/mintty.git /c/Users/{{ ansible_user_id }}/mintty'
+          shell: '"{{ found_git_path.stdout }}" clone https://github.com/dracula/mintty.git /c/Users/{{ ansible_user_id }}/mintty'
 
         - name: Append Dracula theme configuration to .minttyrc
           shell: 'cat /c/Users/{{ ansible_user_id }}/mintty/dracula.mintty >> /c/Users/{{ ansible_user_id }}/.minttyrc'
