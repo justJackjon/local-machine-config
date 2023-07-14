@@ -109,5 +109,6 @@
         - name: Append Dracula theme configuration to .minttyrc
           shell: 'cat /c/Users/{{ ansible_user_id }}/mintty/dracula.minttyrc >> /c/Users/{{ ansible_user_id }}/.minttyrc'
 
+      always:
         - name: Cleanup Dracula MINTTY theme repository
           shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty' 
