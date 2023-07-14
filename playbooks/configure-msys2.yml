@@ -116,8 +116,16 @@
         - name: Cleanup Dracula MINTTY theme repository
           shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty'
 
-    - name: Update .minttyrc to use Dracula theme
-      lineinfile:
-        path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
-        regexp: '^ThemeFile='
-        line: 'ThemeFile=dracula'
+    - name: Select Dracula as the active theme for MINTTY
+      tags: dracula_theme
+      block:
+        - name: Ensure .minttyrc exists
+          file:
+            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            state: touch
+
+        - name: Update .minttyrc to use Dracula theme
+          lineinfile:
+            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            regexp: '^ThemeFile='
+            line: 'ThemeFile=dracula'
