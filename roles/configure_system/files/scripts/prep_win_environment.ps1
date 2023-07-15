@@ -6,6 +6,8 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
     Set-ExecutionPolicy Bypass -Scope Process -Force
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
     iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+} else {
+    Write-Host "Chocolatey is already installed."
 }
 
 # Check if MSYS2 is installed
@@ -15,6 +17,8 @@ $msys2Installed = $msys2Paths | ForEach-Object { if (Test-Path -Path $_) { $true
 if (-not $msys2Installed) {
     # Install MSYS2
     choco install msys2 -y
+} else {
+    Write-Host "MSYS2 is already installed."
 }
 
 # Open MSYS2 terminal and install Ansible
@@ -27,6 +31,8 @@ if (-not $ansibleCheck) {
     # Install Ansible
     & $msys2Shell -lc "pacman -Syu --noconfirm"
     & $msys2Shell -lc "pacman -S --noconfirm ansible"
+} else {
+    Write-Host "Ansible is already installed."
 }
 
 # Create a shortcut to the MSYS2 terminal on the desktop
