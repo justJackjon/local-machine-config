@@ -12,7 +12,14 @@ if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
 
 # Check if MSYS2 is installed
 $msys2Paths = @("C:\tools\msys64", "C:\msys64")
-$msys2Installed = $msys2Paths | ForEach-Object { if (Test-Path -Path $_) { $true; break } }
+$msys2Installed = $false
+
+ForEach ($path in $msys2Paths) {
+    if (Test-Path -Path $path) {
+        $msys2Installed = $true
+        break
+    }
+}
 
 if (-not $msys2Installed) {
     # Install MSYS2
@@ -27,6 +34,7 @@ $msys2Shell = Join-Path -Path $msys2Path -ChildPath "usr\bin\bash.exe"
 
 # Check if Ansible is installed
 $ansibleCheck = & $msys2Shell -lc "command -v ansible-playbook"
+
 if (-not $ansibleCheck) {
     # Install Ansible
     & $msys2Shell -lc "pacman -Syu --noconfirm"
