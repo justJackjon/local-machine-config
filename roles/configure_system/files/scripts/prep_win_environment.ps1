@@ -49,5 +49,5 @@ $shortcut = $shell.CreateShortcut("C:\Users\Public\Desktop\MSYS2 Terminal.lnk")
 $shortcut.TargetPath = Join-Path -Path $msys2Path -ChildPath "mingw64.exe"
 $shortcut.Save()
 
-Write-Host "`n`nMSYS2 and Ansible are installed. A shortcut to the MSYS2 terminal has been created on your desktop."
-Write-Host "You can now use the MSYS2 terminal to run Ansible playbooks.`n"
+Write-Host "`n`nMSYS2 and Ansible are installed. A shortcut to the MSYS2 terminal has been created on your desktop." -ForegroundColor Green
+Write-Host "You can now use the MSYS2 terminal to run Ansible playbooks.`n" -ForegroundColor Green
