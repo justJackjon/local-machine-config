@@ -43,10 +43,11 @@ if (-not $ansibleCheck) {
     Write-Host "Ansible is already installed."
 }
 
-# Create a shortcut to the MSYS2 terminal on the desktop
-$WshShell = New-Object -comObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("$Home\Desktop\MSYS2 Terminal.lnk")
-$Shortcut.TargetPath = Join-Path -Path $msys2Path -ChildPath "mingw64.exe"
-$Shortcut.Save()
+# Create a shortcut to the MSYS2 terminal on the public desktop
+$shell = New-Object -COM WScript.Shell
+$shortcut = $shell.CreateShortcut("C:\Users\Public\Desktop\MSYS2 Terminal.lnk")
+$shortcut.TargetPath = Join-Path -Path $msys2Path -ChildPath "mingw64.exe"
+$shortcut.Save()
 
-Write-Host "MSYS2 and Ansible have been installed successfully. A shortcut to the MSYS2 terminal has been created on your desktop. You can now use this terminal to run Ansible playbooks."
+Write-Host "`n`nMSYS2 and Ansible are installed. A shortcut to the MSYS2 terminal has been created on your desktop."
+Write-Host "You can now use the MSYS2 terminal to run Ansible playbooks.`n"
