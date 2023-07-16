@@ -62,13 +62,17 @@
       block:
         - name: Check if MSYS2 is installed
           stat:
-            path: 'C:\msys64\usr\bin\pacman'
+            path: "{{ item }}"
+          loop:
+            - '/c/msys64/mingw64.exe'
+            - '/c/tools/msys64/mingw64.exe'
           register: msys2
+          failed_when: msys2.results | selectattr('stat.exists', 'equalto', true) | list | length == 0
 
         - name: Fail if MSYS2 is not installed
           fail:
             msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
-          when: not msys2.stat.exists
+          when: msys2 | failed
 
         - name: Install dependencies
           shell: pacman -S --noconfirm git curl unzip
