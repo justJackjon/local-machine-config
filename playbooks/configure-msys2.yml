@@ -82,42 +82,38 @@
             content: ''
             dest: '~/.bashrc'
 
-    - name: Check if Dracula theme is installed
-      tags: dracula_theme
-      stat:
-        path: '/usr/share/mintty/themes/dracula'
-      register: dracula_installed
-
-    - name: Install Dracula Theme for MINTTY
-      when: not dracula_installed.stat.exists
-      tags: dracula_theme
+    - name: Install Caskaydia Cove Nerd Font
+      when: ansible_env.OS == 'Windows_NT'
       block:
-        # NOTE: Whilst the 'Update mingw64.ini file' task in this playbook is responsible for ensuring we inherit from the full Windows PATH on future executions of MSYS2,
-        # at this point in the execution flow, we won't have access to the full Windows PATH. Therefore, we must locate the git executable before executing it.
-        - name: Find Git executable
-          shell: 'find /c/Program\ Files/Git /c/Users/{{ ansible_user_id }}/AppData/Local/Programs/Git -name "git.exe" -print -quit 2>/dev/null'
-          register: found_git_path
-          ignore_errors: true
+        - name: Download Caskaydia Cove Nerd Font
+          get_url:
+            url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.zip'
+            dest: '/tmp/CascadiaCode.zip'
 
-        - name: Fail if Git is not found
-          fail:
-            msg: "Git is not found. Please install Git before running this playbook."
-          when: found_git_path.stdout == ""
+        - name: Ensure unzip package is installed
+          pacman:
+            name: unzip
+            state: present
 
-        # NOTE: Whilst the 'Update nsswitch.conf' task in this playbook is responsible for updating the default `home` location, at this point in the execution flow,
-        # the value of the tilde `~` operator will not be updated to reflect the new value yet. Therefore, we will use the full path to the home directory instead.
-        - name: Clone Dracula MINTTY theme repository
-          shell: '"{{ found_git_path.stdout }}" clone https://github.com/dracula/mintty.git /c/Users/{{ ansible_user_id }}/mintty'
+        - name: Unzip archived font files
+          unarchive:
+            src: '/tmp/CascadiaCode.zip'
+            dest: '/usr/share/fonts'
 
-        - name: Copy Dracula theme to Mintty themes directory
-          copy:
-            src: '/c/Users/{{ ansible_user_id }}/mintty/dracula.minttyrc'
-            dest: '/usr/share/mintty/themes/dracula'
-      always:
-        - name: Cleanup Dracula MINTTY theme repository
-          shell: 'rm -rf /c/Users/{{ ansible_user_id }}/mintty'
+        - name: Install fonts using PowerShell
+          shell: >
+            powershell.exe -Command "
+            $fontsFolder = (New-Object -ComObject Shell.Application).Namespace(0x14)
+            Get-ChildItem -Path '/usr/share/fonts/*.ttf' | ForEach-Object {
+              $fontsFolder.CopyHere($_.FullName)
+            }"
 
-    - name: Select Dracula as the active theme for MINTTY
+        - name: Update .minttyrc to use Nerd Font
+          lineinfile:
+            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            regexp: '^Font='
+            line: 'Font=CascadiaCode'
+    
       tags: dracula_theme
       block:
         - name: Ensure .minttyrc exists
