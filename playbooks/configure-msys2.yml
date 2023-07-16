@@ -106,7 +106,7 @@
             patterns: '*.ttf'
           register: ttf_files
 
-        - name: 'Ensure a /use/share/fonts directory exists'
+        - name: 'Ensure a /usr/share/fonts directory exists'
           file:
             path: /usr/share/fonts
             state: directory
