@@ -93,7 +93,7 @@
         - name: Unzip archived font files
           unarchive:
             src: '/tmp/CascadiaCode.tar.xz'
-            dest: '/tmp'
+            dest: '/tmp/CascadiaCode'
 
         - name: Find .ttf files
           find:
