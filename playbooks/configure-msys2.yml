@@ -20,7 +20,7 @@
 #    You may have to locate the executable. Depending upon the method of installation you can try /c/msys64 or /c/tools.
 #    Alternatively, you can try the following command: `find /c -name "mingw64.exe" -print -quit 2>/dev/null`.
 
-- name: Configure MSYS2 and Install Dracula Theme on Windows
+- name: Configure MSYS2 on Windows
   hosts: localhost
   connection: local
   gather_facts: true
