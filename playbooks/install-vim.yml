@@ -58,7 +58,7 @@
             dest: "~/.SpaceVim.d/init.toml"
 
     - name: Install SpaceVim and Nerd Font on Windows (MSYS2)
-      when: ansible_os_family == "Windows"
+      when: ansible_env.OS == 'Windows_NT'
       block:
         - name: Check if MSYS2 is installed
           stat:
@@ -97,7 +97,7 @@
           when: download.changed
 
     - name: Configure SpaceVim on Windows (MSYS2)
-      when: ansible_os_family == "Windows"
+      when: ansible_env.OS == 'Windows_NT'
       block:
         - name: Install Dracula theme for SpaceVim
           shell: git clone https://github.com/dracula/vim.git ~/AppData/Local/SpaceVim/bundle/dracula
