@@ -43,12 +43,12 @@
     - name: Configure MSYS2
       when: ansible_env.OS == 'Windows_NT'
       block:
-        - name: Update nsswitch.conf file
+        - name: 'Update nsswitch.conf file to configure home (`~`) to be the Windows user directory'
           lineinfile:
             path: '/etc/nsswitch.conf'
             line: 'db_home: windows'
 
-        - name: Update mingw64.ini file
+        - name: Update mingw64.ini file to inherit the full Windows PATH
           lineinfile:
             path: '/mingw64.ini'
             regexp: '^#MSYS2_PATH_TYPE=inherit'
