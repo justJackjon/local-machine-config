@@ -90,7 +90,7 @@
             url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz'
             dest: '/tmp/CascadiaCode.tar.xz'
 
-        - name: Unzip archived font files
+        - name: Unarchive font files
           unarchive:
             src: '/tmp/CascadiaCode.tar.xz'
             dest: '/tmp/CascadiaCode'
