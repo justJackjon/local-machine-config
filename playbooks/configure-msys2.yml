@@ -85,52 +85,9 @@
     - name: Install Caskaydia Cove Nerd Font
       when: ansible_env.OS == 'Windows_NT'
       block:
-        - name: Download Caskaydia Cove Nerd Font
-          get_url:
-            url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz'
-            dest: /tmp/CascadiaCode.tar.xz
-
-        - name: Create temporary directory for font files
-          file:
-            path: /tmp/CascadiaCode
-            state: directory
-
-        - name: Unarchive font files
-          unarchive:
-            src: /tmp/CascadiaCode.tar.xz
-            dest: /tmp/CascadiaCode
-
-        - name: Find .ttf files
-          find:
-            paths: /tmp/CascadiaCode
-            patterns: '*.ttf'
-          register: ttf_files
-
-        - name: 'Ensure a /usr/share/fonts directory exists'
-          file:
-            path: /usr/share/fonts
-            state: directory
-
-        - name: Move .ttf files to fonts directory
-          copy:
-            src: '{{ item.path }}'
-            dest: /usr/share/fonts
-            remote_src: yes
-          with_items: '{{ ttf_files.files }}'
-
-        - name: Remove temporary directory
-          file:
-            path: /tmp/CascadiaCode
-            state: absent
-
-        - name: Ensure fontconfig package is installed
-          pacman:
-            name: mingw-w64-x86_64-fontconfig
-            state: present
-
-        - name: Update font cache
-          command: fc-cache -fv
-
+        - name: Use chocolatey to install Caskaydia Cove Nerd Font
+          shell: choco install cascadia-code-nerd-font -y
+          
         - name: Update .minttyrc to use Nerd Font
           lineinfile:
             path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
