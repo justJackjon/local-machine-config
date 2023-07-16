@@ -97,7 +97,7 @@
           lineinfile:
             path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
             regexp: '^Font='
-            line: 'Font=CaskaydiaCoveNerdFontMono-Regular'
+            line: 'Font=CaskaydiaCove Nerd Font'
 
     - name: Install and Configure Starship
       when: ansible_env.OS == 'Windows_NT'
