@@ -120,7 +120,7 @@
 
         - name: Ensure fontconfig package is installed
           pacman:
-            name: fontconfig
+            name: mingw-w64-x86_64-fontconfig
             state: present
 
         - name: Update font cache
