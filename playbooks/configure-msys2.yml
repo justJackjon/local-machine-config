@@ -127,9 +127,23 @@
           path: '~/.bashrc'
           line: 'eval "$(starship init bash)"'
 
+    - name: Install Dracula Theme and Configure MINTTY
+      when: ansible_env.OS == 'Windows_NT'
       tags: dracula_theme
       block:
-        - name: Ensure .minttyrc exists
+        - name: Check if Dracula theme is installed
+          stat:
+            path: '/usr/share/mintty/themes/dracula'
+          register: dracula_installed
+
+        - name: Download Dracula theme for MINTTY
+          when: not dracula_installed.stat.exists
+          get_url:
+            # NOTE: Potentially brittle, and whilst we could use git, we don't really expect any changes to the remote.
+            url: https://raw.githubusercontent.com/dracula/mintty/master/dracula.minttyrc
+            dest: '/usr/share/mintty/themes/dracula'
+
+        - name: Ensure .minttyrc file exists
           file:
             path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
             state: touch
