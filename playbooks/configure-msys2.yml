@@ -142,7 +142,7 @@
       block:
         - name: Install Starship via pacman
           pacman:
-            name: starship
+            name: mingw-w64-x86_64-starship
             state: present
 
         - name: Configure Starship for use with bash
