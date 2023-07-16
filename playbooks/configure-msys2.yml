@@ -90,6 +90,11 @@
             url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz'
             dest: '/tmp/CascadiaCode.tar.xz'
 
+        - name: Create temporary directory for font files
+          file:
+            path: /tmp/CascadiaCode
+            state: directory
+
         - name: Unarchive font files
           unarchive:
             src: '/tmp/CascadiaCode.tar.xz'
@@ -108,8 +113,15 @@
             remote_src: yes
           with_items: '{{ ttf_files.files }}'
 
-        - name: Install fontconfig
-          command: pacman -S fontconfig --noconfirm
+        - name: Remove temporary directory
+          file:
+            path: /tmp/CascadiaCode
+            state: absent
+
+        - name: Ensure fontconfig package is installed
+          pacman:
+            name: fontconfig
+            state: present
 
         - name: Update font cache
           command: fc-cache -fv
