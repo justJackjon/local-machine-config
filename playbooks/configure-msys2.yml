@@ -88,7 +88,7 @@
         - name: Download Caskaydia Cove Nerd Font
           get_url:
             url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz'
-            dest: '/tmp/CascadiaCode.tar.xz'
+            dest: /tmp/CascadiaCode.tar.xz
 
         - name: Create temporary directory for font files
           file:
@@ -97,19 +97,24 @@
 
         - name: Unarchive font files
           unarchive:
-            src: '/tmp/CascadiaCode.tar.xz'
-            dest: '/tmp/CascadiaCode'
+            src: /tmp/CascadiaCode.tar.xz
+            dest: /tmp/CascadiaCode
 
         - name: Find .ttf files
           find:
-            paths: '/tmp/CascadiaCode'
+            paths: /tmp/CascadiaCode
             patterns: '*.ttf'
           register: ttf_files
+
+        - name: 'Ensure a /use/share/fonts directory exists'
+          file:
+            path: /usr/share/fonts
+            state: directory
 
         - name: Move .ttf files to fonts directory
           copy:
             src: '{{ item.path }}'
-            dest: '/usr/share/fonts'
+            dest: /usr/share/fonts
             remote_src: yes
           with_items: '{{ ttf_files.files }}'
 
