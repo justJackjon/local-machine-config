@@ -94,9 +94,6 @@
 
         - name: Install SpaceVim
           shell: curl -sLf https://spacevim.org/install.sh | bash
-          args:
-            executable: 'C:\msys64\usr\bin\bash'
-            creates: "~/AppData/Local/SpaceVim"
 
     - name: Configure SpaceVim on Windows (MSYS2)
       when: ansible_env.OS == 'Windows_NT'
