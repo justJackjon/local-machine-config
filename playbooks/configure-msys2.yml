@@ -85,46 +85,38 @@
     - name: Install Caskaydia Cove Nerd Font
       when: ansible_env.OS == 'Windows_NT'
       block:
-        - name: Create temporary directory for font files
-          tempfile:
-            state: directory
-            suffix: _nerd_fonts
-          register: temp_dir
-
         - name: Download Caskaydia Cove Nerd Font
           get_url:
-            url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.zip'
-            dest: "{{ temp_dir.path }}/CascadiaCode.zip"
-
-        - name: Ensure unzip package is installed
-          pacman:
-            name: unzip
-            state: present
+            url: 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz'
+            dest: '/tmp/CascadiaCode.tar.xz'
 
         - name: Unzip archived font files
           unarchive:
-            src: "{{ temp_dir.path }}/CascadiaCode.zip"
-            dest: "{{ temp_dir.path }}"
+            src: '/tmp/CascadiaCode.tar.xz'
+            dest: '/tmp'
 
-        - name: Install fonts using PowerShell
-          shell: |
-            powershell.exe -Command "
-            $fontsFolder = (New-Object -ComObject Shell.Application).Namespace(0x14)
-            Get-ChildItem -Path '{{ temp_dir.path }}/*.ttf' | ForEach-Object {
-              $fontsFolder.CopyHere($_.FullName)
-            }"
+        - name: Find .ttf files
+          find:
+            paths: '/tmp/CascadiaCode'
+            patterns: '*.ttf'
+          register: ttf_files
 
-        - name: Remove temporary directory
-          file:
-            path: "{{ temp_dir.path }}"
-            state: absent
+        - name: Move .ttf files to fonts directory
+          copy:
+            src: '{{ item.path }}'
+            dest: '/usr/share/fonts'
+            remote_src: yes
+          with_items: '{{ ttf_files.files }}'
+
+        - name: Update font cache
+          command: fc-cache -fv
 
         - name: Update .minttyrc to use Nerd Font
           lineinfile:
             path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
             regexp: '^Font='
-            line: 'Font=CascadiaCode'
-    
+            line: 'Font=CaskaydiaCoveNerdFontMono-Regular'
+
     - name: Install and Configure Starship
       when: ansible_env.OS == 'Windows_NT'
       block:
