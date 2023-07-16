@@ -74,30 +74,29 @@
           when: msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
 
         - name: Install dependencies
-          shell: pacman -S --noconfirm git curl unzip
+          shell: pacman -S --noconfirm git curl 
           args:
             executable: 'C:\msys64\usr\bin\bash'
+
+        - name: Use chocolatey to install Caskaydia Cove Nerd Font
+          shell: choco install cascadia-code-nerd-font -y
+          
+        - name: Ensure .minttyrc file exists
+          file:
+            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            state: touch
+
+        - name: Update .minttyrc to use Nerd Font
+          lineinfile:
+            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            regexp: '^Font='
+            line: 'Font=CaskaydiaCove Nerd Font'
 
         - name: Install SpaceVim
           shell: curl -sLf https://spacevim.org/install.sh | bash
           args:
             executable: 'C:\msys64\usr\bin\bash'
             creates: "~/AppData/Local/SpaceVim"
-
-        - name: Install CaskaydiaCove Nerd Font
-          get_url:
-            url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.zip
-            dest: 'C:\msys64\home\{{ ansible_user_id }}\CascadiaCode.zip'
-          register: download
-          # NOTE: Check mode is set to false, as the following unarchive step will fail otherwise in --check mode.
-          check_mode: false
-
-        - name: Unzip font
-          unarchive:
-            src: 'C:\msys64\home\{{ ansible_user_id }}\CascadiaCode.zip'
-            dest: 'C:\msys64\home\{{ ansible_user_id }}\.local\share\fonts'
-            creates: 'C:\msys64\home\{{ ansible_user_id }}\.local\share\fonts\CaskaydiaCove Nerd Font Complete.ttf'
-          when: download.changed
 
     - name: Configure SpaceVim on Windows (MSYS2)
       when: ansible_env.OS == 'Windows_NT'
