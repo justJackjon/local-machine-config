@@ -120,15 +120,15 @@
     - name: Install and Configure Starship
       when: ansible_env.OS == 'Windows_NT'
       block:
-      - name: Install Starship via pacman
-        pacman:
-          name: starship
-          state: present
+        - name: Install Starship via pacman
+          pacman:
+            name: starship
+            state: present
 
-      - name: Configure Starship for use with bash
-        lineinfile:
-          path: '~/.bashrc'
-          line: 'eval "$(starship init bash)"'
+        - name: Configure Starship for use with bash
+          lineinfile:
+            path: '~/.bashrc'
+            line: 'eval "$(starship init bash)"'
 
     - name: Install Dracula Theme and Configure MINTTY
       when: ansible_env.OS == 'Windows_NT'
