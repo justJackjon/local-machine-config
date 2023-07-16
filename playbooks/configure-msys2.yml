@@ -88,6 +88,11 @@
         - name: Use chocolatey to install Caskaydia Cove Nerd Font
           shell: choco install cascadia-code-nerd-font -y
           
+        - name: Ensure .minttyrc file exists
+          file:
+            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            state: touch
+
         - name: Update .minttyrc to use Nerd Font
           lineinfile:
             path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
