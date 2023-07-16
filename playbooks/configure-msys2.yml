@@ -108,6 +108,9 @@
             remote_src: yes
           with_items: '{{ ttf_files.files }}'
 
+        - name: Install fontconfig
+          command: pacman -S fontconfig --noconfirm
+
         - name: Update font cache
           command: fc-cache -fv
 
