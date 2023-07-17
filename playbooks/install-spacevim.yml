@@ -5,19 +5,20 @@
   tasks:
     - name: Set OS specific facts
       set_fact:
-        spacevim_config_dir: >-
-          {{ "/c/Users/" + ansible_user_id + "/.SpaceVim.d" 
-          if ansible_env.OS == 'Windows_NT' 
-          else "~/.SpaceVim.d" }}
+        is_windows: "{{ ansible_env.OS is defined and ansible_env.OS == 'Windows_NT' }}"
         minttyrc_file: >-
           {{ "/c/Users/" + ansible_user_id + "/.minttyrc" 
-          if ansible_env.OS == 'Windows_NT' 
+          if is_windows 
           else "~/.minttyrc" }}
+        spacevim_config_dir: >-
+          {{ "/c/Users/" + ansible_user_id + "/.SpaceVim.d" 
+          if is_windows 
+          else "~/.SpaceVim.d" }}
 
     - name: Install SpaceVim
       block:
         - name: Check if MSYS2 is installed on Windows
-          when: ansible_env.OS == 'Windows_NT'
+          when: is_windows
           stat:
             path: "{{ item }}"
           loop:
@@ -27,7 +28,7 @@
 
         - name: Fail if MSYS2 is not installed on Windows
           when: 
-            - ansible_env.OS == 'Windows_NT'
+            - is_windows
             - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
           fail:
             msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
@@ -40,7 +41,7 @@
     - name: Install Nerd Font
       block:
         - name: Use chocolatey to install Caskaydia Cove Nerd Font on Windows
-          when: ansible_env.OS == 'Windows_NT'
+          when: is_windows
           shell: choco install cascadia-code-nerd-font -y
 
         - name: Install Nerd Font on Debian
@@ -76,7 +77,7 @@
                 warn: false
 
     - name: Configure MINTTY to use Nerd Font on Windows
-      when: ansible_env.OS == 'Windows_NT'
+      when: is_windows
       block:
         - name: Ensure .minttyrc file exists
           file:
