@@ -102,8 +102,7 @@
           lineinfile:
             path: "~/.SpaceVim.d/init.toml"
             insertafter: '^\[\[custom_plugins\]\]$'
-            line: 'name = "dracula/vim"'
-            marker: "{mark}: ANSIBLE MANAGED CUSTOM PLUGINS"
+            line: 'name = "dracula/vim" # NOTE: ANSIBLE MANAGED CUSTOM PLUGIN'
 
         - name: Configure Dracula theme for SpaceVim
           blockinfile:
