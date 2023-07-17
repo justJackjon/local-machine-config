@@ -3,9 +3,12 @@
   connection: local
   gather_facts: true
   tasks:
-    - name: Set OS specific facts
+    - name: Set is_windows fact
       set_fact:
         is_windows: "{{ ansible_env.OS is defined and ansible_env.OS == 'Windows_NT' }}"
+
+    - name: Set OS specific facts
+      set_fact:
         minttyrc_file: >-
           {{ "/c/Users/" + ansible_user_id + "/.minttyrc" 
           if is_windows 
