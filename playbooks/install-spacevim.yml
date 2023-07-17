@@ -123,7 +123,7 @@
 
         - name: Configure Dracula theme for SpaceVim
           blockinfile:
-            pth: "{{ spacevim_config_dir }}/init.toml"
+            path: "{{ spacevim_config_dir }}/init.toml"
             insertafter: '^\[options\]$'
             block: |
               # Sets the SpaceVim theme. By default the colorscheme layer is not loaded,
