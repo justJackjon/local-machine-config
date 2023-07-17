@@ -98,15 +98,20 @@
     - name: Configure SpaceVim on Windows (MSYS2)
       when: ansible_env.OS == 'Windows_NT'
       block:
+        - name: Ensure init.toml file exists
+          file:
+            path: "/c/Users/{{ ansible_user_id }}/.SpaceVim.d/init.toml"
+            state: touch
+
         - name: Add Dracula plugin to SpaceVim
           lineinfile:
-            path: "~/.SpaceVim.d/init.toml"
+            path: "/c/Users/{{ ansible_user_id }}/.SpaceVim.d/init.toml"
             insertafter: '^\[\[custom_plugins\]\]$'
             line: 'name = "dracula/vim" # NOTE: ANSIBLE MANAGED CUSTOM PLUGIN'
 
         - name: Configure Dracula theme for SpaceVim
           blockinfile:
-            path: "~/.SpaceVim.d/init.toml"
+            path: "/c/Users/{{ ansible_user_id }}/.SpaceVim.d/init.toml"
             insertafter: '\[options\]'
             block: |
               colorscheme = "dracula"
