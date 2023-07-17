@@ -98,15 +98,18 @@
     - name: Configure SpaceVim on Windows (MSYS2)
       when: ansible_env.OS == 'Windows_NT'
       block:
-        - name: Install Dracula theme for SpaceVim
-          shell: git clone https://github.com/dracula/vim.git ~/AppData/Local/SpaceVim/bundle/dracula
-          args:
-            executable: 'C:\msys64\usr\bin\bash'
-            creates: "~/AppData/Local/SpaceVim/bundle/dracula"
+        - name: Add Dracula plugin to SpaceVim
+          lineinfile:
+            path: "~/.SpaceVim.d/init.toml"
+            insertafter: '^\[\[custom_plugins\]\]$'
+            line: 'name = "dracula/vim"'
+            marker: "{mark}: ANSIBLE MANAGED CUSTOM PLUGINS"
 
         - name: Configure Dracula theme for SpaceVim
-          copy:
-            content: |
-              [options]
+          blockinfile:
+            path: "~/.SpaceVim.d/init.toml"
+            insertafter: '\[options\]'
+            block: |
               colorscheme = "dracula"
-            dest: "~/AppData/Local/SpaceVim.d/init.toml"
+              colorscheme_bg = "dark"
+            marker: "{mark}: ANSIBLE MANAGED OPTIONS"
