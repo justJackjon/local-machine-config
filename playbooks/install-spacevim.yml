@@ -6,13 +6,13 @@
     - name: Set OS specific facts
       set_fact:
         spacevim_config_dir: >-
-          {{ '/c/Users/{{ ansible_user_id }}/.SpaceVim.d' 
+          {{ "/c/Users/" + ansible_user_id + "/.SpaceVim.d" 
           if ansible_env.OS == 'Windows_NT' 
-          else '~/.SpaceVim.d' }}
+          else "~/.SpaceVim.d" }}
         minttyrc_file: >-
-          {{ '/c/Users/{{ ansible_user_id }}/.minttyrc' 
+          {{ "/c/Users/" + ansible_user_id + "/.minttyrc" 
           if ansible_env.OS == 'Windows_NT' 
-          else '~/.minttyrc' }}
+          else "~/.minttyrc" }}
 
     - name: Install SpaceVim
       block:
