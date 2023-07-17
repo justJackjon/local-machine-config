@@ -118,10 +118,14 @@
             line: "[[custom_plugins]]"
 
         - name: Add Dracula plugin to SpaceVim
-          lineinfile:
+          blockinfile:
             path: "{{ config_dir }}/init.toml"
             insertafter: '^\[\[custom_plugins\]\]$'
-            line: 'name = "dracula/vim" # NOTE: ANSIBLE MANAGED CUSTOM PLUGIN'
+            block: |
+              repo = "dracula/vim"
+              name = "dracula"
+              merged = false
+            marker: "# {mark}: ANSIBLE MANAGED CUSTOM PLUGINS"
 
         - name: Add options header to SpaceVim configuration
           lineinfile:
@@ -133,7 +137,16 @@
             path: "{{ config_dir }}/init.toml"
             insertafter: '^\[options\]$'
             block: |
+              # Sets the SpaceVim theme. By default the colorscheme layer is not loaded,
+              # if you want to use more colorschemes, load the colorscheme layer.
               colorscheme = "dracula"
               colorscheme_bg = "dark"
+              # NOTE: Disable guicolors in basic mode, many terminals do not support 24bit true colors.
+              enable_guicolors = true
+              statusline_separator = "arrow"
+              statusline_iseparator = "arrow"
+              buffer_index_type = 4
+              enable_tabline_filetype_icon = true
+              enable_statusline_mode = false
             marker: "# {mark}: ANSIBLE MANAGED OPTIONS"
 
