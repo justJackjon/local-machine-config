@@ -89,7 +89,7 @@
 
         - name: Install dependencies
           pacman:
-            name: neovim curl
+            name: mingw-w64-x86_64-python-pynvim curl
             state: present
 
         - name: Install SpaceVim
