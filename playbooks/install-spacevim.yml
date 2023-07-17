@@ -3,64 +3,21 @@
   connection: local
   gather_facts: true
   tasks:
-    - name: Install SpaceVim and Nerd Font on Xubuntu
-      when: ansible_os_family == "Debian"
+    - name: Set OS specific facts
+      set_fact:
+        spacevim_config_dir: >-
+          {{ '/c/Users/{{ ansible_user_id }}/.SpaceVim.d' 
+          if ansible_env.OS == 'Windows_NT' 
+          else '~/.SpaceVim.d' }}
+        minttyrc_file: >-
+          {{ '/c/Users/{{ ansible_user_id }}/.minttyrc' 
+          if ansible_env.OS == 'Windows_NT' 
+          else '~/.minttyrc' }}
+
+    - name: Install SpaceVim
       block:
-        - name: Install dependencies
-          apt:
-            name:
-              - git
-              - curl
-              - fonts-powerline
-              - unzip
-            state: present
-          become: true
-
-        - name: Install SpaceVim
-          shell: curl -sLf https://spacevim.org/install.sh | bash
-          args:
-            creates: "~/.SpaceVim"
-
-        - name: Install CaskaydiaCove Nerd Font
-          get_url:
-            url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.zip
-            dest: "/tmp/CascadiaCode.zip"
-          register: download
-          # NOTE: Check mode is set to false, as the following unarchive step will fail otherwise in --check mode.
-          check_mode: false
-
-        - name: Unzip font
-          unarchive:
-            src: "/tmp/CascadiaCode.zip"
-            dest: "~/.local/share/fonts/"
-            remote_src: yes
-          when: download.changed
-
-        - name: Update font cache
-          command: fc-cache -fv
-          args:
-            warn: false
-          when: download.changed
-
-    - name: Configure SpaceVim on Xubuntu
-      when: ansible_os_family == "Debian"
-      block:
-        - name: Install Dracula theme for SpaceVim
-          shell: git clone https://github.com/dracula/vim.git ~/.SpaceVim/bundle/dracula
-          args:
-            creates: "~/.SpaceVim/bundle/dracula"
-
-        - name: Configure Dracula theme for SpaceVim
-          copy:
-            content: |
-              [options]
-              colorscheme = "dracula"
-            dest: "~/.SpaceVim.d/init.toml"
-
-    - name: Install SpaceVim and Nerd Font on Windows (MSYS2)
-      when: ansible_env.OS == 'Windows_NT'
-      block:
-        - name: Check if MSYS2 is installed
+        - name: Check if MSYS2 is installed on Windows
+          when: ansible_env.OS == 'Windows_NT'
           stat:
             path: "{{ item }}"
           loop:
@@ -68,58 +25,90 @@
             - '/c/tools/msys64/mingw64.exe'
           register: msys2_check
 
-        - name: Fail if MSYS2 is not installed
+        - name: Fail if MSYS2 is not installed on Windows
+          when: 
+            - ansible_env.OS == 'Windows_NT'
+            - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
           fail:
             msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
-          when: msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
 
-        - name: Use chocolatey to install Caskaydia Cove Nerd Font
+        - name: Install SpaceVim
+          shell: curl -sLf https://spacevim.org/install.sh | bash
+          args:
+            creates: "{{ spacevim_config_dir }}"
+
+    - name: Install Nerd Font
+      block:
+        - name: Use chocolatey to install Caskaydia Cove Nerd Font on Windows
+          when: ansible_env.OS == 'Windows_NT'
           shell: choco install cascadia-code-nerd-font -y
-          
+
+        - name: Install Nerd Font on Debian
+          when: ansible_os_family == "Debian"
+          block:
+            - name: Install dependencies
+              become: true
+              apt:
+                name:
+                  - curl
+                  - fonts-powerline
+                  - tar
+                state: present
+
+            - name: Install CaskaydiaCove Nerd Font
+              check_mode: false
+              get_url:
+                url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.gz
+                dest: "/tmp/CascadiaCode.tar.gz"
+              register: download
+
+            - name: Unarchive font
+              when: download.changed
+              unarchive:
+                src: "/tmp/CascadiaCode.tar.gz"
+                dest: "~/.local/share/fonts/"
+                remote_src: yes
+
+            - name: Update font cache
+              when: download.changed
+              command: fc-cache -fv
+              args:
+                warn: false
+
+    - name: Configure MINTTY to use Nerd Font on Windows
+      when: ansible_env.OS == 'Windows_NT'
+      block:
         - name: Ensure .minttyrc file exists
           file:
-            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            path: "{{ minttyrc_file }}"
             state: touch
 
         - name: Update .minttyrc to use Nerd Font
           lineinfile:
-            path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+            path: "{{ minttyrc_file }}"
             regexp: '^Font='
             line: 'Font=CaskaydiaCove Nerd Font'
 
-        - name: Install dependencies
-          pacman:
-            name: 
-              - vim
-              - curl
-            state: present
-
-        - name: Install SpaceVim
-          shell: curl -sLf https://spacevim.org/install.sh | bash
-
-    - name: Configure SpaceVim on Windows (MSYS2)
-      when: ansible_env.OS == 'Windows_NT'
-      vars:
-        config_dir: '/c/Users/{{ ansible_user_id }}/.SpaceVim.d'
+    - name: Configure SpaceVim
       block:
         - name: 'Ensure .SpaceVim.d directory exists'
           file:
-            path: "{{ config_dir }}"
+            path: "{{ spacevim_config_dir }}"
             state: directory
 
         - name: Ensure init.toml file exists
           file:
-            path: "{{ config_dir }}/init.toml"
+            path: "{{ spacevim_config_dir }}/init.toml"
             state: touch
 
         - name: Add custom_plugins header to SpaceVim configuration
           lineinfile:
-            path: "{{ config_dir }}/init.toml"
+            path: "{{ spacevim_config_dir }}/init.toml"
             line: "[[custom_plugins]]"
 
         - name: Add Dracula plugin to SpaceVim
           blockinfile:
-            path: "{{ config_dir }}/init.toml"
+            path: "{{ spacevim_config_dir }}/init.toml"
             insertafter: '^\[\[custom_plugins\]\]$'
             block: |
               repo = "dracula/vim"
@@ -129,12 +118,12 @@
 
         - name: Add options header to SpaceVim configuration
           lineinfile:
-            path: "{{ config_dir }}/init.toml"
+            path: "{{ spacevim_config_dir }}/init.toml"
             line: "[options]"
 
         - name: Configure Dracula theme for SpaceVim
           blockinfile:
-            path: "{{ config_dir }}/init.toml"
+            pth: "{{ spacevim_config_dir }}/init.toml"
             insertafter: '^\[options\]$'
             block: |
               # Sets the SpaceVim theme. By default the colorscheme layer is not loaded,
@@ -149,4 +138,3 @@
               enable_tabline_filetype_icon = true
               enable_statusline_mode = false
             marker: "# {mark}: ANSIBLE MANAGED OPTIONS"
-
