@@ -90,7 +90,7 @@
         - name: Install dependencies
           pacman:
             name: 
-              - mingw-w64-x86_64-python-pynvim
+              - vim
               - curl
             state: present
 
