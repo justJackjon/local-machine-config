@@ -1,4 +1,4 @@
-- name: "Install + Configure Vim"
+- name: "Install + Configure SpaceVim"
   hosts: localhost
   connection: local
   gather_facts: true
