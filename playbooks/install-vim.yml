@@ -89,7 +89,7 @@
 
         - name: Install dependencies
           pacman:
-            name: curl
+            name: neovim curl
             state: present
 
         - name: Install SpaceVim
