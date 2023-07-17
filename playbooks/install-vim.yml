@@ -98,6 +98,11 @@
     - name: Configure SpaceVim on Windows (MSYS2)
       when: ansible_env.OS == 'Windows_NT'
       block:
+        - name: 'Ensure .SpaceVim.d directory exists'
+          file:
+            path: '/c/Users/{{ ansible_user_id }}/.SpaceVim.d'
+            state: directory
+
         - name: Ensure init.toml file exists
           file:
             path: '/c/Users/{{ ansible_user_id }}/.SpaceVim.d/init.toml'
