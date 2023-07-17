@@ -62,7 +62,8 @@
             - name: Install CaskaydiaCove Nerd Font
               check_mode: false
               get_url:
-                url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.gz
+                url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
+
                 dest: "/tmp/CascadiaCode.tar.gz"
               register: download
 
