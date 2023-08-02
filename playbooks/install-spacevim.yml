@@ -89,15 +89,13 @@
               apt:
                 name:
                   - curl
-                  - fonts-powerline
                   - tar
                 state: present
 
-            - name: Install CaskaydiaCove Nerd Font
+            - name: Install Nerd Font (Debian)
               check_mode: false
               get_url:
                 url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
-
                 dest: "/tmp/CascadiaCode.tar.gz"
               register: download
 
