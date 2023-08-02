@@ -63,6 +63,23 @@
             - name: Install Nerd Font (Windows)
               shell: choco install cascadia-code-nerd-font -y
 
+        - name: Install Nerd Font on MacOS
+          when: ansible_os_family == 'Darwin'
+          block:
+            - name: Check if Homebrew is installed
+              command: brew -v
+              register: brew_check
+              ignore_errors: yes
+
+            - name: Fail if Homebrew is not installed
+              fail:
+                msg: "Homebrew is not installed. Please install Homebrew first."
+              when: brew_check.rc != 0
+
+            - name: Install Nerd Font (MacOS)
+              homebrew_cask:
+                name: font-caskaydia-cove-nerd-font
+                state: present
 
         - name: Install Nerd Font on Debian
           when: ansible_os_family == "Debian"
