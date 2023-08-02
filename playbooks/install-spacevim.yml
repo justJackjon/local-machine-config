@@ -8,11 +8,15 @@
         is_windows: "{{ ansible_env.OS is defined and ansible_env.OS == 'Windows_NT' }}"
 
     - name: Set OS specific facts
+      when: is_windows
       set_fact:
         minttyrc_file: >-
           {{ "/c/Users/" + ansible_user_id + "/.minttyrc" 
           if is_windows 
           else "~/.minttyrc" }}
+
+    - name: Set general facts
+      set_fact:
         spacevim_config_dir: >-
           {{ "/c/Users/" + ansible_user_id + "/.SpaceVim.d" 
           if is_windows 
