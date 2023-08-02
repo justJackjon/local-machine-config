@@ -143,13 +143,16 @@
             path: "{{ spacevim_config_dir }}/init.toml"
             line: "[[custom_plugins]]"
 
-        - name: Add Dracula plugin to SpaceVim
+        - name: Add custom SpaceVim plugins
           blockinfile:
             path: "{{ spacevim_config_dir }}/init.toml"
             insertafter: '^\[\[custom_plugins\]\]$'
             block: |
-              repo = "dracula/vim"
-              name = "dracula"
+              repo = 'github/copilot.vim'
+              merged = false
+
+              [[custom_plugins]]
+              repo = 'dracula/vim'
               merged = false
             marker: "# {mark}: ANSIBLE MANAGED CUSTOM PLUGINS"
 
