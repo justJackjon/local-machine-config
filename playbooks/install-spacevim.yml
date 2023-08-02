@@ -34,7 +34,7 @@
           register: msys2_check
 
         - name: Fail if MSYS2 is not installed on Windows
-          when: 
+          when:
             - is_windows
             - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
           fail:
@@ -47,9 +47,22 @@
 
     - name: Install Nerd Font
       block:
-        - name: Use chocolatey to install Caskaydia Cove Nerd Font on Windows
+        - name: Install Nerd Font on Windows 
           when: is_windows
-          shell: choco install cascadia-code-nerd-font -y
+          block:
+            - name: Check if Chocolatey is installed
+              win_shell: choco -v
+              register: choco_check
+              ignore_errors: yes
+
+            - name: Fail if Chocolatey is not installed
+              fail:
+                msg: "Chocolatey is not installed. Please install Chocolatey first."
+              when: choco_check.rc != 0
+
+            - name: Install Nerd Font (Windows)
+              shell: choco install cascadia-code-nerd-font -y
+
 
         - name: Install Nerd Font on Debian
           when: ansible_os_family == "Debian"
