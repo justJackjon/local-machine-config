@@ -1,4 +1,4 @@
-- name: "Install + Configure SpaceVim"
+- name: Install + Configure SpaceVim
   hosts: localhost
   connection: local
   gather_facts: true
@@ -11,16 +11,16 @@
       when: is_windows
       set_fact:
         minttyrc_file: >-
-          {{ "/c/Users/" + ansible_user_id + "/.minttyrc" 
+          {{ '/c/Users/' + ansible_user_id + '/.minttyrc'
           if is_windows 
-          else "~/.minttyrc" }}
+          else '~/.minttyrc' }}
 
     - name: Set general facts
       set_fact:
         spacevim_config_dir: >-
-          {{ "/c/Users/" + ansible_user_id + "/.SpaceVim.d" 
+          {{ '/c/Users/' + ansible_user_id + '/.SpaceVim.d'
           if is_windows 
-          else "~/.SpaceVim.d" }}
+          else '~/.SpaceVim.d' }}
 
     - name: Install SpaceVim
       block:
@@ -38,7 +38,7 @@
             - is_windows
             - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
           fail:
-            msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
+            msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
 
         - name: Install SpaceVim
           shell: curl -sLf https://spacevim.org/install.sh | bash
@@ -57,7 +57,7 @@
 
             - name: Fail if Chocolatey is not installed
               fail:
-                msg: "Chocolatey is not installed. Please install Chocolatey first."
+                msg: 'Chocolatey is not installed. Please install Chocolatey first.'
               when: choco_check.rc != 0
 
             - name: Install Nerd Font (Windows)
@@ -73,7 +73,7 @@
 
             - name: Fail if Homebrew is not installed
               fail:
-                msg: "Homebrew is not installed. Please install Homebrew first."
+                msg: 'Homebrew is not installed. Please install Homebrew first.'
               when: brew_check.rc != 0
 
             - name: Install Nerd Font (MacOS)
@@ -82,7 +82,7 @@
                 state: present
 
         - name: Install Nerd Font on Debian
-          when: ansible_os_family == "Debian"
+          when: ansible_os_family == 'Debian'
           block:
             - name: Install dependencies
               become: true
@@ -96,14 +96,14 @@
               check_mode: false
               get_url:
                 url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
-                dest: "/tmp/CascadiaCode.tar.gz"
+                dest: '/tmp/CascadiaCode.tar.gz'
               register: download
 
             - name: Unarchive font
               when: download.changed
               unarchive:
-                src: "/tmp/CascadiaCode.tar.gz"
-                dest: "~/.local/share/fonts/"
+                src: '/tmp/CascadiaCode.tar.gz'
+                dest: '~/.local/share/fonts/'
                 remote_src: yes
 
             - name: Update font cache
@@ -128,7 +128,7 @@
 
     - name: Configure SpaceVim
       block:
-        - name: 'Ensure .SpaceVim.d directory exists'
+        - name: Ensure .SpaceVim.d directory exists
           file:
             path: "{{ spacevim_config_dir }}"
             state: directory
@@ -141,7 +141,7 @@
         - name: Add custom_plugins header to SpaceVim configuration
           lineinfile:
             path: "{{ spacevim_config_dir }}/init.toml"
-            line: "[[custom_plugins]]"
+            line: '[[custom_plugins]]'
 
         - name: Add custom SpaceVim plugins
           blockinfile:
@@ -154,42 +154,42 @@
               [[custom_plugins]]
               repo = 'dracula/vim'
               merged = false
-            marker: "# {mark}: ANSIBLE MANAGED CUSTOM PLUGINS"
+            marker: '# {mark}: ANSIBLE MANAGED CUSTOM PLUGINS'
 
         - name: Add options header to SpaceVim configuration
           lineinfile:
             path: "{{ spacevim_config_dir }}/init.toml"
-            line: "[options]"
+            line: '[options]'
 
         - name: Configure SpaceVim init.toml
           blockinfile:
             path: "{{ spacevim_config_dir }}/init.toml"
             insertafter: '^\[options\]$'
             block: |
-              colorscheme = "dracula"
-              colorscheme_bg = "dark"
+              colorscheme = 'dracula'
+              colorscheme_bg = 'dark'
               # NOTE: Disable guicolors in basic mode, many terminals do not support 24bit true colors.
               enable_guicolors = {{ 'false' if ansible_os_family == 'Darwin' else 'true' }}
-              statusline_separator = "arrow"
-              statusline_iseparator = "arrow"
+              statusline_separator = 'arrow'
+              statusline_iseparator = 'arrow'
               buffer_index_type = 0
               enable_tabline_filetype_icon = true
               enable_statusline_mode = true
               bootstrap_after = 'myspacevim#after'
 
               [[layers]]
-              name = "autocomplete"
-              auto-completion-return-key-behavior = "complete"
-              auto-completion-tab-key-behavior = "cycle"
+              name = 'autocomplete'
+              auto-completion-return-key-behavior = 'complete'
+              auto-completion-tab-key-behavior = 'cycle'
 
               [[layers]]
-              name = "shell"
-              default_position = "top"
+              name = 'shell'
+              default_position = 'top'
               default_height = 50
 
               [[layers]]
-              name = "telescope"
-            marker: "# {mark}: ANSIBLE MANAGED OPTIONS"
+              name = 'telescope'
+            marker: '# {mark}: ANSIBLE MANAGED OPTIONS'
 
         - name: Ensure autoload directory exists
           file:
