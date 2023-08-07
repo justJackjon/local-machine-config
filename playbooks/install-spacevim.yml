@@ -91,6 +91,7 @@
                   - curl
                   - tar
                 state: present
+                update_cache: yes
 
             - name: Install Nerd Font (Debian)
               check_mode: false
