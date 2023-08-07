@@ -155,6 +155,10 @@
               [[custom_plugins]]
               repo = 'dracula/vim'
               merged = false
+
+              [[custom_plugins]]
+              repo = 'pearofducks/ansible-vim'
+              merged = false
             marker: '# {mark}: ANSIBLE MANAGED CUSTOM PLUGINS'
 
         - name: Add options header to SpaceVim configuration
