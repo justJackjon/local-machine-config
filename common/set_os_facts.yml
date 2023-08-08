@@ -1,0 +1,3 @@
+- name: Set is_windows fact
+  set_fact:
+    is_windows: '{{ ansible_env.OS is defined and ansible_env.OS == "Windows_NT" }}'
