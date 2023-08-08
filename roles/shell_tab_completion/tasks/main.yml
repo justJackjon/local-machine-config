@@ -1,0 +1,18 @@
+- name: Enable tab completion for Ansible CLI commands
+  block:
+    - name: Install argcomplete for Ansible tab completion
+      pip:
+        name:
+          - argcomplete
+        state: present
+        extra_args: '--user'
+
+    - name: Find path to activate-global-python-argcomplete3
+      command: python3 -m site --user-base
+      register: python_user_base
+      changed_when: false
+
+    - name: Activate global argcomplete
+      shell: "yes | {{ python_user_base.stdout }}/bin/activate-global-python-argcomplete{{ '3' if is_windows else '' }} --user"
+      args:
+        executable: /bin/bash

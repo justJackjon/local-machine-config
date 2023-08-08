@@ -1,0 +1,55 @@
+- name: Install required packages
+  block:
+    - name: Install required packages for Debian-like systems
+      when: ansible_os_family == 'Debian'
+      become: true
+      apt:
+        name:
+          - python3-pip
+          - bash-completion
+        state: present
+        update_cache: true
+
+    - name: Install required packages for macOS
+      when: ansible_os_family == 'Darwin'
+      block:
+        - name: Check if Homebrew is installed
+          command: which brew
+          register: homebrew_check
+          failed_when: homebrew_check.stdout == ''
+          changed_when: false
+          ignore_errors: true
+
+        - name: Fail if Homebrew is not installed
+          when: homebrew_check.stdout == ''
+          fail:
+            msg: 'Homebrew is not installed. Please install it first.'
+
+        - name: Install Homebrew packages
+          homebrew:
+            name:
+              - python3
+              - bash-completion
+            state: present
+            update_homebrew: yes
+
+    - name: Install required packages for Windows with MSYS2
+      when: is_windows
+      block:
+        - name: Check if Chocolatey is installed
+          shell: which choco
+          register: chocolatey_check
+          failed_when: chocolatey_check.stdout == ''
+          changed_when: false
+          ignore_errors: true
+
+        - name: Fail if Chocolatey is not installed
+          when: chocolatey_check.stdout == ''
+          fail:
+            msg: 'Chocolatey is not installed. Please install it first.'
+
+        - name: Update Chocolatey repository
+          shell: choco upgrade chocolatey
+
+        - name: Install Chocolatey packages
+          shell: choco install python3 bash-completion
