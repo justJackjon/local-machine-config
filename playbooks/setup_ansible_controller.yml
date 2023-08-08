@@ -5,5 +5,5 @@
   pre_tasks:
     - include_tasks: ../common/set_os_facts.yml
   roles:
-    - shell_tab_completion
+    - configure_shell_tab_completion
     - install_packages
