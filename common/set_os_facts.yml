@@ -1,5 +1,5 @@
 - name: Set operating system facts
   set_fact:
-    is_debian_family: ansible_os_family == 'Debian'
-    is_mac: ansible_os_family == 'Darwin'
+    is_debian_family: '{{ ansible_os_family == "Debian" }}'
+    is_mac: '{{ ansible_os_family == "Darwin" }}'
     is_windows: '{{ ansible_env.OS is defined and ansible_env.OS == "Windows_NT" }}'
