@@ -1,25 +1,83 @@
 - name: Setup Ansible Controller
   hosts: localhost
   connection: local
-  gather_facts: false
+  gather_facts: true
   tasks:
+    - name: Set is_windows fact
+      set_fact:
+        is_windows: '{{ ansible_env.OS is defined and ansible_env.OS == "Windows_NT" }}'
+
     - name: Install required packages
-      become: true
-      apt:
-        name:
-          - python3-pip
-          - bash-completion
-        state: present
-        update-cache: true
+      block:
+        - name: Install required packages for Debian-like systems
+          when: ansible_os_family == 'Debian'
+          become: true
+          apt:
+            name:
+              - python3-pip
+              - bash-completion
+            state: present
+            update_cache: true
 
-    - name: Install argcomplete for Ansible Bash Completion
-      pip:
-        name:
-          - argcomplete
-        state: present
-        extra_args: --user
+        - name: Install required packages for macOS
+          when: ansible_os_family == 'Darwin'
+          block:
+            - name: Check if Homebrew is installed
+              command: which brew
+              register: homebrew_check
+              failed_when: homebrew_check.stdout == ''
+              changed_when: false
+              ignore_errors: true
 
-    - name: Activate global argcomplete 
-      shell: activate-global-python-argcomplete3 --user
-      args:
-        executable: /bin/bash
+            - name: Fail if Homebrew is not installed
+              when: homebrew_check.stdout == ''
+              fail:
+                msg: 'Homebrew is not installed. Please install it first.'
+
+            - name: Install required packages
+              homebrew:
+                name:
+                  - python3
+                  - bash-completion
+                state: present
+                update_homebrew: yes
+
+        - name: Install required packages for Windows with MSYS2
+          when: is_windows
+          block:
+            - name: Check if Chocolatey is installed
+              shell: which choco
+              register: chocolatey_check
+              failed_when: chocolatey_check.stdout == ''
+              changed_when: false
+              ignore_errors: true
+
+            - name: Fail if Chocolatey is not installed
+              when: chocolatey_check.stdout == ''
+              fail:
+                msg: 'Chocolatey is not installed. Please install it first.'
+
+            - name: Update Chocolatey repository
+              shell: choco upgrade chocolatey
+
+            - name: Install required packages
+              shell: choco install python3 bash-completion
+
+        - name: Enable tab completion for Ansible CLI commands
+          block:
+            - name: Install argcomplete for Ansible tab completion
+              pip:
+                name:
+                  - argcomplete
+                state: present
+                extra_args: '--user'
+
+            - name: Find path to activate-global-python-argcomplete3
+              command: python3 -m site --user-base
+              register: python_user_base
+              changed_when: false
+
+            - name: Activate global argcomplete
+              shell: "yes | {{ python_user_base.stdout }}/bin/activate-global-python-argcomplete{{ '3' if is_windows else '' }} --user"
+              args:
+                executable: /bin/bash
