@@ -1,0 +1,9 @@
+- name: Setup Ansible Controller
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  pre_tasks:
+    - include_tasks: ../common/set_os_facts.yml
+  roles:
+    - shell_tab_completion
+    - install_packages
