@@ -1,7 +1,7 @@
 - name: Install required packages
   block:
     - name: Install required packages for Debian-like systems
-      when: ansible_os_family == 'Debian'
+      when: is_debian_family
       become: true
       apt:
         name:
@@ -11,7 +11,7 @@
         update_cache: true
 
     - name: Install required packages for macOS
-      when: ansible_os_family == 'Darwin'
+      when: is_mac
       block:
         - name: Check if Homebrew is installed
           command: which brew
