@@ -6,5 +6,6 @@
     - include_tasks: ../common/set_os_facts.yml
     - include_tasks: ../common/set_sys_architecture_facts.yml
   roles:
+    - install_base_packages
     - configure_shell_tab_completion
     - install_packages
