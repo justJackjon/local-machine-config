@@ -40,10 +40,21 @@
           fail:
             msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
 
+        - name: Download SpaceVim install.sh
+          get_url:
+            url: https://spacevim.org/install.sh
+            dest: /tmp/install_spacevim.sh
+            mode: '0755'
+
         - name: Install SpaceVim
-          shell: curl -sLf https://spacevim.org/install.sh | bash
+          command: bash /tmp/install_spacevim.sh
           args:
             creates: "{{ spacevim_config_dir }}"
+
+        - name: Remove install_spacevim.sh
+          file:
+            path: /tmp/install_spacevim.sh
+            state: absent
 
     - name: Install Nerd Font
       block:
@@ -87,9 +98,7 @@
             - name: Install dependencies
               become: true
               apt:
-                name:
-                  - curl
-                  - tar
+                name: tar
                 state: present
                 update_cache: yes
 
