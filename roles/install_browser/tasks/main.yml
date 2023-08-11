@@ -1,0 +1,30 @@
+- name: Install browser
+  block:
+    - name: Install Chrome on non arm64 Debian based systems
+      # NOTE: Chrome is presently not available for Linux on ARM64 based systems.
+      become: true
+      when: is_debian_family and not is_arm64
+      block:
+        - name: Download Google Chrome
+          get_url:
+            url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            dest: /tmp/google-chrome-stable_current_amd64.deb
+
+        - name: Install Google Chrome
+          apt:
+            deb: /tmp/google-chrome-stable_current_amd64.deb
+            state: present
+
+        - name: Clean up downloaded file
+          file:
+            path: /tmp/google-chrome-stable_current_amd64.deb
+            state: absent
+
+    - name: Install Firefox on arm64 Debian based systems
+      # NOTE: Because Chrome is not presently available for Linux on ARM64 based systems, we'll use Firefox as an alternative browser.
+      when: is_debian_family and is_arm64
+      become: true
+      apt:
+        name: firefox
+        state: present
+        update_cache: true
