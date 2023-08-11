@@ -22,24 +22,58 @@
           if is_windows 
           else '~/.SpaceVim.d' }}
 
+    - name: Ensure required dependencies are installed
+      block:
+        - name: Ensure Debian-based system dependencies are installed
+          when: ansible_os_family == 'Debian'
+          become: true
+          apt:
+            name: tar
+            state: present
+            update_cache: yes
+
+        - name: Ensure MacOS dependencies are installed
+          when: ansible_os_family == 'Darwin'
+          block:
+            - name: Check if Homebrew is installed
+              command: brew -v
+              register: brew_check
+              ignore_errors: yes
+
+            - name: Fail if Homebrew is not installed
+              fail:
+                msg: 'Homebrew is not installed. Please install Homebrew first.'
+              when: brew_check.rc != 0
+
+        - name: Ensure Windows dependencies are installed
+          when: is_windows
+          block:
+            - name: Check if MSYS2 is installed on Windows
+              stat:
+                path: "{{ item }}"
+              loop:
+                - '/c/msys64/mingw64.exe'
+                - '/c/tools/msys64/mingw64.exe'
+              register: msys2_check
+
+            - name: Fail if MSYS2 is not installed on Windows
+              when:
+                - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
+              fail:
+                msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
+
+            - name: Check if Chocolatey is installed
+              win_shell: choco -v
+              register: choco_check
+              ignore_errors: yes
+
+            - name: Fail if Chocolatey is not installed
+              fail:
+                msg: 'Chocolatey is not installed. Please install Chocolatey first.'
+              when: choco_check.rc != 0
+
     - name: Install SpaceVim
       block:
-        - name: Check if MSYS2 is installed on Windows
-          when: is_windows
-          stat:
-            path: "{{ item }}"
-          loop:
-            - '/c/msys64/mingw64.exe'
-            - '/c/tools/msys64/mingw64.exe'
-          register: msys2_check
-
-        - name: Fail if MSYS2 is not installed on Windows
-          when:
-            - is_windows
-            - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
-          fail:
-            msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
-
         - name: Download SpaceVim install.sh
           get_url:
             url: https://spacevim.org/install.sh
@@ -60,48 +94,17 @@
       block:
         - name: Install Nerd Font on Windows 
           when: is_windows
-          block:
-            - name: Check if Chocolatey is installed
-              win_shell: choco -v
-              register: choco_check
-              ignore_errors: yes
-
-            - name: Fail if Chocolatey is not installed
-              fail:
-                msg: 'Chocolatey is not installed. Please install Chocolatey first.'
-              when: choco_check.rc != 0
-
-            - name: Install Nerd Font (Windows)
-              shell: choco install cascadia-code-nerd-font -y
+          shell: choco install cascadia-code-nerd-font -y
 
         - name: Install Nerd Font on MacOS
           when: ansible_os_family == 'Darwin'
-          block:
-            - name: Check if Homebrew is installed
-              command: brew -v
-              register: brew_check
-              ignore_errors: yes
-
-            - name: Fail if Homebrew is not installed
-              fail:
-                msg: 'Homebrew is not installed. Please install Homebrew first.'
-              when: brew_check.rc != 0
-
-            - name: Install Nerd Font (MacOS)
-              homebrew_cask:
-                name: font-caskaydia-cove-nerd-font
-                state: present
+          homebrew_cask:
+            name: font-caskaydia-cove-nerd-font
+            state: present
 
         - name: Install Nerd Font on Debian
           when: ansible_os_family == 'Debian'
           block:
-            - name: Install dependencies
-              become: true
-              apt:
-                name: tar
-                state: present
-                update_cache: yes
-
             - name: Install Nerd Font (Debian)
               check_mode: false
               get_url:
