@@ -7,12 +7,17 @@
         state: present
         extra_args: '--user'
 
-    - name: Find path to activate-global-python-argcomplete3
+    - name: Find Python user base 
+      when: not is_debian_family
       command: python3 -m site --user-base
       register: python_user_base
       changed_when: false
 
+    - name: Set global argcomplete bin directory
+      set_fact:
+        bin_dir: "{{ '/usr' if is_debian_family else python_user_base.stdout }}/bin/"
+
     - name: Activate global argcomplete
-      shell: "yes | {{ python_user_base.stdout }}/bin/activate-global-python-argcomplete{{ '3' if is_windows else '' }} --user"
+      shell: yes | {{ bin_dir }}activate-global-python-argcomplete{{ '3' if not is_mac else '' }} --user
       args:
         executable: /bin/bash
