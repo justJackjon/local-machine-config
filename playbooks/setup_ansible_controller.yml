@@ -4,6 +4,7 @@
   gather_facts: true
   pre_tasks:
     - include_tasks: ../common/set_os_facts.yml
+    - include_tasks: ../common/set_sys_architecture_facts.yml
   roles:
     - configure_shell_tab_completion
     - install_packages

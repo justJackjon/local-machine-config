@@ -1,0 +1,4 @@
+- name: Set operating system facts
+  set_fact:
+    is_arm64: '{{ ansible_architecture == "aarch64" }}'
+    is_amd64: '{{ ansible_architecture == "x86_64" }}'
