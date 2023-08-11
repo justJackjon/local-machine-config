@@ -2,11 +2,9 @@
   hosts: localhost
   connection: local
   gather_facts: true
+  pre_tasks:
+    - include_tasks: ../common/set_os_facts.yml
   tasks:
-    - name: Set is_windows fact
-      set_fact:
-        is_windows: "{{ ansible_env.OS is defined and ansible_env.OS == 'Windows_NT' }}"
-
     - name: Set OS specific facts
       when: is_windows
       set_fact:
@@ -25,7 +23,7 @@
     - name: Ensure required dependencies are installed
       block:
         - name: Ensure Debian-based system dependencies are installed
-          when: ansible_os_family == 'Debian'
+          when: is_debian_family
           become: true
           apt:
             name: tar
@@ -33,7 +31,7 @@
             update_cache: yes
 
         - name: Ensure MacOS dependencies are installed
-          when: ansible_os_family == 'Darwin'
+          when: is_mac
           block:
             - name: Check if Homebrew is installed
               command: brew -v
@@ -97,13 +95,13 @@
           shell: choco install cascadia-code-nerd-font -y
 
         - name: Install Nerd Font on MacOS
-          when: ansible_os_family == 'Darwin'
+          when: is_mac
           homebrew_cask:
             name: font-caskaydia-cove-nerd-font
             state: present
 
         - name: Install Nerd Font on Debian
-          when: ansible_os_family == 'Debian'
+          when: is_debian_family
           block:
             - name: Install Nerd Font (Debian)
               check_mode: false
@@ -186,7 +184,7 @@
               colorscheme = 'dracula'
               colorscheme_bg = 'dark'
               # NOTE: Disable guicolors in basic mode, many terminals do not support 24bit true colors.
-              enable_guicolors = {{ 'false' if ansible_os_family == 'Darwin' else 'true' }}
+              enable_guicolors = {{ 'false' if is_mac else 'true' }}
               statusline_separator = 'arrow'
               statusline_iseparator = 'arrow'
               buffer_index_type = 0
