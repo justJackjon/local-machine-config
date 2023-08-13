@@ -148,19 +148,35 @@
               args:
                 warn: false
 
-    - name: Configure MINTTY to use Nerd Font on Windows
-      when: is_windows
+    - name: Configure the terminal emulator to use the new Nerd Font
       block:
-        - name: Ensure .minttyrc file exists
-          file:
-            path: "{{ minttyrc_file }}"
-            state: touch
+        - name: Configure XFCE Terminal to use Nerd Font on Debian-based systems
+          when: is_debian_family
+          block:
+            - name: Ensure XFCE Terminal configuration directory exists
+              file:
+                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal"
+                state: directory
 
-        - name: Update .minttyrc to use Nerd Font
-          lineinfile:
-            path: "{{ minttyrc_file }}"
-            regexp: '^Font='
-            line: 'Font=CaskaydiaCove Nerd Font'
+            - name: Configure XFCE Terminal to use Nerd Font
+              lineinfile:
+                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
+                regexp: '^FontName='
+                line: 'FontName=CaskaydiaCove Nerd Font 10'
+
+        - name: Configure MINTTY to use Nerd Font on Windows
+          when: is_windows
+          block:
+            - name: Ensure .minttyrc file exists
+              file:
+                path: "{{ minttyrc_file }}"
+                state: touch
+
+            - name: Update .minttyrc to use Nerd Font
+              lineinfile:
+                path: "{{ minttyrc_file }}"
+                regexp: '^Font='
+                line: 'Font=CaskaydiaCove Nerd Font'
 
     - name: Configure SpaceVim
       block:
