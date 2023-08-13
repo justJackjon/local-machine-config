@@ -91,6 +91,9 @@
           when: is_windows
           shell: choco install neovim -y
 
+        # TODO: If Neovim is installed via choco but accessed via MSYS2, check that we don't need to modify the bashrc
+        # to point to where the default config location is.
+
     - name: Install SpaceVim
       block:
         - name: Download SpaceVim install.sh
