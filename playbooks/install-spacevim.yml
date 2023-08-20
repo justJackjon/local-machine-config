@@ -164,6 +164,18 @@
                 regexp: '^FontName='
                 line: 'FontName=CaskaydiaCove Nerd Font 10'
 
+        - name: Configure Terminal app to use Nerd Font on MacOS
+          when: is_mac
+          block:
+            - name: Set font for all Terminal profiles
+              command: >
+                osascript -e 'tell application "Terminal"
+                  repeat with profileName in (get every settings set)
+                      set font name of profileName to "CaskaydiaCove Nerd Font"
+                      set font size of profileName to 14
+                  end repeat
+                end tell'
+
         - name: Configure MINTTY to use Nerd Font on Windows
           when: is_windows
           block:
