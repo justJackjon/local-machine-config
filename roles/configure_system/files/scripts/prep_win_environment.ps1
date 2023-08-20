@@ -29,7 +29,15 @@ try {
       Write-Host "MSYS2 is already installed."
   }
 
-# Open MSYS2 terminal and install Ansible
+  # Check if Git for Windows is installed
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+      # Install Git for Windows
+      choco install git -y
+  } else {
+      Write-Host "Git for Windows is already installed."
+  }
+
+  # Open MSYS2 terminal and install Ansible
   $msys2Path = if (Test-Path -Path "C:\tools\msys64") { "C:\tools\msys64" } else { "C:\msys64" }
   $msys2Shell = Join-Path -Path $msys2Path -ChildPath "usr\bin\bash.exe"
 
