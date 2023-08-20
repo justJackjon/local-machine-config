@@ -85,9 +85,21 @@
     - name: Install Caskaydia Cove Nerd Font
       when: ansible_env.OS == 'Windows_NT'
       block:
+        # NOTE: Choco isn't in our PATH yet, so we require the full path to the executable.
+        - name: Check for choco executable in typical path
+          stat:
+            path: '/c/ProgramData/chocolatey/bin/choco.exe'
+          register: choco_stat
+
+        - name: Fail if choco is not found
+          fail:
+            msg: "Chocolatey executable not found at /c/ProgramData/chocolatey/bin/choco.exe. Please ensure Chocolatey is installed."
+          when: not choco_stat.stat.exists
+
         - name: Use chocolatey to install Caskaydia Cove Nerd Font
-          shell: choco install cascadia-code-nerd-font -y
-          
+          shell: '/c/ProgramData/chocolatey/bin/choco.exe install cascadia-code-nerd-font -y'
+          when: choco_stat.stat.exists
+
         - name: Ensure .minttyrc file exists
           file:
             path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
