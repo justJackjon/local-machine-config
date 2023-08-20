@@ -91,9 +91,6 @@
           when: is_windows
           shell: choco install neovim -y
 
-        # TODO: If Neovim is installed via choco but accessed via MSYS2, check that we don't need to modify the bashrc
-        # to point to where the default config location is.
-
     - name: Install SpaceVim
       block:
         - name: Download SpaceVim install.sh
@@ -111,6 +108,14 @@
           file:
             path: /tmp/install_spacevim.sh
             state: absent
+
+        - name: Set XDG_CONFIG_HOME to MSYS2's HOME so ~/.SpaceVim.d config is auto-discovered
+          when: is_windows
+          lineinfile:
+            path: "{{ ansible_env.HOME }}/.bashrc"
+            line: 'export XDG_CONFIG_HOME="{{ ansible_env.HOME }}"'
+            state: present
+            create: yes
 
     - name: Install Nerd Font
       block:
