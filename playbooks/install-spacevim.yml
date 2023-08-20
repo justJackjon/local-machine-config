@@ -61,7 +61,7 @@
                 msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
 
             - name: Check if Chocolatey is installed
-              win_shell: choco -v
+              shell: choco -v
               register: choco_check
               ignore_errors: yes
 
