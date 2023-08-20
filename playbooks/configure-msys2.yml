@@ -59,7 +59,7 @@
       block:
         - name: Check if .bash_profile exists
           stat:
-            path: '~/.bash_profile'
+            path: '/c/Users/{{ ansible_user_id }}/.bash_profile'
           register: bash_profile_exists
 
         - name: Create .bash_profile
@@ -69,18 +69,18 @@
               if [ -f ~/.bashrc ]; then
                 source ~/.bashrc
               fi
-            dest: '~/.bash_profile'
+            dest: '/c/Users/{{ ansible_user_id }}/.bash_profile'
 
         - name: Check if .bashrc exists
           stat:
-            path: '~/.bashrc'
+            path: '/c/Users/{{ ansible_user_id }}/.bashrc'
           register: bashrc_exists
 
         - name: Create .bashrc
           when: not bashrc_exists.stat.exists
           copy:
             content: ''
-            dest: '~/.bashrc'
+            dest: '/c/Users/{{ ansible_user_id }}/.bashrc'
 
     - name: Install Caskaydia Cove Nerd Font
       when: ansible_env.OS == 'Windows_NT'
@@ -121,7 +121,7 @@
 
         - name: Configure Starship for use with bash
           lineinfile:
-            path: '~/.bashrc'
+            path: '/c/Users/{{ ansible_user_id }}/.bashrc'
             line: 'eval "$(starship init bash)"'
 
     - name: Install Dracula Theme and Configure MINTTY
