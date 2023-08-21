@@ -52,4 +52,4 @@
           shell: choco upgrade chocolatey
 
         - name: Install Chocolatey packages
-          shell: choco install python3 bash-completion
+          shell: choco install python3 bash-completion -y
