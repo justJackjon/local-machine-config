@@ -109,13 +109,11 @@
             path: /tmp/install_spacevim.sh
             state: absent
 
-        - name: Set XDG_CONFIG_HOME to MSYS2's HOME so ~/.SpaceVim.d config is auto-discovered
+        - name: Create symbolic link for nvim configuration
           when: is_windows
-          lineinfile:
-            path: "{{ ansible_env.HOME }}/.bashrc"
-            line: 'export XDG_CONFIG_HOME="{{ ansible_env.HOME }}"'
-            state: present
-            create: yes
+          command: ln -s {{ ansible_env.HOME }}/.SpaceVim {{ ansible_env.HOME }}/AppData/Local/nvim
+          args:
+            creates: "{{ ansible_env.HOME }}/AppData/Local/nvim"
 
     - name: Install Nerd Font
       block:
