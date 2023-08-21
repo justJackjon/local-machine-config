@@ -9,3 +9,4 @@
     - install_base_packages
     - configure_shell_tab_completion
     - install_browser
+    - install_spacevim
