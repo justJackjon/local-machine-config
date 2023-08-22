@@ -1,23 +1,32 @@
 - name: Enable tab completion for Ansible CLI commands
   block:
     - name: Install argcomplete for Ansible tab completion
-      pip:
-        name:
-          - argcomplete
-        state: present
-        extra_args: '--user'
+      block:
+        - name: Install argcomplete on non-Windows systems using Pip
+          when: not is_windows
+          pip:
+            name:
+              - argcomplete
+            state: present
+            extra_args: '--user'
+        - name: Install argcomplete on Windows MSYS2 systems using Pacman
+          when: is_windows
+          pacman:
+            name: mingw-w64-x86_64-python-argcomplete
+            state: present
+            update_cache: true
 
     - name: Find Python user base 
-      when: not is_debian_family
+      when: is_mac
       command: python3 -m site --user-base
       register: python_user_base
       changed_when: false
 
     - name: Set global argcomplete bin directory
       set_fact:
-        bin_dir: "{{ '/usr' if is_debian_family else python_user_base.stdout }}/bin/"
+        bin_dir: "{{ '/usr' if is_debian_family else (python_user_base.stdout if is_mac else ('/mingw64' if is_windows)) }}/bin/"
 
     - name: Activate global argcomplete
-      shell: yes | {{ bin_dir }}activate-global-python-argcomplete{{ '3' if not is_mac else '' }} --user
+      shell: yes | {{ bin_dir }}activate-global-python-argcomplete{{ '3' if is_debian_family else '' }} --user
       args:
         executable: /bin/bash
