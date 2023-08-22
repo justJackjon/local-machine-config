@@ -1,4 +1,4 @@
 - name: Set ansible_python_interpreter for Windows
   when: is_windows
   set_fact:
-    ansible_python_interpreter: "/usr/bin/python3.11"
+    ansible_python_interpreter: "/usr/bin/python3"
