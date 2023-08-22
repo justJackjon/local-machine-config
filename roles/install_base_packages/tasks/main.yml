@@ -38,6 +38,7 @@
       pacman:
         name:
           - python
+          - python-pip
           - python-setuptools
           - bash-completion
         state: present
