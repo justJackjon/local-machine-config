@@ -38,7 +38,7 @@
       pacman:
         name:
           - python
-          - setuptools
+          - python-setuptools
           - bash-completion
         state: present
         update_cache: true
