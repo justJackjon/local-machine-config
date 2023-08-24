@@ -37,9 +37,9 @@
       when: is_windows
       pacman:
         name:
-          - python
-          - python-pip
-          - python-setuptools
+          - mingw-w64-x86_64-python
+          - mingw-w64-x86_64-python-pip
+          - mingw-w64-x86_64-python-setuptools
           - bash-completion
         state: present
         update_cache: true
