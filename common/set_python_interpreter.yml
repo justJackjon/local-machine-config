@@ -1,4 +1,15 @@
+# NOTE: We cannot rely on ansible gathered facts until the interpreter has been set.
+# Therefore, we will use `uname` to determine whether we are running under MSYS2.
+- name: Check if running on Windows under MSYS2
+  shell: uname -o
+  register: os_check
+  changed_when: false
+
+- name: Set is_windows_msys fact
+  set_fact:
+    is_windows_msys: "{{ os_check.stdout == 'Msys' }}"
+
 - name: Set ansible_python_interpreter for Windows
-  when: is_windows
+  when: is_windows_msys
   set_fact:
     ansible_python_interpreter: "/usr/bin/python3"
