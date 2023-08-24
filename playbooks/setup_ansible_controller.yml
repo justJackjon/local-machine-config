@@ -6,7 +6,6 @@
     - include_tasks: ../common/set_python_interpreter.yml
     - name: Manually gather facts once the python interpreter has been set
       setup:
-        args: {}
     - include_tasks: ../common/set_os_facts.yml
     - include_tasks: ../common/set_sys_architecture_facts.yml
   roles:
