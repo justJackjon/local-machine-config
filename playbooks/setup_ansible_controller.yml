@@ -4,7 +4,6 @@
   gather_facts: false
   pre_tasks:
     - include_tasks: ../common/set_python_interpreter.yml
-  tasks:
     - name: Manually gather facts once the python interpreter has been set
       setup:
         args: {}
