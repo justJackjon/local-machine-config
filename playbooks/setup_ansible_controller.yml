@@ -1,10 +1,14 @@
 - name: Setup Ansible Controller
   hosts: localhost
   connection: local
-  gather_facts: true
+  gather_facts: false
   pre_tasks:
-    - include_tasks: ../common/set_os_facts.yml
     - include_tasks: ../common/set_python_interpreter.yml
+  tasks:
+    - name: Manually gather facts once the python interpreter has been set
+      setup:
+        args: {}
+    - include_tasks: ../common/set_os_facts.yml
     - include_tasks: ../common/set_sys_architecture_facts.yml
   roles:
     - install_base_packages
