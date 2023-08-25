@@ -60,7 +60,7 @@
 
             - name: Set deletion script permissions
               file:
-                path: "{{ xfce4_shortcut_deletion_script_path }}"
+                path: "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
                 mode: '0744'
 
             - name: Execute XFCE4 workspace switching shortcut deletion script
@@ -68,7 +68,7 @@
 
             - name: Set creation script permissions
               file:
-                path: "{{ xfce4_shortcut_creation_script_path }}"
+                path: "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
                 mode: '0744'
 
             - name: Execute XFCE4 workspace switching shortcut creation script
