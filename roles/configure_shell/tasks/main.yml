@@ -1,3 +1,17 @@
+- name: Configure Shell
+  block:
+    - name: Change default MacOS shell from zsh to bash
+      when: is_mac
+      become: true
+      block:
+        - name: Add Homebrew's Bash to the list of allowed shells
+          lineinfile:
+            path: /etc/shells
+            line: /opt/homebrew/bin/bash
+            state: present
+        - name: Change default shell to Homebrew's Bash
+          command: chsh -s /opt/homebrew/bin/bash {{ ansible_user_id }}
+
 - name: Enable tab completion for Ansible CLI commands
   block:
     - name: Install argcomplete for Ansible tab completion
