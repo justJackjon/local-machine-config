@@ -7,7 +7,7 @@
         name:
           - python3-pip
           - bash-completion
-        state: present
+        state: latest
         update_cache: true
 
     - name: Install required packages for macOS
@@ -28,9 +28,10 @@
         - name: Install Homebrew packages
           homebrew:
             name:
-              - python3
+              - bash
               - bash-completion
-            state: present
+              - python3
+            state: latest
             update_homebrew: yes
 
     - name: Install required packages for Windows with MSYS2
@@ -41,5 +42,5 @@
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-setuptools
           - bash-completion
-        state: present
+        state: latest
         update_cache: true
