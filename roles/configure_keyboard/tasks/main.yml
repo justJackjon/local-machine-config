@@ -74,6 +74,20 @@
             - name: Execute XFCE4 workspace switching shortcut creation script
               command: "{{ role_path }}/files/{{ xfce4_shortcut_creation_script_path }}"
 
+        - name: Configure MacOS workspace shortcuts
+          when: is_mac
+          block:
+            - name: Set creation script permissions
+              file:
+                path: "{{ role_path }}/files/{{ macos_shortcut_creation_script_path }}"
+                mode: '0744'
+
+            - name: Execute MacOS workspace switching shortcut creation script
+              # NOTE: Requires bash 4 or higher to provide support for associative arrays.
+              # Because the `shell` module runs `sh` by default unless it is symlinked to
+              # `/bin/bash`, the `command` module is used instead to spawn a bash shell.
+              command: "bash {{ role_path }}/files/{{ macos_shortcut_creation_script_path }}"
+
     - name: Install Kinto.sh 
       tags: kinto_install
       block:
