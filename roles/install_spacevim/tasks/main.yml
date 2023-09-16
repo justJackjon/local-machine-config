@@ -161,6 +161,7 @@
                 path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
                 regexp: '^FontName='
                 line: 'FontName=CaskaydiaCove Nerd Font 10'
+                create: true
 
         - name: Configure Terminal app to use Nerd Font on MacOS
           when: is_mac
