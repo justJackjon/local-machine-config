@@ -22,7 +22,7 @@
             name:
               - argcomplete
             state: present
-            extra_args: '--user'
+            extra_args: '--user --break-system-packages'
         - name: Install argcomplete on Windows MSYS2 systems using Pacman
           when: is_windows
           pacman:
@@ -32,7 +32,7 @@
 
     - name: Find Python user base 
       when: is_mac
-      command: python3 -m site --user-base
+      command: "{{ ansible_python_interpreter }} -m site --user-base"
       register: python_user_base
       changed_when: false
 

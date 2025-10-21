@@ -6,6 +6,12 @@
     - include_tasks: ../common/set_python_interpreter.yml
     - name: Manually gather facts once python interpreter is set
       setup:
+    - name: Ensure 'packaging' library is installed for Ansible's Python environment (macOS)
+      when: ansible_facts.os_family == 'Darwin'
+      ansible.builtin.command: /opt/homebrew/opt/python@3.12/bin/pip3 install packaging --break-system-packages --user
+      changed_when: false
+      failed_when: false # Allow this to fail if packaging is already installed or if pip is not found
+
     - include_tasks: ../common/set_os_facts.yml
     - include_tasks: ../common/set_sys_architecture_facts.yml
   roles:
