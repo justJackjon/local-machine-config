@@ -1,0 +1,232 @@
+- name: Install LazyVim
+  block:
+    - name: Set OS specific facts
+      when: is_windows
+      ansible.builtin.set_fact:
+        minttyrc_file: "{{ '/c/Users/' + ansible_user_id + '/.minttyrc' if is_windows else '~/.minttyrc' }}"
+
+    - name: Set general facts
+      ansible.builtin.set_fact:
+        nvim_config_dir: "{{ '$env:LOCALAPPDATA\nvim' if is_windows else '~/.config/nvim' }}"
+
+    - name: Ensure required dependencies are installed
+      block:
+        - name: Ensure Debian-based system dependencies are installed
+          when: is_debian_family
+          become: true
+          ansible.builtin.apt:
+            name: tar
+            state: present
+            update_cache: true
+
+        - name: Ensure MacOS dependencies are installed
+          when: is_mac
+          block:
+            - name: Check if Homebrew is installed
+              ansible.builtin.command: brew -v
+              register: brew_check
+              ignore_errors: true
+              changed_when: brew_check is failed
+              # TODO: If error try: `brew tap --repair`
+
+            - name: Fail if Homebrew is not installed
+              ansible.builtin.fail:
+                msg: 'Homebrew is not installed. Please install Homebrew first.'
+              when: brew_check.rc != 0
+
+        - name: Ensure Windows dependencies are installed
+          when: is_windows
+          block:
+            - name: Check if MSYS2 is installed on Windows
+              ansible.builtin.stat:
+                path: "{{ item }}"
+              loop:
+                - '/c/msys64/mingw64.exe'
+                - '/c/tools/msys64/mingw64.exe'
+              register: msys2_check
+
+            - name: Fail if MSYS2 is not installed on Windows
+              when:
+                - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
+              ansible.builtin.fail:
+                msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
+
+            - name: Check if Chocolatey is installed
+              ansible.builtin.command: choco -v
+              register: choco_check
+              ignore_errors: true
+              changed_when: choco_check is failed
+
+            - name: Fail if Chocolatey is not installed
+              ansible.builtin.fail:
+                msg: 'Chocolatey is not installed. Please install Chocolatey first.'
+              when: choco_check.rc != 0
+
+    - name: Install Neovim
+      block:
+        - name: Install Neovim on Debian-based systems
+          when: is_debian_family
+          become: true
+          ansible.builtin.apt:
+            name: neovim
+            state: present
+            update_cache: true
+
+        - name: Install Neovim on MacOS
+          when: is_mac
+          homebrew:
+            name: neovim
+            state: present
+            update_homebrew: true
+
+        - name: Install Neovim on Windows
+          when: is_windows
+          ansible.builtin.shell: choco install neovim -y
+
+    - name: Backup current Neovim Configuration (Debian/MacOS)
+      when: is_debian_family or is_mac
+      block:
+        - name: "Backup {{ nvim_config_dir }}"
+          ansible.builtin.shell: "mv {{ nvim_config_dir }}{,.bak}"
+          ignore_errors: true
+
+        - name: Backup ~/.local/share/nvim
+          ansible.builtin.shell: mv ~/.local/share/nvim{,.bak}
+          ignore_errors: true
+
+        - name: Backup ~/.local/state/nvim
+          ansible.builtin.shell: mv ~/.local/state/nvim{,.bak}
+          ignore_errors: true
+
+        - name: Backup ~/.cache/nvim
+          ansible.builtin.shell: mv ~/.cache/nvim{,.bak}
+          ignore_errors: true
+
+    - name: Backup current Neovim Configuration (Windows)
+      when: is_windows
+      block:
+        - name: Backup LOCALAPPDATA nvim
+          win_shell: "Move-Item {{ nvim_config_dir }} {{ nvim_config_dir }}.bak"
+          ignore_errors: true
+
+        - name: Backup LOCALAPPDATA nvim-data
+          win_shell: Move-Item $env:LOCALAPPDATA\nvim-data $env:LOCALAPPDATA\nvim-data.bak
+          ignore_errors: true
+
+        - name: Clone LazyVim starter
+          win_shell: git clone https://github.com/LazyVim/starter $env:LOCALAPPDATA\nvim
+
+        - name: Remove .git folder
+          win_shell: Remove-Item $env:LOCALAPPDATA\nvim\.git -Recurse -Force
+
+    - name: Install LazyVim
+      when: is_debian_family or is_mac
+      block:
+        - name: Clone LazyVim starter
+          ansible.builtin.git:
+            repo: 'https://github.com/LazyVim/starter'
+            dest: "{{ nvim_config_dir }}"
+            force: true
+              # TODO: Creates
+
+        - name: Remove .git folder
+          ansible.builtin.file:
+            path: "{{ nvim_config_dir }}/.git"
+            state: absent
+
+    - name: Install Nerd Font
+      block:
+        - name: Install Nerd Font on Windows
+          when: is_windows
+          ansible.builtin.shell: choco install cascadia-code-nerd-font -y
+
+        - name: Install Nerd Font on MacOS
+          when: is_mac
+          homebrew_cask:
+            name: font-caskaydia-cove-nerd-font
+            state: present
+            update_homebrew: true
+
+        - name: Install Nerd Font on Debian
+          when: is_debian_family
+          block:
+            - name: Install Nerd Font (Debian)
+              check_mode: false
+              ansible.builtin.get_url:
+                url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
+                dest: '/tmp/CascadiaCode.tar.gz'
+              register: download
+
+            - name: Unarchive font
+              when: download.changed
+              ansible.builtin.unarchive:
+                src: '/tmp/CascadiaCode.tar.gz'
+                dest: '~/.local/share/fonts/'
+                remote_src: true
+
+            - name: Update font cache
+              when: download.changed
+              ansible.builtin.command: fc-cache -fv
+              args:
+                warn: false
+
+    - name: Configure the terminal emulator to use the new Nerd Font
+      block:
+        - name: Configure XFCE Terminal to use Nerd Font on Debian-based systems
+          when: is_debian_family
+          block:
+            - name: Ensure XFCE Terminal configuration directory exists
+              ansible.builtin.file:
+                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal"
+                state: directory
+                mode: '0755'
+
+            - name: Configure XFCE Terminal to use Nerd Font
+              ansible.builtin.lineinfile:
+                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
+                regexp: '^FontName='
+                line: 'FontName=CaskaydiaCove Nerd Font 10'
+                create: true
+                mode: '0644'
+
+    - name: Configure Terminal app to use Nerd Font on MacOS
+      when: is_mac
+      block:
+        - name: Check current Terminal font
+          ansible.builtin.command: >
+            osascript -e 'tell application "Terminal"
+              repeat with profileName in (get every settings set)
+                  if font name of profileName is not "CaskaydiaCove Nerd Font" or font size of profileName is not 14 then
+                      return false
+                  end if
+              end repeat
+              return true
+            end tell'
+          register: terminal_font_check
+          changed_when: terminal_font_check.stdout != "true"
+
+        - name: Set font for all Terminal profiles
+          when: terminal_font_check.stdout != "true"
+          ansible.builtin.command: >
+            osascript -e 'tell application "Terminal"
+              repeat with profileName in (get every settings set)
+                  set font name of profileName to "CaskaydiaCove Nerd Font"
+                  set font size of profileName to 14
+              end repeat
+            end tell'
+          changed_when: terminal_font_check.stdout != "true"
+
+        - name: Configure MINTTY to use Nerd Font on Windows
+          when: is_windows
+          block:
+            - name: Ensure .minttyrc file exists
+              ansible.builtin.file:
+                path: "{{ minttyrc_file }}"
+                state: touch
+                mode: '0644'
+
+            - name: Update .minttyrc to use Nerd Font
+              ansible.builtin.lineinfile:
+                path: "{{ minttyrc_file }}"
+                regexp: '^Font='
+                line: 'Font=CaskaydiaCove Nerd Font'
