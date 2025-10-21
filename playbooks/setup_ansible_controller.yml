@@ -19,4 +19,4 @@
     - configure_shell
     - configure_keyboard
     - install_browser
-    - install_spacevim
+    - install_lazyvim
