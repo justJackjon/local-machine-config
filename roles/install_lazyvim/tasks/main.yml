@@ -83,112 +83,21 @@
           when: is_windows
           ansible.builtin.shell: choco install neovim -y
 
+    - name: Define Neovim config paths to backup (Debian/MacOS)
+      when: is_debian_family or is_mac
+      ansible.builtin.set_fact:
+        nvim_backup_paths:
+          - "{{ nvim_config_dir }}"
+          - "~/.local/share/nvim"
+          - "~/.local/state/nvim"
+          - "~/.cache/nvim"
+
     - name: Backup current Neovim Configuration (Debian/MacOS)
       when: is_debian_family or is_mac
-      block:
-        - name: Backup {{ nvim_config_dir }}
-          block:
-            - name: Check if {{ nvim_config_dir }} exists
-              ansible.builtin.stat:
-                path: "{{ nvim_config_dir }}"
-                follow: false
-              register: nvim_config_dir_stat
-
-            - name: Check if {{ nvim_config_dir }}.bak exists
-              ansible.builtin.stat:
-                path: "{{ nvim_config_dir }}.bak"
-                follow: false
-              register: nvim_config_dir_bak_stat
-
-            - name: Ensure old backup directory is removed
-              ansible.builtin.file:
-                path: "{{ nvim_config_dir }}.bak"
-                state: absent
-              when: nvim_config_dir_stat.stat.exists and nvim_config_dir_bak_stat.stat.exists
-              ignore_errors: true
-
-            - name: Move current config to backup
-              ansible.builtin.shell: "mv {{ nvim_config_dir }} {{ nvim_config_dir }}.bak"
-              when: nvim_config_dir_stat.stat.exists
-              ignore_errors: true
-
-        - name: Backup ~/.local/share/nvim
-          block:
-            - name: Check if ~/.local/share/nvim exists
-              ansible.builtin.stat:
-                path: "~/.local/share/nvim"
-                follow: false
-              register: local_share_nvim_stat
-
-            - name: Check if ~/.local/share/nvim.bak exists
-              ansible.builtin.stat:
-                path: "~/.local/share/nvim.bak"
-                follow: false
-              register: local_share_nvim_bak_stat
-
-            - name: Ensure old backup directory is removed
-              ansible.builtin.file:
-                path: "~/.local/share/nvim.bak"
-                state: absent
-              when: local_share_nvim_stat.stat.exists and local_share_nvim_bak_stat.stat.exists
-              ignore_errors: true
-
-            - name: Move current config to backup
-              ansible.builtin.shell: mv ~/.local/share/nvim ~/.local/share/nvim.bak
-              when: local_share_nvim_stat.stat.exists
-              ignore_errors: true
-
-        - name: Backup ~/.local/state/nvim
-          block:
-            - name: Check if ~/.local/state/nvim exists
-              ansible.builtin.stat:
-                path: "~/.local/state/nvim"
-                follow: false
-              register: local_state_nvim_stat
-
-            - name: Check if ~/.local/state/nvim.bak exists
-              ansible.builtin.stat:
-                path: "~/.local/state/nvim.bak"
-                follow: false
-              register: local_state_nvim_bak_stat
-
-            - name: Ensure old backup directory is removed
-              ansible.builtin.file:
-                path: "~/.local/state/nvim.bak"
-                state: absent
-              when: local_state_nvim_stat.stat.exists and local_state_nvim_bak_stat.stat.exists
-              ignore_errors: true
-
-            - name: Move current config to backup
-              ansible.builtin.shell: mv ~/.local/state/nvim ~/.local/state/nvim.bak
-              when: local_state_nvim_stat.stat.exists
-              ignore_errors: true
-
-        - name: Backup ~/.cache/nvim
-          block:
-            - name: Check if ~/.cache/nvim exists
-              ansible.builtin.stat:
-                path: "~/.cache/nvim"
-                follow: false
-              register: cache_nvim_stat
-
-            - name: Check if ~/.cache/nvim.bak exists
-              ansible.builtin.stat:
-                path: "~/.cache/nvim.bak"
-                follow: false
-              register: cache_nvim_bak_stat
-
-            - name: Ensure old backup directory is removed
-              ansible.builtin.file:
-                path: "~/.cache/nvim.bak"
-                state: absent
-              when: cache_nvim_stat.stat.exists and cache_nvim_bak_stat.stat.exists
-              ignore_errors: true
-
-            - name: Move current config to backup
-              ansible.builtin.shell: mv ~/.cache/nvim ~/.cache/nvim.bak
-              when: cache_nvim_stat.stat.exists
-              ignore_errors: true
+      ansible.builtin.include_tasks: ../../common/tasks/backup_directory.yml
+      loop: "{{ nvim_backup_paths }}"
+      loop_control:
+        loop_var: item
 
     - name: Backup current Neovim Configuration (Windows)
       when: is_windows

@@ -3,7 +3,7 @@
   connection: local
   gather_facts: false
   pre_tasks:
-    - include_tasks: ../common/set_python_interpreter.yml
+    - include_tasks: ../common/tasks/set_python_interpreter.yml
     - name: Manually gather facts once python interpreter is set
       setup:
     - name: Ensure 'packaging' library is installed for Ansible's Python environment (macOS)
@@ -12,8 +12,8 @@
       changed_when: false
       failed_when: false # Allow this to fail if packaging is already installed or if pip is not found
 
-    - include_tasks: ../common/set_os_facts.yml
-    - include_tasks: ../common/set_sys_architecture_facts.yml
+    - include_tasks: ../common/tasks/set_os_facts.yml
+    - include_tasks: ../common/tasks/set_sys_architecture_facts.yml
   roles:
     - install_base_packages
     - configure_shell
