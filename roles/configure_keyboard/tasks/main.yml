@@ -58,21 +58,11 @@
             - name: Ensure there are 10 workspaces
               command: xfconf-query -c xfwm4 -p /general/workspace_count -s 10
 
-            - name: Set deletion script permissions
-              file:
-                path: "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
-                mode: '0744'
-
             - name: Execute XFCE4 workspace switching shortcut deletion script
-              command: "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
-
-            - name: Set creation script permissions
-              file:
-                path: "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
-                mode: '0744'
+              command: bash "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
 
             - name: Execute XFCE4 workspace switching shortcut creation script
-              command: "{{ role_path }}/files/{{ xfce4_shortcut_creation_script_path }}"
+              command: bash "{{ role_path }}/files/{{ xfce4_shortcut_creation_script_path }}"
 
         - name: Configure MacOS workspace shortcuts
           when: is_mac

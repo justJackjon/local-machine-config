@@ -22,7 +22,7 @@
             name:
               - argcomplete
             state: present
-            extra_args: '--user --break-system-packages'
+            extra_args: "{{ '--user --break-system-packages' if is_mac else '--user' }}"
         - name: Install argcomplete on Windows MSYS2 systems using Pacman
           when: is_windows
           pacman:
