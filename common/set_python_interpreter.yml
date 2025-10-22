@@ -1,9 +1,19 @@
 # NOTE: We cannot rely on ansible gathered facts until the interpreter has been set.
-# Therefore, we will use `uname` to determine whether we are running under MSYS2.
-- name: Check if running on Windows under MSYS2
-  raw: uname -o
+# Therefore, we will use `uname` to determine the operating system.
+- name: Check operating system
+  raw: uname -s
   register: os_result
   changed_when: false
+
+- name: Set python interpreter for macOS
+  set_fact:
+    ansible_python_interpreter: "/opt/homebrew/bin/python3.12"
+  when: "'Darwin' in os_result.stdout"
+
+- name: Set python interpreter for Linux
+  set_fact:
+    ansible_python_interpreter: "/usr/bin/python3"
+  when: "'Linux' in os_result.stdout"
 
 - name: Set python interpreter for MSYS2 on Windows
   set_fact:
