@@ -1,0 +1,30 @@
+
+- name: Ensure .dotfiles directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.dotfiles"
+    state: directory
+    mode: '0755'
+
+- name: Clone or update .dotfiles repository
+  ansible.builtin.git:
+    repo: 'https://github.com/justJackjon/.dotfiles.git'
+    dest: "{{ ansible_env.HOME }}/.dotfiles"
+    version: main
+    update: yes
+    accept_hostkey: yes
+
+- name: Stow dotfiles with --adopt and restore git changes
+  ansible.builtin.shell:
+    cmd: |
+      cd "{{ ansible_env.HOME }}/.dotfiles"
+      # NOTE: The --adopt flag is used to take ownership of existing files in the home directory
+      #       that would otherwise conflict with stow's symlinking process. This allows stow
+      #       to create symlinks for these files and move the original files into the .dotfiles
+      #       repository. Immediately after, 'git restore .' is used to revert these changes
+      #       in the .dotfiles repository, ensuring that the repository remains clean and
+      #       reflects only the intended dotfiles from the origin.
+      stow */ --adopt
+      git restore .
+  args:
+    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+  changed_when: true

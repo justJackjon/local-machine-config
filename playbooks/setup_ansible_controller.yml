@@ -20,3 +20,4 @@
     - configure_keyboard
     - install_browser
     - install_lazyvim
+    - stow_dotfiles

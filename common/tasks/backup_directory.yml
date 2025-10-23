@@ -1,4 +1,4 @@
----
+
 - name: Check if {{ item }} exists
   ansible.builtin.stat:
     path: "{{ item }}"
