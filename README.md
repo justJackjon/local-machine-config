@@ -22,7 +22,7 @@ To start the setup, run the following command in your terminal:
 
 ## Features
 
-- **Cross-Platform Configuration:** Supports Debian-based Linux, macOS, and Windows (via MSYS2/Chocolatey).
+- **Cross-Platform Configuration:** Supports Debian-based Linux, macOS, and Windows (via MSYS2/Chocolatey and WSL).
   > [!NOTE]
   > For Linux, this script is designed for Debian-based distributions (e.g., Ubuntu, Mint) using `apt-get`.
 - **Base Package Installation:** Installs fundamental development tools and utilities.
@@ -31,13 +31,14 @@ To start the setup, run the following command in your terminal:
 - **Browser Installation:** Installs a web browser (Chrome or Firefox).
 - **Neovim & LazyVim Setup:** Automates the installation and configuration of Neovim with the LazyVim distribution, including a Nerd Font.
 - **Kinto.sh Integration:** Installs and configures Kinto.sh for improved keyboard experience on Linux.
+- **WSL GUI Setup:** Automates the installation and configuration of XFCE and XRDP for a graphical desktop environment within WSL.
 
 ## Roles Overview
 
 This repository is structured into several Ansible roles, each responsible for a specific aspect of machine configuration.
 
 - **`common/`**: Contains common tasks used across playbooks, primarily for setting up Ansible facts related to the operating system and architecture.
-  - `set_os_facts.yml`: Determines the operating system family (e.g., Debian, macOS, Windows).
+  - `set_os_facts.yml`: Determines the operating system family (e.g., Debian, macOS, Windows) and detects if running within a WSL environment, setting the `is_wsl` fact.
   - `set_python_interpreter.yml`: Configures the Python interpreter for Ansible.
   - `set_sys_architecture_facts.yml`: Identifies the system's architecture (e.g., amd64, arm64).
 
@@ -64,6 +65,9 @@ This repository is structured into several Ansible roles, each responsible for a
   - Clones and sets up [LazyVim](https://www.lazyvim.org/) (a Neovim distribution).
   - Installs a [Nerd Font](https://www.nerdfonts.com/) (Cascadia Code) and configures terminal emulators (XFCE Terminal, macOS Terminal, Mintty on Windows) to use it.
 
+- **`install_wsl_gui/`**:
+  - Installs and configures XFCE (Xfce Desktop Environment) and XRDP (X.Org RDP server) for a graphical desktop experience in WSL environments.
+
 - **`stow_dotfiles/`**:
   - Manages dotfiles by cloning my personal `.dotfiles` repository from GitHub.
   - Uses GNU Stow to symlink the dotfiles into my home directory.
@@ -80,6 +84,8 @@ The playbooks in this repository will install and configure the following softwa
 - **LazyVim** (Neovim distribution)
 - **Nerd Fonts** (Cascadia Code)
 - **Google Chrome** or **Mozilla Firefox** (depending on OS/architecture)
+- **XFCE** (Xfce Desktop Environment)
+- **XRDP** (X.Org RDP server)
 - **Kinto.sh** (Linux only)
 - **Homebrew** (macOS)
 - **Chocolatey** (Windows)

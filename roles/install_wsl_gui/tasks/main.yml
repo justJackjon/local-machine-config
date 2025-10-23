@@ -1,0 +1,25 @@
+- name: Update and upgrade apt packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+  become: yes
+
+- name: Install XFCE, XRDP, and Net-tools
+  apt:
+    name:
+      - xfce4
+      - xrdp
+      - net-tools
+    state: present
+  become: yes
+
+- name: Configure XRDP to use XFCE
+  shell: echo xfce4-session > ~/.xsession
+  args:
+    creates: ~/.xsession
+
+- name: Restart XRDP service
+  service:
+    name: xrdp
+    state: restarted
+  become: yes
