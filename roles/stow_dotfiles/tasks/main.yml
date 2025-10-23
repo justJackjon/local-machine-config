@@ -1,13 +1,12 @@
-
 - name: Ensure .dotfiles directory exists
   ansible.builtin.file:
     path: "{{ ansible_env.HOME }}/.dotfiles"
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Clone or update .dotfiles repository
   ansible.builtin.git:
-    repo: 'https://github.com/justJackjon/.dotfiles.git'
+    repo: "https://github.com/justJackjon/.dotfiles.git"
     dest: "{{ ansible_env.HOME }}/.dotfiles"
     version: main
     update: yes
