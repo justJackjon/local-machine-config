@@ -36,12 +36,23 @@
       register: python_user_base
       changed_when: false
 
-    - name: Set global argcomplete bin directory
-      set_fact:
-        bin_dir: "{{ '/usr' if is_debian_family else (python_user_base.stdout if is_mac else ('/mingw64' if is_windows)) }}/bin/"
+    - name: Activate global argcomplete for macOS
+      when: is_mac
+      shell: yes | {{ python_user_base.stdout }}/bin/activate-global-python-argcomplete --user
+      args:
+        executable: /bin/bash
 
-    - name: Activate global argcomplete
-      shell: yes | {{ bin_dir }}activate-global-python-argcomplete{{ '3' if is_debian_family else '' }} --user
+    - name: Source argcomplete completion script for Debian-based systems
+      when: is_debian_family
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        line: "source /usr/lib/python3/dist-packages/argcomplete/bash_completion.d/python-argcomplete.sh"
+        create: true
+        mode: '0644'
+
+    - name: Activate global argcomplete for Windows (MSYS2)
+      when: is_windows
+      shell: yes | /mingw64/bin/activate-global-python-argcomplete --user
       args:
         executable: /bin/bash
 

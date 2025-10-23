@@ -13,7 +13,7 @@
 
     - name: Install ansible-lint via pipx for Debian based systems
       when: is_debian_family
-      ansible.builtin.command: pipx install ansible-lint || pipx upgrade ansible-lint
+      ansible.builtin.command: pipx install --force ansible-lint
       args:
         creates: "{{ ansible_env.HOME }}/.local/bin/ansible-lint"
 
