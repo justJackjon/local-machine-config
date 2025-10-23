@@ -11,6 +11,12 @@
         state: latest
         update_cache: true
 
+    - name: Install ansible-lint via pipx for Debian based systems
+      when: is_debian_family
+      ansible.builtin.command: pipx install ansible-lint || pipx upgrade ansible-lint
+      args:
+        creates: "{{ ansible_env.HOME }}/.local/bin/ansible-lint"
+
     - name: Install required packages for macOS
       when: is_mac
       block:
@@ -34,6 +40,7 @@
               - python3
               - stow
               - pnpm
+              - ansible-lint
             state: latest
             update_homebrew: yes
 
