@@ -21,3 +21,10 @@
     - install_browser
     - install_lazyvim
     - stow_dotfiles
+
+  post_tasks:
+    - name: Display final instructions
+      ansible.builtin.debug:
+        msg:
+          - "Playbook execution finished."
+          - "If you are having issues with commands not being found (e.g. 'nvim'), please run 'hash -r' or open a new terminal session to refresh your shell's command cache."
