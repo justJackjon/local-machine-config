@@ -155,17 +155,27 @@
               register: terminal_changes
 
         - name: Restart xkeysnail service after making changes to kinto.py
-          when: xfce_changes.changed or gui_changes.changed or terminal_changes.changed
+          when: (xfce_changes.changed or gui_changes.changed or terminal_changes.changed) and not is_wsl
           systemd:
             name: xkeysnail
             state: restarted
           register: kinto_config_result
           become: true
 
+        - name: Restart xkeysnail service for WSL
+          when: (xfce_changes.changed or gui_changes.changed or terminal_changes.changed) and is_wsl
+          shell: |
+            pkill -f "xkeysnail"
+            sudo /usr/bin/xkeysnail --quiet --watch {{ kinto_config_path }} &
+          args:
+            executable: /bin/bash
+          become: true
+          register: kinto_config_result_wsl
+
     - name: Manage Kinto Backup Files
       block:
         - name: Retain latest backup file only
-          when: kinto_config_result is changed
+          when: (kinto_config_result is defined and kinto_config_result is changed) or (kinto_config_result_wsl is defined and kinto_config_result_wsl is changed)
           block:
             - name: Get list of backup files
               when: ansible_facts.system == "Linux"
