@@ -44,3 +44,10 @@
       shell: yes | {{ bin_dir }}activate-global-python-argcomplete{{ '3' if is_debian_family else '' }} --user
       args:
         executable: /bin/bash
+
+- name: Source .dotfilesrc in .bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: "source {{ ansible_env.HOME }}/.dotfilesrc"
+    create: true
+    mode: '0644'
