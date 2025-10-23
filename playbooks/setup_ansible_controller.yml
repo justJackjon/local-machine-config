@@ -16,6 +16,8 @@
     - include_tasks: ../common/tasks/set_sys_architecture_facts.yml
   roles:
     - install_base_packages
+    - role: install_wsl_gui
+      when: is_wsl | default(false)
     - configure_shell
     - configure_keyboard
     - install_browser

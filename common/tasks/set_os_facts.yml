@@ -3,3 +3,14 @@
     is_debian_family: '{{ ansible_os_family == "Debian" }}'
     is_mac: '{{ ansible_os_family == "Darwin" }}'
     is_windows: '{{ ansible_env.OS is defined and ansible_env.OS == "Windows_NT" }}'
+
+- name: Check for WSL
+  command: uname -r
+  register: uname_output
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Set WSL fact
+  set_fact:
+    is_wsl: "{{ uname_output.stdout is defined and ('microsoft' in uname_output.stdout | lower or 'wsl' in uname_output.stdout | lower) }}"
+  when: ansible_os_family == "Debian"
