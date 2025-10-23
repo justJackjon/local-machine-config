@@ -113,6 +113,10 @@ This repository is structured into several Ansible roles, each responsible for a
     *   Clones and sets up [LazyVim](https://www.lazyvim.org/) (a Neovim distribution).
     *   Installs a [Nerd Font](https://www.nerdfonts.com/) (Cascadia Code) and configures terminal emulators (XFCE Terminal, macOS Terminal, Mintty on Windows) to use it.
 
+*   **`stow_dotfiles/`**:
+    *   Manages dotfiles by cloning my personal `.dotfiles` repository from GitHub.
+    *   Uses GNU Stow to symlink the dotfiles into my home directory.
+
 *   **`install_spacevim/`**:
     *   **Note:** This role is being deprecated and replaced by `install_lazyvim`.
 
@@ -134,7 +138,6 @@ The playbooks in this repository will install and configure the following softwa
 *   **argcomplete** (for Ansible tab completion)
 
 ## TODO:
-- Manage dotfiles (inc. new nvim config)
 - Add new nvim role to replace SpaceVim role
 - Install tmux
 - Manage keys
