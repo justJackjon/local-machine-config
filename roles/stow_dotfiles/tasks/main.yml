@@ -4,6 +4,21 @@
     state: directory
     mode: "0755"
 
+- name: Check for local changes in .dotfiles repository
+  ansible.builtin.command: git status --porcelain
+  args:
+    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+  register: git_status
+  changed_when: false
+  ignore_errors: true
+
+- name: Stash local changes if any
+  ansible.builtin.command: git stash
+  args:
+    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+  when: git_status.stdout is defined and git_status.stdout != ""
+  register: git_stash
+
 - name: Clone or update .dotfiles repository
   ansible.builtin.git:
     repo: "https://github.com/justJackjon/.dotfiles.git"
@@ -27,3 +42,9 @@
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
   changed_when: true
+
+- name: Unstash local changes
+  ansible.builtin.command: git stash pop
+  args:
+    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+  when: git_stash.stdout is defined and "Saved working directory and index state" in git_stash.stdout
