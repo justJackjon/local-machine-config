@@ -33,8 +33,55 @@
               - bash-completion
               - python3
               - stow
+              - pnpm
             state: latest
             update_homebrew: yes
+
+    - name: Install nvm, node and pnpm
+      block:
+        - name: Download nvm install script
+          when: is_debian_family or is_mac
+          get_url:
+            url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+            dest: /tmp/install_nvm.sh
+            mode: '0755'
+
+        - name: Run nvm install script
+          when: is_debian_family or is_mac
+          command: /tmp/install_nvm.sh
+          args:
+            creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+
+        - name: Install Node.js LTS for Debian and macOS
+          when: is_debian_family or is_mac
+          shell: source {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install --lts
+          args:
+            executable: /bin/bash
+            creates: "{{ ansible_env.HOME }}/.nvm/versions/node"
+
+        - name: Check if pnpm is installed on Debian
+          when: is_debian_family
+          stat:
+            path: "{{ ansible_env.HOME }}/.local/share/pnpm/pnpm"
+          register: pnpm_stat_debian
+
+        - name: Download pnpm install script
+          when: is_debian_family and not pnpm_stat_debian.stat.exists
+          get_url:
+            url: https://get.pnpm.io/install.sh
+            dest: /tmp/install_pnpm.sh
+            mode: '0755'
+
+        - name: Run pnpm install script
+          when: is_debian_family and not pnpm_stat_debian.stat.exists
+          command: sh /tmp/install_pnpm.sh
+
+        - name: Update pnpm on Debian based systems
+          when: is_debian_family and pnpm_stat_debian.stat.exists
+          shell: "{{ ansible_env.HOME }}/.local/share/pnpm/pnpm self-update"
+          args:
+            executable: /bin/bash
+            chdir: "{{ ansible_env.HOME }}"
 
     - name: Install required packages for Windows with MSYS2
       when: is_windows
@@ -47,3 +94,29 @@
           - stow
         state: latest
         update_cache: true
+
+    - name: Install nvm and Node.js on Windows
+      when: is_windows
+      block:
+        - name: Install nvm-windows
+          win_chocolatey:
+            name: nvm
+            state: present
+        - name: Install Node.js LTS
+          win_shell: nvm install lts
+
+    - name: Check if pnpm is installed on Windows
+      when: is_windows
+      win_stat:
+        path: '{{ ansible_env.LOCALAPPDATA }}\pnpm\pnpm.exe'
+      register: pnpm_stat_windows
+
+    - name: Install pnpm on Windows
+      when: is_windows and not pnpm_stat_windows.stat.exists
+      win_shell: iwr https://get.pnpm.io/install.ps1 -useb | iex
+
+    - name: Update pnpm on Windows
+      when: is_windows and pnpm_stat_windows.stat.exists
+      win_shell: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe self-update"
+      args:
+        chdir: '{{ ansible_env.USERPROFILE }}'
