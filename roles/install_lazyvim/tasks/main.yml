@@ -67,10 +67,48 @@
         - name: Install Neovim on Debian-based systems
           when: is_debian_family
           become: true
-          ansible.builtin.apt:
-            name: neovim
-            state: present
-            update_cache: true
+          block:
+            - name: Remove existing neovim package
+              ansible.builtin.apt:
+                name: neovim
+                state: absent
+
+            - name: Set Neovim architecture string
+              ansible.builtin.set_fact:
+                nvim_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else '' }}"
+
+            - name: Fail if architecture is not supported
+              ansible.builtin.fail:
+                msg: "Unsupported architecture: {{ ansible_architecture }}"
+              when: nvim_arch == ''
+
+            - name: Set Neovim archive and directory names
+              ansible.builtin.set_fact:
+                nvim_archive_name: "nvim-linux-{{ nvim_arch }}.tar.gz"
+                nvim_dir_name: "nvim-linux-{{ nvim_arch }}"
+
+            - name: Download Neovim archive
+              ansible.builtin.get_url:
+                url: "https://github.com/neovim/neovim/releases/latest/download/{{ nvim_archive_name }}"
+                dest: "/tmp/{{ nvim_archive_name }}"
+
+            - name: Remove existing Neovim directory
+              ansible.builtin.file:
+                path: "/opt/{{ nvim_dir_name }}"
+                state: absent
+
+            - name: Unarchive Neovim
+              ansible.builtin.unarchive:
+                src: "/tmp/{{ nvim_archive_name }}"
+                dest: /opt
+                remote_src: true
+                creates: "/opt/{{ nvim_dir_name }}/bin/nvim"
+
+            - name: Create symbolic link
+              ansible.builtin.file:
+                src: "/opt/{{ nvim_dir_name }}/bin/nvim"
+                dest: /usr/local/bin/nvim
+                state: link
 
         - name: Install Neovim on MacOS
           when: is_mac
