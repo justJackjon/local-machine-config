@@ -1,24 +1,26 @@
+- name: "Backup {{ item }}"
+  block:
+    - name: Check if path exists
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      register: primary_path_stat
 
-- name: Check if {{ item }} exists
-  ansible.builtin.stat:
-    path: "{{ item }}"
-    follow: false
-  register: primary_path_stat
+    - name: Check if backup path exists
+      ansible.builtin.stat:
+        path: "{{ item }}.bak"
+        follow: false
+      register: backup_path_stat
 
-- name: Check if {{ item }}.bak exists
-  ansible.builtin.stat:
-    path: "{{ item }}.bak"
-    follow: false
-  register: backup_path_stat
+    - name: Ensure old backup directory is removed
+      ansible.builtin.file:
+        path: "{{ item }}.bak"
+        state: absent
+      when: primary_path_stat.stat.exists and backup_path_stat.stat.exists
+      failed_when: false
 
-- name: Ensure old backup directory is removed
-  ansible.builtin.file:
-    path: "{{ item }}.bak"
-    state: absent
-  when: primary_path_stat.stat.exists and backup_path_stat.stat.exists
-  ignore_errors: true
-
-- name: Move current config to backup
-  ansible.builtin.shell: "mv {{ item }} {{ item }}.bak"
-  when: primary_path_stat.stat.exists
-  ignore_errors: true
+    - name: Move current config to backup
+      ansible.builtin.command: "mv {{ item }} {{ item }}.bak"
+      when: primary_path_stat.stat.exists
+      failed_when: false
+      changed_when: false

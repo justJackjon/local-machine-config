@@ -8,24 +8,25 @@
   ansible.builtin.command: git status --porcelain
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
-  register: git_status
+  register: stow_dotfiles_git_status
   changed_when: false
-  ignore_errors: true
+  failed_when: false
 
 - name: Stash local changes if any
   ansible.builtin.command: git stash
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
-  when: git_status.stdout is defined and git_status.stdout != ""
-  register: git_stash
+  when: stow_dotfiles_git_status.stdout != ""
+  register: stow_dotfiles_git_stash
+  changed_when: false
 
 - name: Clone or update .dotfiles repository
   ansible.builtin.git:
     repo: "https://github.com/justJackjon/.dotfiles.git"
     dest: "{{ ansible_env.HOME }}/.dotfiles"
     version: main
-    update: yes
-    accept_hostkey: yes
+    update: true
+    accept_hostkey: true
 
 - name: Stow dotfiles with --adopt and restore git changes
   ansible.builtin.shell:
@@ -47,4 +48,5 @@
   ansible.builtin.command: git stash pop
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
-  when: git_stash.stdout is defined and "Saved working directory and index state" in git_stash.stdout
+  when: stow_dotfiles_git_stash.stdout is defined and "Saved working directory and index state" in stow_dotfiles_git_stash.stdout
+  changed_when: false

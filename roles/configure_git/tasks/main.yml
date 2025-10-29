@@ -10,45 +10,48 @@
 - name: Get stat of GitHub SSH key
   ansible.builtin.stat:
     path: "{{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa"
-  register: github_ssh_key_stat
+  register: configure_git_github_ssh_key_stat
 
 - name: Create SSH key for GitHub
   community.crypto.openssh_keypair:
     path: "{{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa"
     passphrase: "{{ ssh_passphrase }}"
-    comment: "{{ git_user_email }}"
+    comment: "{{ configure_git_user_email }}"
     type: ed25519
   vars:
     ssh_passphrase: "{{ lookup('password', 'Enter SSH key passphrase chars=ascii_letters,digits,symbols') }}"
-  when: not github_ssh_key_stat.stat.exists
+  when: not configure_git_github_ssh_key_stat.stat.exists
 
 - name: Start ssh-agent and add SSH key
   ansible.builtin.shell: |
-    eval "$(ssh-agent -s)"
+    set -o pipefail && eval "$(ssh-agent -s)"
     echo "{{ ssh_passphrase }}" | ssh-add "{{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa"
   args:
     executable: /bin/bash
   vars:
     ssh_passphrase: "{{ lookup('password', 'Enter SSH key passphrase chars=ascii_letters,digits,symbols') }}"
-  when: not github_ssh_key_stat.stat.exists
+  when: not configure_git_github_ssh_key_stat.stat.exists
+  changed_when: true
 
 - name: Check if GPG key already exists
   ansible.builtin.command: gpg --list-keys --homedir {{ ansible_env.HOME }}/.gnupg/ansible-managed/github
-  register: gpg_keys_check
+  register: configure_git_gpg_keys_check
   changed_when: false
   ignore_errors: true
 
 - name: Check if gh CLI is authenticated
   ansible.builtin.command: gh auth status
-  register: gh_auth_status
+  register: configure_git_gh_auth_status
   changed_when: false
   failed_when: false
   tags: always # This check should always run
 
 - name: Fail if gh CLI is not authenticated
   ansible.builtin.fail:
-    msg: "gh CLI is not authenticated. This process is automated in the 'install.sh' script. Please run 'install.sh' or manually run 'gh auth login' before running this playbook."
-  when: gh_auth_status.rc != 0
+    msg: >
+      gh CLI is not authenticated. This process is automated in the 'install.sh' script.
+      Please run 'install.sh' or manually run 'gh auth login' before running this playbook.
+  when: configure_git_gh_auth_status.rc != 0
 
 - name: Create GPG key for signing commits
   ansible.builtin.shell: |
@@ -57,69 +60,77 @@
     Key-Length: 4096
     Subkey-Type: RSA
     Subkey-Length: 4096
-    Name-Real: {{ git_user_name }}
-    Name-Email: {{ git_user_email }}
+    Name-Real: {{ configure_git_user_name }}
+    Name-Email: {{ configure_git_user_email }}
     Expire-Date: 0
     EOF
   vars:
     gpg_passphrase: "{{ lookup('password', 'Enter GPG key passphrase chars=ascii_letters,digits,symbols') }}"
-  when: git_user_email not in gpg_keys_check.stdout
+  when: configure_git_user_email not in configure_git_gpg_keys_check.stdout
+  changed_when: true
 
 - name: Configure git
-  git_config:
+  community.general.git_config:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
     scope: global
   loop:
-    - { name: "user.name", value: "{{ git_user_name }}" }
-    - { name: "user.email", value: "{{ git_user_email }}" }
+    - { name: "user.name", value: "{{ configure_git_user_name }}" }
+    - { name: "user.email", value: "{{ configure_git_user_email }}" }
     - { name: "gpg.program", value: "gpg" }
     - { name: "commit.gpgsign", value: "true" }
 
 - name: Read SSH public key
   ansible.builtin.slurp:
     src: "{{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa.pub"
-  register: github_ssh_public_key
+  register: configure_git_github_ssh_public_key
 
 - name: Add SSH key to GitHub
   ansible.builtin.shell: |
-    echo "{{ github_ssh_public_key['content'] | b64decode }}" | gh ssh-key add -t "{{ ansible_hostname }} SSH Key" -
+    set -o pipefail && echo "{{ configure_git_github_ssh_public_key['content'] | b64decode }}" | gh ssh-key add -t "{{ ansible_hostname }} SSH Key" -
   args:
     executable: /bin/bash
-  ignore_errors: true
+  failed_when: configure_git_add_ssh_key_result.rc != 0
+  changed_when: true
+  register: configure_git_add_ssh_key_result
 
 - name: Export GPG public key
   ansible.builtin.shell: |
-    GNUPGHOME="{{ ansible_env.HOME }}/.gnupg/ansible-managed/github" gpg --armor --export {{ git_user_email }}
-  register: github_gpg_public_key
+    GNUPGHOME="{{ ansible_env.HOME }}/.gnupg/ansible-managed/github" gpg --armor --export {{ configure_git_user_email }}
+  register: configure_git_github_gpg_public_key
   changed_when: false
 
 - name: Get GPG key fingerprint
   ansible.builtin.shell: |
-    echo "{{ github_gpg_public_key.stdout }}" | gpg --with-colons --import-options show-only --import | grep '^fpr' | cut -d: -f10
-  register: gpg_fingerprint
+    set -o pipefail && echo "{{ configure_git_github_gpg_public_key.stdout }}" | \
+      gpg --with-colons --import-options show-only --import | grep '^fpr' | cut -d: -f10
+  args:
+    executable: /bin/bash
+  register: configure_git_gpg_fingerprint
   changed_when: false
 
 - name: Get list of GPG key fingerprints from GitHub
   ansible.builtin.set_fact:
-    local_key_ids: "{{ gpg_fingerprint.stdout_lines | map('regex_replace', '.*(.{16})$', '\\1') | list }}"
+    configure_git_local_key_ids: "{{ configure_git_gpg_fingerprint.stdout_lines | map('regex_replace', '.*(.{16})$', '\\1') | list }}"
 
 - name: Check if GPG key is on GitHub
-  ansible.builtin.shell: "gh gpg-key list | grep {{ item }}"
-  loop: "{{ local_key_ids }}"
-  register: grep_results
+  ansible.builtin.shell: "set -o pipefail && gh gpg-key list | grep {{ item }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ configure_git_local_key_ids }}"
+  register: configure_git_grep_results
   failed_when: false
   changed_when: false
 
 - name: Set key_found fact
   ansible.builtin.set_fact:
-    key_found: true
-  when: grep_results.results | selectattr('rc', 'equalto', 0) | list | length > 0
+    configure_git_key_found: true
+  when: configure_git_grep_results.results | selectattr('rc', 'equalto', 0) | list | length > 0
 
 - name: Add GPG key to GitHub
   ansible.builtin.shell: |
-    echo "{{ github_gpg_public_key.stdout }}" | gh gpg-key add -t "{{ ansible_hostname }} GPG Key" -
+    set -o pipefail && echo "{{ configure_git_github_gpg_public_key.stdout }}" | gh gpg-key add -t "{{ ansible_hostname }} GPG Key" -
   args:
     executable: /bin/bash
-  when: not key_found
-
+  when: not configure_git_key_found
+  changed_when: true
