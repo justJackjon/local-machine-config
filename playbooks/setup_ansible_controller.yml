@@ -12,6 +12,11 @@
       changed_when: false
       failed_when: false # Allow this to fail if packaging is already installed or if pip is not found
 
+    - name: Set is_inside_xfce fact
+      ansible.builtin.set_fact:
+        is_inside_xfce: "{{ ansible_facts.env.XDG_CURRENT_DESKTOP is defined and ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE' }}"
+      tags: always
+
     - include_tasks: ../common/tasks/set_os_facts.yml
     - include_tasks: ../common/tasks/set_sys_architecture_facts.yml
   roles:
