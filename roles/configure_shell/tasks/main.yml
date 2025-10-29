@@ -5,67 +5,56 @@
       become: true
       block:
         - name: Add Homebrew's Bash to the list of allowed shells
-          ansible.builtin.lineinfile:
+          lineinfile:
             path: /etc/shells
             line: /opt/homebrew/bin/bash
             state: present
         - name: Change default shell to Homebrew's Bash
-          ansible.builtin.command: chsh -s /opt/homebrew/bin/bash {{ ansible_user_id }}
-          changed_when: false
+          command: chsh -s /opt/homebrew/bin/bash {{ ansible_user_id }}
 
 - name: Enable tab completion for Ansible CLI commands
   block:
     - name: Install argcomplete for Ansible tab completion
       block:
-        - name: Install argcomplete on Debian-based systems using Apt
-          when: is_debian_family
-          become: true
-          ansible.builtin.apt:
-            name: python3-argcomplete
-            state: present
-
-        - name: Install argcomplete on macOS systems using Pip
-          when: is_mac # NOTE: Changed from 'not is_windows'
-          ansible.builtin.pip:
+        - name: Install argcomplete on non-Windows systems using Pip
+          when: not is_windows
+          pip:
             name:
               - argcomplete
             state: present
-            extra_args: "--user --break-system-packages" # NOTE: Simplified from ternary
-
+            extra_args: "{{ '--user --break-system-packages' if is_mac else '--user' }}"
         - name: Install argcomplete on Windows MSYS2 systems using Pacman
           when: is_windows
-          community.general.pacman:
-            name: mingw-w64-x86__64-python-argcomplete
+          pacman:
+            name: mingw-w64-x86_64-python-argcomplete
             state: present
             update_cache: true
 
-    - name: Find Python user base
+    - name: Find Python user base 
       when: is_mac
-      ansible.builtin.command: "{{ ansible_python_interpreter }} -m site --user-base"
-      register: configure_shell_python_user_base
+      command: "{{ ansible_python_interpreter }} -m site --user-base"
+      register: python_user_base
       changed_when: false
 
     - name: Activate global argcomplete for macOS
       when: is_mac
-      ansible.builtin.shell: set -o pipefail && yes | {{ configure_shell_python_user_base.stdout }}/bin/activate-global-python-argcomplete --user
+      shell: yes | {{ python_user_base.stdout }}/bin/activate-global-python-argcomplete --user
       args:
         executable: /bin/bash
-      changed_when: false
 
-    - name: Manually create global argcomplete hook for Debian (workaround for buggy script)
+    - name: Source argcomplete completion script for Debian-based systems
       when: is_debian_family
-      become: true
-      ansible.builtin.copy:
-        src: python-argcomplete.sh
-        dest: /etc/bash_completion.d/python-argcomplete.sh
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        line: "source /usr/lib/python3/dist-packages/argcomplete/bash_completion.d/python-argcomplete.sh"
+        create: true
         mode: '0644'
 
     - name: Activate global argcomplete for Windows (MSYS2)
       when: is_windows
-      ansible.builtin.shell: set -o pipefail && yes | /mingw64/bin/activate-global-python-argcomplete --user
+      shell: yes | /mingw64/bin/activate-global-python-argcomplete --user
       args:
         executable: /bin/bash
-      changed_when: false
 
 - name: Source .dotfilesrc in .bashrc
   ansible.builtin.lineinfile:
