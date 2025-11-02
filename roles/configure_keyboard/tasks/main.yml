@@ -16,6 +16,8 @@
             ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE') or
             (is_wsl | default(false))
           }}
+        is_linux_system: "{{ ansible_facts.system == 'Linux' }}"
+        is_apt_package_manager: "{{ ansible_facts.pkg_mgr == 'apt' }}"
 
     - name: Apply Custom Keyboard Mappings for Debian based systems on Chromebook hardware
       when: configure_keyboard_is_debian_os_on_gb_chromebook
@@ -64,11 +66,11 @@
               changed_when: false
 
             - name: Execute XFCE4 workspace switching shortcut deletion script
-              ansible.builtin.command: bash "{{ role_path }}/files/{{ xfce4_shortcut_deletion_script_path }}"
+              ansible.builtin.command: bash "{{ role_path }}/files/{{ configure_keyboard_xfce4_shortcut_deletion_script_path }}"
               changed_when: false
 
             - name: Execute XFCE4 workspace switching shortcut creation script
-              ansible.builtin.command: bash "{{ role_path }}/files/{{ xfce4_shortcut_creation_script_path }}"
+              ansible.builtin.command: bash "{{ role_path }}/files/{{ configure_keyboard_xfce4_shortcut_creation_script_path }}"
               changed_when: false
 
         - name: Configure MacOS workspace shortcuts
@@ -76,24 +78,24 @@
           block:
             - name: Set creation script permissions
               ansible.builtin.file:
-                path: "{{ role_path }}/files/{{ macos_shortcut_creation_script_path }}"
+                path: "{{ role_path }}/files/{{ configure_keyboard_macos_shortcut_creation_script_path }}"
                 mode: "0744"
 
             - name: Execute MacOS workspace switching shortcut creation script
               # NOTE: Requires bash 4 or higher to provide support for associative arrays.
               # Because the `shell` module runs `sh` by default unless it is symlinked to
               # `/bin/bash`, the `command` module is used instead to spawn a bash shell.
-              ansible.builtin.command: "bash {{ role_path }}/files/{{ macos_shortcut_creation_script_path }}"
+              ansible.builtin.command: "bash {{ role_path }}/files/{{ configure_keyboard_macos_shortcut_creation_script_path }}"
               changed_when: false
 
     - name: Install Kinto.sh
       tags: kinto_install
       block:
         - name: Install Kinto.sh on Linux
-          when: ansible_facts.system == 'Linux'
+          when: is_linux_system
           block:
             - name: Install Kinto dependencies
-              when: ansible_facts.pkg_mgr == 'apt'
+              when: is_apt_package_manager
               ansible.builtin.apt:
                 name:
                   - gir1.2-vte-2.91
@@ -121,8 +123,12 @@
                 mode: '0755'
               register: configure_keyboard_kinto_download_result
 
+            - name: Set fact if Kinto download was successful
+              ansible.builtin.set_fact:
+                is_kinto_download_successful: "{{ configure_keyboard_kinto_download_result is success }}"
+
             - name: Run Kinto install script
-              when: configure_keyboard_kinto_download_result is success
+              when: is_kinto_download_successful
               ansible.builtin.shell:
                 cmd: "{{ configure_keyboard_tempdir.path }}/install_kinto.sh"
                 executable: /bin/bash
@@ -136,7 +142,7 @@
         - name: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4
           when: configure_keyboard_is_xfce_desktop
           ansible.builtin.replace:
-            path: "{{ kinto_config_path }}"
+            path: "{{ configure_keyboard_kinto_config_path }}"
             regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
             replace: '\1\3'
             backup: true
@@ -147,7 +153,7 @@
           block:
             - name: Modify general GUI related shortcuts
               ansible.builtin.blockinfile:
-                path: "{{ kinto_config_path }}"
+                path: "{{ configure_keyboard_kinto_config_path }}"
                 block: "{{ lookup('file', 'snippets/kinto/gui_shortcuts') }}"
                 marker: "# {mark}: ANSIBLE MANAGED GENERAL GUI SHORTCUTS"
                 insertbefore: '\s*\},\s*\"General GUI\"\s*'
@@ -155,32 +161,37 @@
 
             - name: Modify terminal related shortcuts
               ansible.builtin.blockinfile:
-                path: "{{ kinto_config_path }}"
+                path: "{{ configure_keyboard_kinto_config_path }}"
                 block: "{{ lookup('file', 'snippets/kinto/terminal_shortcuts') }}"
                 marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
                 insertbefore: '\s*\},\s*\"terminals\"\s*'
               register: configure_keyboard_terminal_changes
 
+        - name: Set fact if Kinto configuration has changed
+          ansible.builtin.set_fact:
+            is_kinto_config_changed: "{{ configure_keyboard_xfce_changes.changed or configure_keyboard_gui_changes.changed or configure_keyboard_terminal_changes.changed }}"
+
         - name: Restart xkeysnail service after making changes to kinto.py
-          when: >-
-            (configure_keyboard_xfce_changes.changed or
-            configure_keyboard_gui_changes.changed or
-            configure_keyboard_terminal_changes.changed) and not is_wsl
+          when: is_kinto_config_changed and not is_wsl
           ansible.builtin.systemd:
             name: xkeysnail
             state: restarted
           register: configure_keyboard_kinto_config_result
           become: true
 
+    - name: Set fact if Kinto config result is changed
+      ansible.builtin.set_fact:
+        is_kinto_config_result_changed: "{{ configure_keyboard_kinto_config_result is defined and configure_keyboard_kinto_config_result is changed }}"
+
     - name: Manage Kinto Backup Files
       block:
         - name: Retain latest backup file only
-          when: configure_keyboard_kinto_config_result is defined and configure_keyboard_kinto_config_result is changed
+          when: is_kinto_config_result_changed
           block:
             - name: Get list of backup files
-              when: ansible_facts.system == "Linux"
+              when: is_linux_system
               ansible.builtin.set_fact:
-                configure_keyboard_backup_files: "{{ lookup('fileglob', kinto_config_path ~ '.*', wantlist=true) }}"
+                configure_keyboard_backup_files: "{{ lookup('fileglob', configure_keyboard_kinto_config_path ~ '.*', wantlist=true) }}"
 
             - name: Extract timestamps from backup filenames
               ansible.builtin.set_fact:
@@ -193,10 +204,12 @@
                   {{ configure_keyboard_backup_files | zip(configure_keyboard_backup_files_with_ts)
                   | sort(attribute='1') | map(attribute='0') | list }}
 
+            - name: Set fact if there are multiple Kinto backup files
+              ansible.builtin.set_fact:
+                has_multiple_kinto_backup_files: "{{ configure_keyboard_backup_files_sorted is defined and configure_keyboard_backup_files_sorted|length > 1 }}"
+
             - name: Remove older backup files whilst retaining the latest backup
-              when: >-
-                configure_keyboard_backup_files_sorted is defined and
-                configure_keyboard_backup_files_sorted|length > 1
+              when: has_multiple_kinto_backup_files
               ansible.builtin.file:
                 path: "{{ item }}"
                 state: absent

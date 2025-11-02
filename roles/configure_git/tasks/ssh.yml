@@ -7,6 +7,10 @@
     path: "{{ configure_git_ssh_key_path }}"
   register: configure_git_ssh_key_stat
 
+- name: Set fact if SSH key is present locally
+  ansible.builtin.set_fact:
+    is_ssh_key_present_locally: "{{ configure_git_ssh_key_stat.stat.exists }}"
+
 - name: Create managed directory for SSH key
   ansible.builtin.file:
     path: "{{ configure_git_ssh_key_path | dirname }}"
@@ -17,9 +21,7 @@
   ansible.builtin.pause:
     prompt: "Enter SSH key passphrase"
     echo: false
-  register: configure_git_ssh_passphrase_prompt
-  no_log: true
-  when: not configure_git_ssh_key_stat.stat.exists
+  when: not is_ssh_key_present_locally
 
 - name: Confirm SSH key passphrase
   ansible.builtin.pause:
@@ -27,12 +29,17 @@
     echo: false
   register: configure_git_ssh_passphrase_confirm
   no_log: true
-  when: not configure_git_ssh_key_stat.stat.exists
+  when: not is_ssh_key_present_locally
+
+- name: Set fact if SSH key passphrases match
+  ansible.builtin.set_fact:
+    is_ssh_passphrases_match: "{{ configure_git_ssh_passphrase_prompt.user_input == configure_git_ssh_passphrase_confirm.user_input }}"
+  when: configure_git_ssh_passphrase_prompt is defined
 
 - name: Fail if SSH key passphrases don't match
   ansible.builtin.fail:
     msg: "SSH key passphrases don't match!"
-  when: not configure_git_ssh_key_stat.stat.exists and (configure_git_ssh_passphrase_prompt.user_input != configure_git_ssh_passphrase_confirm.user_input)
+  when: not is_ssh_key_present_locally and not is_ssh_passphrases_match
 
 - name: Create SSH key for GitHub
   community.crypto.openssh_keypair:
@@ -40,7 +47,7 @@
     passphrase: "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}"
     comment: "{{ configure_git_user_email }}"
     type: ed25519
-  when: not configure_git_ssh_key_stat.stat.exists
+  when: not is_ssh_key_present_locally
 
 - name: Read SSH public key
   ansible.builtin.slurp:
@@ -48,9 +55,17 @@
   register: configure_git_ssh_public_key
 
 - name: Get remote SSH public keys from GitHub
-  ansible.builtin.shell: gh ssh-key list --json key | jq -r '.[].key'
+  ansible.builtin.shell: |
+    set -o pipefail
+    gh api /user/keys | jq -r '.[].key'
+  args:
+    executable: /bin/bash
   register: configure_git_remote_ssh_keys
   changed_when: false
+
+- name: Set fact if SSH key is already on GitHub
+  ansible.builtin.set_fact:
+    is_ssh_key_already_on_github: "{{ (configure_git_ssh_public_key.content | b64decode) in configure_git_remote_ssh_keys.stdout_lines }}"
 
 - name: Add SSH key to GitHub
   ansible.builtin.shell: |
@@ -59,7 +74,7 @@
   args:
     executable: /bin/bash
   register: configure_git_add_ssh_key_result
-  when: "(configure_git_ssh_public_key.content | b64decode) not in configure_git_remote_ssh_keys.stdout_lines"
+  when: not is_ssh_key_already_on_github
   changed_when: "'already exist' not in configure_git_add_ssh_key_result.stderr"
   failed_when: "configure_git_add_ssh_key_result.rc != 0 and 'already exist' not in configure_git_add_ssh_key_result.stderr"
 
@@ -71,8 +86,9 @@
 
 - name: Add SSH key to ssh-agent
   ansible.builtin.shell: |
+    set -o pipefail
     echo "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"
   args:
     executable: /bin/bash
-  when: not configure_git_ssh_key_stat.stat.exists
+  when: not is_ssh_key_present_locally
   changed_when: true
