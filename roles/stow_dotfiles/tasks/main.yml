@@ -4,7 +4,9 @@
     state: directory
     mode: "0755"
 
-- name: Check for local changes in .dotfiles repository
+- name: Check for local changes in .dotfiles repository  # noqa: command-instead-of-module
+  # NOTE: The ansible.builtin.git module does not support `git status --porcelain`,
+  #       so we use `ansible.builtin.command` here.
   ansible.builtin.command: git status --porcelain
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
@@ -12,17 +14,27 @@
   changed_when: false
   failed_when: false
 
-- name: Stash local changes if any
+- name: Set fact if dotfiles repository is dirty
+  ansible.builtin.set_fact:
+    is_dotfiles_repo_dirty: "{{ stow_dotfiles_git_status.stdout != '' }}"
+
+- name: Stash local changes if any  # noqa: command-instead-of-module
+  # NOTE: The ansible.builtin.git module does not support `git stash`,
+  #       so we use `ansible.builtin.command` here.
   ansible.builtin.command: git stash
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
-  when: stow_dotfiles_git_status.stdout != ""
+  when: is_dotfiles_repo_dirty
   register: stow_dotfiles_git_stash
   changed_when: false
 
+- name: Set fact if git stash was successful
+  ansible.builtin.set_fact:
+    is_git_stash_successful: "{{ stow_dotfiles_git_stash.stdout is defined and 'Saved working directory and index state' in stow_dotfiles_git_stash.stdout }}"
+
 - name: Clone or update .dotfiles repository
   ansible.builtin.git:
-    repo: "https://github.com/justJackjon/.dotfiles.git"
+    repo: "{{ stow_dotfiles_repo_url }}"
     dest: "{{ ansible_env.HOME }}/.dotfiles"
     version: main
     update: true
@@ -44,9 +56,11 @@
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
   changed_when: true
 
-- name: Unstash local changes
+- name: Unstash local changes  # noqa: command-instead-of-module
+  # NOTE: The ansible.builtin.git module does not support `git stash pop`,
+  #       so we use `ansible.builtin.command` here.
   ansible.builtin.command: git stash pop
   args:
     chdir: "{{ ansible_env.HOME }}/.dotfiles"
-  when: stow_dotfiles_git_stash.stdout is defined and "Saved working directory and index state" in stow_dotfiles_git_stash.stdout
+  when: is_git_stash_successful
   changed_when: false

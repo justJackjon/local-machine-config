@@ -8,7 +8,4 @@
     - { name: "user.email", value: "{{ configure_git_user_email }}" }
     - { name: "gpg.program", value: "gpg" }
     - { name: "commit.gpgsign", value: "true" }
-    - {
-        name: "user.signingkey",
-        value: "{{ configure_git_gpg_fingerprint.stdout }}",
-      }
+    - { name: "user.signingkey", value: "{{ configure_git_gpg_fingerprint.stdout }}" }

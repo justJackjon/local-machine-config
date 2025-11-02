@@ -191,14 +191,25 @@
           ansible.windows.win_shell: nvm install lts
           changed_when: false
 
+    - name: Get current nofile soft limit
+      ansible.builtin.shell: ulimit -Sn
+      register: install_base_packages_soft_limit
+      changed_when: false
+
+    - name: Get current nofile hard limit
+      ansible.builtin.shell: ulimit -Hn
+      register: install_base_packages_hard_limit
+      changed_when: false
+
     - name: Increase the number of open files limit
+      when: install_base_packages_soft_limit.stdout | int < install_base_packages_max_open_files or install_base_packages_hard_limit.stdout | int < install_base_packages_max_open_files
       become: true
       ansible.builtin.blockinfile:
         path: /etc/security/limits.conf
         block: |
           # Increased for development environment
-          {{ ansible_user_id }} soft nofile 65536
-          {{ ansible_user_id }} hard nofile 65536
+          {{ ansible_user_id }} soft nofile {{ install_base_packages_max_open_files }}
+          {{ ansible_user_id }} hard nofile {{ install_base_packages_max_open_files }}
         marker: "# {mark} ANSIBLE MANAGED BLOCK for nofile limit"
         mode: '0644'
 

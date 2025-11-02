@@ -6,17 +6,18 @@
       when: is_debian_family and not is_arm64
       block:
         - name: Download Google Chrome
-          get_url:
+          ansible.builtin.get_url:
             url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
             dest: /tmp/google-chrome-stable_current_amd64.deb
+            mode: '0644'
 
         - name: Install Google Chrome
-          apt:
+          ansible.builtin.apt:
             deb: /tmp/google-chrome-stable_current_amd64.deb
             state: present
 
         - name: Clean up downloaded file
-          file:
+          ansible.builtin.file:
             path: /tmp/google-chrome-stable_current_amd64.deb
             state: absent
 
@@ -24,7 +25,7 @@
       # NOTE: Because Chrome is not presently available for Linux on ARM64 based systems, we'll use Firefox as an alternative browser.
       when: is_debian_family and is_arm64
       become: true
-      apt:
+      ansible.builtin.apt:
         name: firefox
         state: present
         update_cache: true
