@@ -13,6 +13,7 @@
           - tldr
           - tree
           - alacritty
+          - ssh-askpass
         state: present
         update_cache: true
 
@@ -95,6 +96,7 @@
               - tldr
               - tree
               - alacritty
+              - ssh-askpass
             state: present
             update_homebrew: true
 
@@ -176,6 +178,10 @@
         - name: Install gnupg on Windows
           chocolatey.chocolatey.win_chocolatey:
             name: gnupg
+            state: present
+        - name: Install openssh on Windows
+          chocolatey.chocolatey.win_chocolatey:
+            name: openssh
             state: present
         - name: Install Alacritty on Windows
           chocolatey.chocolatey.win_chocolatey:

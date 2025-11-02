@@ -38,7 +38,7 @@
 
   roles:
     - role: install_base_packages
-      tags: install_base_packages
+      tags: [install_base_packages, configure_git]
 
     - role: install_wsl_gui
       when: is_wsl | default(false)

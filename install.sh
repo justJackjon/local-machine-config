@@ -63,13 +63,13 @@ if [ "$os" == "Linux" ]; then
   GH_VERSION=$(gh --version | head -n 1 | cut -d ' ' -f 3)
   if printf '%s\n' "2.48.0" "$GH_VERSION" | sort -V -C; then
     # The gh version is 2.48.0 or higher, use --skip-ssh-key...
-    gh auth login --web --git-protocol ssh -h github.com -s public_repo,write:gpg_key,admin:public_key --skip-ssh-key
+    gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   else
     # The gh version is older, --skip-ssh-key flag not available.
     # The --clipboard flag is also only available in gh 2.79.0 or higher, see: https://github.com/cli/cli/releases/tag/v2.79.0
     warning "When prompted to 'Generate a new SSH key to add to your GitHub account?', please answer 'n'. Ansible will handle SSH key generation."
     note "The --skip-ssh-key flag is not available in your gh CLI version (${GH_VERSION}). See: https://github.com/cli/cli/releases/tag/v2.48.0 for release notes."
-    gh auth login --web --git-protocol ssh -h github.com -s public_repo,write:gpg_key,admin:public_key
+    gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key
   fi
   info "gh CLI authentication complete."
 
@@ -91,7 +91,7 @@ elif [ "$os" == "macOS" ]; then
   ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto
 
   info "Authenticating gh CLI (user interaction required)..."
-  gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,write:gpg_key,admin:public_key --skip-ssh-key
+  gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   info "gh CLI authentication complete."
 
 elif [ "$os" == "Windows" ]; then
@@ -111,7 +111,7 @@ elif [ "$os" == "Windows" ]; then
   ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto
 
   info "Authenticating gh CLI (user interaction required)..."
-  gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,write:gpg_key,admin:public_key --skip-ssh-key
+  gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   info "gh CLI authentication complete."
 else
   info "Unsupported OS: ${os}"
