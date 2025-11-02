@@ -10,3 +10,16 @@
     msg: "gh CLI is not authenticated. This process is automated in the 'install.sh' script. Please run 'install.sh' or manually run 'gh auth login' before running this playbook."
   when: gh_auth_status.rc != 0
   tags: configure_git
+
+- name: Install ssh-askpass for Debian
+  ansible.builtin.package:
+    name: ssh-askpass
+    state: present
+  when: ansible_facts.os_family == "Debian"
+  become: true
+
+- name: Install openssh for macOS
+  community.general.homebrew:
+    name: openssh
+    state: present
+  when: ansible_facts.os_family == "Darwin"

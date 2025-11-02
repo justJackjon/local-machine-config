@@ -1,0 +1,62 @@
+- name: Check for existing GPG secret key
+  ansible.builtin.shell: |
+    set -o pipefail
+    gpg --list-secret-keys --with-colons "{{ configure_git_user_email }}" | grep '^sec'
+  args:
+    executable: /bin/bash
+  register: configure_git_gpg_secret_key_check
+  changed_when: false
+  failed_when: false
+
+- name: Create GPG key
+  ansible.builtin.shell: |
+    gpg --batch --full-generate-key <<EOF
+    Key-Type: RSA
+    Key-Length: 4096
+    Subkey-Type: RSA
+    Subkey-Length: 4096
+    Name-Real: {{ configure_git_user_name }}
+    Name-Email: {{ configure_git_user_email }}
+    Name-Comment: ansible-managed
+    Expire-Date: 0
+    EOF
+  args:
+    executable: /bin/bash
+  when: configure_git_gpg_secret_key_check.stdout == ""
+  changed_when: true
+
+- name: Get GPG key fingerprint
+  ansible.builtin.shell: |
+    set -o pipefail
+    # NOTE: Extracting the short GPG key fingerprint (last 16 characters) for git configuration.
+    gpg --list-secret-keys --with-colons "{{ configure_git_user_email }}" | grep '^sec' | cut -d: -f5 | tail -c 17
+  args:
+    executable: /bin/bash
+  register: configure_git_gpg_fingerprint
+  changed_when: false
+
+- name: Export GPG public key
+  ansible.builtin.shell: |
+    gpg --armor --export "{{ configure_git_gpg_fingerprint.stdout }}"
+  args:
+    executable: /bin/bash
+  register: configure_git_gpg_public_key
+  changed_when: false
+
+- name: Get remote GPG keys from GitHub
+  ansible.builtin.shell: gh gpg-key list --json keyID | jq -r '.[].keyID'
+  args:
+    executable: /bin/bash
+  register: configure_git_remote_gpg_keys
+  changed_when: false
+
+- name: Add GPG key to GitHub
+  ansible.builtin.shell: |
+    set -o pipefail
+    echo "{{ configure_git_gpg_public_key.stdout }}" | gh gpg-key add -t "{{ ansible_hostname }} GPG Key (ansible-managed)" -
+  args:
+    executable: /bin/bash
+  register: configure_git_add_gpg_key_result
+  when: "configure_git_gpg_fingerprint.stdout not in configure_git_remote_gpg_keys.stdout_lines"
+  changed_when: "'already exist' not in configure_git_add_gpg_key_result.stderr"
+  failed_when: "configure_git_add_gpg_key_result.rc != 0 and 'already exist' not in configure_git_add_gpg_key_result.stderr"
