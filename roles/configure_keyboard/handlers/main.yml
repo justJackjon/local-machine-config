@@ -1,4 +1,3 @@
----
 - name: Apply custom key mappings with xmodmap
   ansible.builtin.command:
     cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap

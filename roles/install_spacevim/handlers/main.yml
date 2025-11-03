@@ -1,0 +1,12 @@
+- name: Unarchive font
+  ansible.builtin.unarchive:
+    src: "/tmp/CascadiaCode.tar.gz"
+    dest: "~/.local/share/fonts/"
+    remote_src: true
+  notify: Update font cache
+
+- name: Update font cache # noqa: inline-env-var
+  ansible.builtin.command: fc-cache -fv
+  args:
+    warn: false
+  changed_when: false

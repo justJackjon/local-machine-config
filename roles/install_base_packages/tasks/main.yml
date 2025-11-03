@@ -202,7 +202,9 @@
       changed_when: false
 
     - name: Increase the number of open files limit
-      when: install_base_packages_soft_limit.stdout | int < install_base_packages_max_open_files or install_base_packages_hard_limit.stdout | int < install_base_packages_max_open_files
+      when:
+        - (install_base_packages_soft_limit.stdout | int < install_base_packages_max_open_files) or
+          (install_base_packages_hard_limit.stdout | int < install_base_packages_max_open_files)
       become: true
       ansible.builtin.blockinfile:
         path: /etc/security/limits.conf
