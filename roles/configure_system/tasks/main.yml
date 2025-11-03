@@ -1,10 +1,12 @@
 - name: Get current nofile soft limit
-  ansible.builtin.shell: ulimit -Sn
+  # NOTE: ulimit is a shell built-in command, so it requires the shell module.
+  ansible.builtin.shell: ulimit -Sn  # noqa: command-instead-of-shell
   register: configure_system_soft_limit
   changed_when: false
 
 - name: Get current nofile hard limit
-  ansible.builtin.shell: ulimit -Hn
+  # NOTE: ulimit is a shell built-in command, so it requires the shell module.
+  ansible.builtin.shell: ulimit -Hn  # noqa: command-instead-of-shell
   register: configure_system_hard_limit
   changed_when: false
 
