@@ -15,6 +15,7 @@
           - alacritty
           - ssh-askpass
           - fonts-noto-color-emoji
+          - ripgrep
         state: present
         update_cache: true
 
@@ -63,6 +64,48 @@
             state: present
             update_cache: true
 
+    - name: Uninstall apt-managed fzf for Debian based systems
+      when: is_debian_family
+      become: true
+      ansible.builtin.apt:
+        name: fzf
+        state: absent
+        autoremove: true
+      # NOTE: We are uninstalling the apt-managed version of fzf because it is often outdated
+      # and causes compatibility issues with fzf-lua. We will install fzf from source instead.
+
+    - name: Install fzf from source for Debian based systems
+      when: is_debian_family
+      block:
+        # NOTE: The apt package for fzf is often outdated, leading to compatibility issues with fzf-lua.
+        # Installing directly from source ensures the latest version with all features.
+        - name: Get latest fzf release tag
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/junegunn/fzf/releases/latest
+            method: GET
+            return_content: true
+          register: install_base_packages_fzf_release_info
+          changed_when: false
+
+        - name: Set fzf_version fact
+          ansible.builtin.set_fact:
+            install_base_packages_fzf_version: "{{ install_base_packages_fzf_release_info.json.tag_name }}"
+
+        - name: Clone fzf repository
+          ansible.builtin.git:
+            repo: 'https://github.com/junegunn/fzf.git'
+            dest: "{{ ansible_env.HOME }}/.fzf"
+            version: "{{ install_base_packages_fzf_version }}"
+            depth: 1
+            force: true
+          changed_when: false # noqa: latest[git]
+
+        - name: Run fzf install script
+          ansible.builtin.command: "{{ ansible_env.HOME }}/.fzf/install --all"
+          args:
+            creates: "{{ ansible_env.HOME }}/.fzf/bin/fzf"
+          changed_when: false
+
     - name: Install ansible-lint via pipx for Debian based systems
       when: is_debian_family
       ansible.builtin.command: pipx install --force ansible-lint
@@ -98,6 +141,8 @@
               - tree
               - alacritty
               - ssh-askpass
+              - fzf
+              - ripgrep
             state: present
             update_homebrew: true
 
@@ -162,6 +207,8 @@
           - xclip
           - tldr
           - tree
+          - fzf
+          - ripgrep
         state: present
         update_cache: true
 
