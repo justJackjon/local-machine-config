@@ -54,7 +54,7 @@
 
 - name: Set fact if GPG key is already on GitHub
   ansible.builtin.set_fact:
-    is_gpg_key_already_on_github: "{{ configure_git_gpg_fingerprint.stdout in configure_git_remote_gpg_keys.stdout_lines }}"
+    configure_git_is_gpg_key_already_on_github: "{{ configure_git_gpg_fingerprint.stdout in configure_git_remote_gpg_keys.stdout_lines }}"
 
 - name: Add GPG key to GitHub
   ansible.builtin.shell: |
@@ -63,10 +63,10 @@
   args:
     executable: /bin/bash
   register: configure_git_add_gpg_key_result
-  when: not is_gpg_key_already_on_github
-  changed_when: not is_gpg_key_add_successful
-  failed_when: configure_git_add_gpg_key_result.rc != 0 and not is_gpg_key_add_successful
+  when: not configure_git_is_gpg_key_already_on_github
+  changed_when: not configure_git_is_gpg_key_add_successful
+  failed_when: configure_git_add_gpg_key_result.rc != 0 and not configure_git_is_gpg_key_add_successful
 
 - name: Set fact if GPG key addition was successful
   ansible.builtin.set_fact:
-    is_gpg_key_add_successful: "{'already exist' not in configure_git_add_gpg_key_result.stderr}"
+    configure_git_is_gpg_key_add_successful: "{'already exist' not in configure_git_add_gpg_key_result.stderr}"

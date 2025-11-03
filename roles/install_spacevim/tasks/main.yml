@@ -1,124 +1,127 @@
 - name: Install SpaceVim
   block:
     - name: Set OS specific facts
-      when: is_windows
-      set_fact:
-        minttyrc_file: >-
+      ansible.builtin.set_fact:
+        install_spacevim_minttyrc_file: >-
           {{ '/c/Users/' + ansible_user_id + '/.minttyrc'
-          if is_windows 
+          if is_windows
           else '~/.minttyrc' }}
 
     - name: Set general facts
-      set_fact:
-        spacevim_config_dir: >-
+      ansible.builtin.set_fact:
+        install_spacevim_spacevim_config_dir: >-
           {{ '/c/Users/' + ansible_user_id + '/.SpaceVim.d'
-          if is_windows 
+          if is_windows
           else '~/.SpaceVim.d' }}
-
     - name: Ensure required dependencies are installed
       block:
         - name: Ensure Debian-based system dependencies are installed
           when: is_debian_family
           become: true
-          apt:
+          ansible.builtin.apt:
             name: tar
             state: present
-            update_cache: yes
+            update_cache: true
 
         - name: Ensure MacOS dependencies are installed
           when: is_mac
           block:
             - name: Check if Homebrew is installed
-              command: brew -v
-              register: brew_check
-              ignore_errors: yes
+              ansible.builtin.command: brew -v
+              register: install_spacevim_brew_check
+              ignore_errors: true
+              changed_when: false
 
             - name: Fail if Homebrew is not installed
-              fail:
+              ansible.builtin.fail:
                 msg: 'Homebrew is not installed. Please install Homebrew first.'
-              when: brew_check.rc != 0
+              when: install_spacevim_brew_check.rc != 0
 
         - name: Ensure Windows dependencies are installed
           when: is_windows
           block:
             - name: Check if MSYS2 is installed on Windows
-              stat:
+              ansible.builtin.stat:
                 path: "{{ item }}"
               loop:
                 - '/c/msys64/mingw64.exe'
                 - '/c/tools/msys64/mingw64.exe'
-              register: msys2_check
+              register: install_spacevim_msys2_check
 
             - name: Fail if MSYS2 is not installed on Windows
               when:
-                - msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length == msys2_check.results | length
-              fail:
+                - (install_spacevim_msys2_check.results | selectattr('stat.exists', 'equalto', false) | list | length) ==
+                  (install_spacevim_msys2_check.results | length)
+              ansible.builtin.fail:
                 msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
 
             - name: Check if Chocolatey is installed
-              shell: choco -v
-              register: choco_check
-              ignore_errors: yes
+              ansible.builtin.command: choco -v
+              register: install_spacevim_choco_check
+              ignore_errors: true
+              changed_when: false
 
             - name: Fail if Chocolatey is not installed
-              fail:
+              ansible.builtin.fail:
                 msg: 'Chocolatey is not installed. Please install Chocolatey first.'
-              when: choco_check.rc != 0
+              when: install_spacevim_choco_check.rc != 0
 
     - name: Install Neovim
       block:
         - name: Install Neovim on Debian-based systems
           when: is_debian_family
           become: true
-          apt:
+          ansible.builtin.apt:
             name: neovim
             state: present
-            update_cache: yes
+            update_cache: true
 
         - name: Install Neovim on MacOS
           when: is_mac
-          homebrew:
+          community.general.homebrew:
             name: neovim
             state: present
             update_homebrew: true
 
-        - name: Install Neovim on Windows 
+        - name: Install Neovim on Windows
           when: is_windows
-          shell: choco install neovim -y
+          ansible.builtin.command: choco install neovim -y
+          changed_when: false
 
     - name: Install SpaceVim
       block:
         - name: Download SpaceVim install.sh
-          get_url:
+          ansible.builtin.get_url:
             url: https://spacevim.org/install.sh
             dest: /tmp/install_spacevim.sh
             mode: '0755'
 
         - name: Install SpaceVim
-          command: bash /tmp/install_spacevim.sh
+          ansible.builtin.command: bash /tmp/install_spacevim.sh
           args:
-            creates: "{{ spacevim_config_dir }}"
+            creates: "{{ install_spacevim_spacevim_config_dir }}"
 
         - name: Remove install_spacevim.sh
-          file:
+          ansible.builtin.file:
             path: /tmp/install_spacevim.sh
             state: absent
 
         - name: Create symbolic link for nvim configuration
           when: is_windows
-          command: ln -s {{ ansible_env.HOME }}/.SpaceVim {{ ansible_env.HOME }}/AppData/Local/nvim
+          ansible.builtin.command: ln -s {{ ansible_env.HOME }}/.SpaceVim {{ ansible_env.HOME }}/AppData/Local/nvim
           args:
             creates: "{{ ansible_env.HOME }}/AppData/Local/nvim"
 
     - name: Install Nerd Font
       block:
-        - name: Install Nerd Font on Windows 
+        - name: Install Nerd Font on Windows
           when: is_windows
-          shell: choco install cascadia-code-nerd-font -y
+          ansible.builtin.command: choco install cascadia-code-nerd-font -y
+          changed_when: false
 
         - name: Install Nerd Font on MacOS
           when: is_mac
-          homebrew_cask:
+          community.general.homebrew_cask:
             name: font-caskaydia-cove-nerd-font
             state: present
             update_homebrew: true
@@ -128,23 +131,13 @@
           block:
             - name: Install Nerd Font (Debian)
               check_mode: false
-              get_url:
+              ansible.builtin.get_url:
                 url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
                 dest: '/tmp/CascadiaCode.tar.gz'
-              register: download
-
-            - name: Unarchive font
-              when: download.changed
-              unarchive:
-                src: '/tmp/CascadiaCode.tar.gz'
-                dest: '~/.local/share/fonts/'
-                remote_src: yes
-
-            - name: Update font cache
-              when: download.changed
-              command: fc-cache -fv
-              args:
-                warn: false
+                mode: '0644'
+              register: install_spacevim_nerd_font_download
+              notify: Unarchive font
+              changed_when: false
 
     - name: Configure the terminal emulator to use the new Nerd Font
       block:
@@ -152,63 +145,68 @@
           when: is_debian_family
           block:
             - name: Ensure XFCE Terminal configuration directory exists
-              file:
+              ansible.builtin.file:
                 path: "{{ ansible_env.HOME }}/.config/xfce4/terminal"
                 state: directory
+                mode: '0755'
 
             - name: Configure XFCE Terminal to use Nerd Font
-              lineinfile:
+              ansible.builtin.lineinfile:
                 path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
                 regexp: '^FontName='
                 line: 'FontName=CaskaydiaCove Nerd Font 10'
                 create: true
+                mode: '0644'
 
         - name: Configure Terminal app to use Nerd Font on MacOS
           when: is_mac
           block:
             - name: Set font for all Terminal profiles
-              command: >
+              ansible.builtin.command: >
                 osascript -e 'tell application "Terminal"
                   repeat with profileName in (get every settings set)
                       set font name of profileName to "CaskaydiaCove Nerd Font"
                       set font size of profileName to 14
                   end repeat
                 end tell'
+              changed_when: false
 
         - name: Configure MINTTY to use Nerd Font on Windows
           when: is_windows
           block:
             - name: Ensure .minttyrc file exists
-              file:
-                path: "{{ minttyrc_file }}"
+              ansible.builtin.file:
+                path: "{{ install_spacevim_minttyrc_file }}"
                 state: touch
+                mode: '0644'
 
             - name: Update .minttyrc to use Nerd Font
-              lineinfile:
-                path: "{{ minttyrc_file }}"
+              ansible.builtin.lineinfile:
+                path: "{{ install_spacevim_minttyrc_file }}"
                 regexp: '^Font='
                 line: 'Font=CaskaydiaCove Nerd Font'
 
     - name: Configure SpaceVim
       block:
         - name: Ensure .SpaceVim.d directory exists
-          file:
-            path: "{{ spacevim_config_dir }}"
+          ansible.builtin.file:
+            path: "{{ install_spacevim_spacevim_config_dir }}"
             state: directory
+            mode: '0755'
 
         - name: Ensure init.toml file exists
-          file:
-            path: "{{ spacevim_config_dir }}/init.toml"
+          ansible.builtin.file:
+            path: "{{ install_spacevim_spacevim_config_dir }}/init.toml"
             state: touch
+            mode: '0644'
 
         - name: Add custom_plugins header to SpaceVim configuration
-          lineinfile:
-            path: "{{ spacevim_config_dir }}/init.toml"
-            line: '[[custom_plugins]]'
+          ansible.builtin.lineinfile:
+            path: "{{ install_spacevim_spacevim_config_dir }}/init.toml"
 
         - name: Add custom SpaceVim plugins
-          blockinfile:
-            path: "{{ spacevim_config_dir }}/init.toml"
+          ansible.builtin.blockinfile:
+            path: "{{ install_spacevim_spacevim_config_dir }}/init.toml"
             insertafter: '^\[\[custom_plugins\]\]$'
             block: |
               repo = 'github/copilot.vim'
@@ -224,13 +222,13 @@
             marker: '# {mark}: ANSIBLE MANAGED CUSTOM PLUGINS'
 
         - name: Add options header to SpaceVim configuration
-          lineinfile:
+          ansible.builtin.lineinfile:
             path: "{{ spacevim_config_dir }}/init.toml"
             line: '[options]'
 
         - name: Configure SpaceVim init.toml
-          blockinfile:
-            path: "{{ spacevim_config_dir }}/init.toml"
+          ansible.builtin.blockinfile:
+            path: "{{ install_spacevim_spacevim_config_dir }}/init.toml"
             insertafter: '^\[options\]$'
             block: |
               colorscheme = 'dracula'
@@ -259,13 +257,13 @@
             marker: '# {mark}: ANSIBLE MANAGED OPTIONS'
 
         - name: Ensure autoload directory exists
-          file:
-            path: "{{ spacevim_config_dir }}/autoload"
+          ansible.builtin.file:
+            path: "{{ install_spacevim_spacevim_config_dir }}/autoload"
             state: directory
             mode: '0755'
 
         - name: Copy bootstrap functions to autoload directory
-          copy:
+          ansible.builtin.copy:
             src: ../config/spacevim/autoload/myspacevim.vim
-            dest: "{{ spacevim_config_dir }}/autoload/myspacevim.vim"
+            dest: "{{ install_spacevim_spacevim_config_dir }}/autoload/myspacevim.vim"
             mode: '0644'

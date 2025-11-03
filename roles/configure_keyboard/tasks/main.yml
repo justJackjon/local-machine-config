@@ -16,8 +16,8 @@
             ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE') or
             (is_wsl | default(false))
           }}
-        is_linux_system: "{{ ansible_facts.system == 'Linux' }}"
-        is_apt_package_manager: "{{ ansible_facts.pkg_mgr == 'apt' }}"
+        configure_keyboard_is_linux_system: "{{ ansible_facts.system == 'Linux' }}"
+        configure_keyboard_is_apt_package_manager: "{{ ansible_facts.pkg_mgr == 'apt' }}"
 
     - name: Apply Custom Keyboard Mappings for Debian based systems on Chromebook hardware
       when: configure_keyboard_is_debian_os_on_gb_chromebook
@@ -33,7 +33,7 @@
               keycode 94 = grave asciitilde
               keycode 108 = Mode_switch Mode_switch Mode_switch Mode_switch
             dest: "/home/{{ ansible_user_id }}/.Xmodmap"
-            mode: '0644'
+            mode: "0644"
           register: configure_keyboard_xmodmap_copy_result
           notify: Apply custom key mappings with xmodmap
 
@@ -92,10 +92,10 @@
       tags: kinto_install
       block:
         - name: Install Kinto.sh on Linux
-          when: is_linux_system
+          when: configure_keyboard_is_linux_system
           block:
             - name: Install Kinto dependencies
-              when: is_apt_package_manager
+              when: configure_keyboard_is_apt_package_manager
               ansible.builtin.apt:
                 name:
                   - gir1.2-vte-2.91
@@ -120,15 +120,15 @@
               ansible.builtin.get_url:
                 url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
                 dest: "{{ configure_keyboard_tempdir.path }}/install_kinto.sh"
-                mode: '0755'
+                mode: "0755"
               register: configure_keyboard_kinto_download_result
 
             - name: Set fact if Kinto download was successful
               ansible.builtin.set_fact:
-                is_kinto_download_successful: "{{ configure_keyboard_kinto_download_result is success }}"
+                configure_keyboard_is_kinto_download_successful: "{{ configure_keyboard_kinto_download_result is success }}"
 
             - name: Run Kinto install script
-              when: is_kinto_download_successful
+              when: configure_keyboard_is_kinto_download_successful
               ansible.builtin.shell:
                 cmd: "{{ configure_keyboard_tempdir.path }}/install_kinto.sh"
                 executable: /bin/bash
@@ -169,10 +169,15 @@
 
         - name: Set fact if Kinto configuration has changed
           ansible.builtin.set_fact:
-            is_kinto_config_changed: "{{ configure_keyboard_xfce_changes.changed or configure_keyboard_gui_changes.changed or configure_keyboard_terminal_changes.changed }}"
+            configure_keyboard_is_kinto_config_changed: >-
+              {{
+                configure_keyboard_xfce_changes.changed or
+                configure_keyboard_gui_changes.changed or
+                configure_keyboard_terminal_changes.changed
+              }}
 
         - name: Restart xkeysnail service after making changes to kinto.py
-          when: is_kinto_config_changed and not is_wsl
+          when: configure_keyboard_is_kinto_config_changed and not is_wsl
           ansible.builtin.systemd:
             name: xkeysnail
             state: restarted
@@ -181,12 +186,16 @@
 
     - name: Set fact if Kinto config result is changed
       ansible.builtin.set_fact:
-        is_kinto_config_result_changed: "{{ configure_keyboard_kinto_config_result is defined and configure_keyboard_kinto_config_result is changed }}"
+        configure_keyboard_is_kinto_config_result_changed: >-
+          {{
+            configure_keyboard_kinto_config_result is defined and
+            configure_keyboard_kinto_config_result is changed
+          }}
 
     - name: Manage Kinto Backup Files
       block:
         - name: Retain latest backup file only
-          when: is_kinto_config_result_changed
+          when: configure_keyboard_is_kinto_config_result_changed
           block:
             - name: Get list of backup files
               when: is_linux_system
@@ -206,10 +215,14 @@
 
             - name: Set fact if there are multiple Kinto backup files
               ansible.builtin.set_fact:
-                has_multiple_kinto_backup_files: "{{ configure_keyboard_backup_files_sorted is defined and configure_keyboard_backup_files_sorted|length > 1 }}"
+                configure_keyboard_has_multiple_kinto_backup_files: >-
+                  {{
+                    configure_keyboard_backup_files_sorted is defined and
+                    (configure_keyboard_backup_files_sorted | length > 1)
+                  }}
 
             - name: Remove older backup files whilst retaining the latest backup
-              when: has_multiple_kinto_backup_files
+              when: configure_keyboard_has_multiple_kinto_backup_files
               ansible.builtin.file:
                 path: "{{ item }}"
                 state: absent

@@ -9,7 +9,7 @@
 
 - name: Set fact if SSH key is present locally
   ansible.builtin.set_fact:
-    is_ssh_key_present_locally: "{{ configure_git_ssh_key_stat.stat.exists }}"
+    configure_git_is_ssh_key_present_locally: "{{ configure_git_ssh_key_stat.stat.exists }}"
 
 - name: Create managed directory for SSH key
   ansible.builtin.file:
@@ -21,7 +21,7 @@
   ansible.builtin.pause:
     prompt: "Enter SSH key passphrase"
     echo: false
-  when: not is_ssh_key_present_locally
+  when: not configure_git_is_ssh_key_present_locally
 
 - name: Confirm SSH key passphrase
   ansible.builtin.pause:
@@ -29,17 +29,17 @@
     echo: false
   register: configure_git_ssh_passphrase_confirm
   no_log: true
-  when: not is_ssh_key_present_locally
+  when: not configure_git_is_ssh_key_present_locally
 
 - name: Set fact if SSH key passphrases match
   ansible.builtin.set_fact:
-    is_ssh_passphrases_match: "{{ configure_git_ssh_passphrase_prompt.user_input == configure_git_ssh_passphrase_confirm.user_input }}"
+    configure_git_is_ssh_passphrases_match: "{{ configure_git_ssh_passphrase_prompt.user_input == configure_git_ssh_passphrase_confirm.user_input }}"
   when: configure_git_ssh_passphrase_prompt is defined
 
 - name: Fail if SSH key passphrases don't match
   ansible.builtin.fail:
     msg: "SSH key passphrases don't match!"
-  when: not is_ssh_key_present_locally and not is_ssh_passphrases_match
+  when: not configure_git_is_ssh_key_present_locally and not configure_git_is_ssh_passphrases_match
 
 - name: Create SSH key for GitHub
   community.crypto.openssh_keypair:
@@ -47,7 +47,7 @@
     passphrase: "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}"
     comment: "{{ configure_git_user_email }}"
     type: ed25519
-  when: not is_ssh_key_present_locally
+  when: not configure_git_is_ssh_key_present_locally
 
 - name: Read SSH public key
   ansible.builtin.slurp:
@@ -65,7 +65,7 @@
 
 - name: Set fact if SSH key is already on GitHub
   ansible.builtin.set_fact:
-    is_ssh_key_already_on_github: "{{ (configure_git_ssh_public_key.content | b64decode) in configure_git_remote_ssh_keys.stdout_lines }}"
+    configure_git_is_ssh_key_already_on_github: "{{ (configure_git_ssh_public_key.content | b64decode) in configure_git_remote_ssh_keys.stdout_lines }}"
 
 - name: Add SSH key to GitHub
   ansible.builtin.shell: |
@@ -74,7 +74,7 @@
   args:
     executable: /bin/bash
   register: configure_git_add_ssh_key_result
-  when: not is_ssh_key_already_on_github
+  when: not configure_git_is_ssh_key_already_on_github
   changed_when: "'already exist' not in configure_git_add_ssh_key_result.stderr"
   failed_when: "configure_git_add_ssh_key_result.rc != 0 and 'already exist' not in configure_git_add_ssh_key_result.stderr"
 
@@ -90,5 +90,5 @@
     echo "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"
   args:
     executable: /bin/bash
-  when: not is_ssh_key_present_locally
+  when: not configure_git_is_ssh_key_present_locally
   changed_when: true
