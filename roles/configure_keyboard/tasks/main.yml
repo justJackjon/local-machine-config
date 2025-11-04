@@ -88,101 +88,82 @@
               ansible.builtin.command: "bash {{ role_path }}/files/{{ configure_keyboard_macos_shortcut_creation_script_path }}"
               changed_when: false
 
-    - name: Install Kinto.sh
-      tags: kinto_install
+    - name: Install and Configure Kinto with Keyszer
+      tags: [kinto_install, kinto_config]
+      when: configure_keyboard_is_linux_system
       block:
-        - name: Install Kinto.sh on Linux
-          when: configure_keyboard_is_linux_system
-          block:
-            - name: Install Kinto dependencies
-              when: configure_keyboard_is_apt_package_manager
-              ansible.builtin.apt:
-                name:
-                  - gir1.2-vte-2.91
-                  - unzip
-                  - curl
-                state: present
-              become: true
+        - name: Install pipx and ensure its path
+          become: true
+          ansible.builtin.apt:
+            name: pipx
+            state: present
 
-            - name: Ensure Downloads directory exists
-              ansible.builtin.file:
-                path: "/home/{{ ansible_user_id }}/Downloads"
-                state: directory
-                mode: "0755"
+        - name: Add pipx to PATH
+          ansible.builtin.command: pipx ensurepath
+          changed_when: false
 
-            - name: Create a temporary directory for the Kinto install script
-              ansible.builtin.tempfile:
-                state: directory
-                suffix: _install_kinto
-              register: configure_keyboard_tempdir
+        - name: Uninstall xkeysnail (if present via pipx)
+          ansible.builtin.command: pipx uninstall xkeysnail
+          register: xkeysnail_uninstall_result
+          changed_when: "'uninstalled' in xkeysnail_uninstall_result.stdout"
+          failed_when: false
 
-            - name: Download Kinto install script
-              ansible.builtin.get_url:
-                url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
-                dest: "{{ configure_keyboard_tempdir.path }}/install_kinto.sh"
-                mode: "0755"
-              register: configure_keyboard_kinto_download_result
+        - name: Install keyszer via pipx
+          ansible.builtin.command: pipx install keyszer
+          register: keyszer_install_result
+          changed_when: "'installed' in keyszer_install_result.stdout"
 
-            - name: Set fact if Kinto download was successful
-              ansible.builtin.set_fact:
-                configure_keyboard_is_kinto_download_successful: "{{ configure_keyboard_kinto_download_result is success }}"
+        - name: Create Kinto config directory
+          ansible.builtin.file:
+            path: "{{ ansible_user_dir }}/.config/kinto"
+            state: directory
+            mode: '0755'
 
-            - name: Run Kinto install script
-              when: configure_keyboard_is_kinto_download_successful
-              ansible.builtin.shell:
-                cmd: "{{ configure_keyboard_tempdir.path }}/install_kinto.sh"
-                executable: /bin/bash
-              register: configure_keyboard_kinto_install_result
-              changed_when: false
-              notify: Remove files downloaded by Kinto install script
+        - name: Download kinto.py
+          ansible.builtin.get_url:
+            url: https://raw.githubusercontent.com/rbreaves/kinto/master/linux/kinto.py
+            dest: "{{ ansible_user_dir }}/.config/kinto/kinto.py"
+            mode: '0644'
+          notify: Restart keyszer service
 
-    - name: Configure Kinto.sh
-      tags: kinto_config
-      block:
-        - name: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4
+        - name: Patch kinto.py for keyszer compatibility
+          ansible.builtin.lineinfile:
+            path: "{{ ansible_user_dir }}/.config/kinto/kinto.py"
+            line: "pass_through_key = ignore_key"
+            insertbefore: BOF
+          notify: Restart keyszer service
+
+        - name: Patch kinto.py to enable XFCE settings
           when: configure_keyboard_is_xfce_desktop
           ansible.builtin.replace:
-            path: "{{ configure_keyboard_kinto_config_path }}"
-            regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
-            replace: '\1\3'
-            backup: true
-          register: configure_keyboard_xfce_changes
+            path: "{{ ansible_user_dir }}/.config/kinto/kinto.py"
+            regexp: "{{ item.regexp }}"
+            replace: "{{ item.replace }}"
+          loop:
+            - { regexp: '(# )(.*)(# xfce4)', replace: '\2\3' }
+            - { regexp: '(\w.*)(# Default not-xfce4)', replace: '# \1\2' }
+          notify: Restart keyszer service
 
-        - name: Modify shortcuts for en_GB Chromebook keyboard layouts in kinto.py
-          when: configure_keyboard_is_debian_os_on_gb_chromebook
-          block:
-            - name: Modify general GUI related shortcuts
-              ansible.builtin.blockinfile:
-                path: "{{ configure_keyboard_kinto_config_path }}"
-                block: "{{ lookup('file', 'snippets/kinto/gui_shortcuts') }}"
-                marker: "# {mark}: ANSIBLE MANAGED GENERAL GUI SHORTCUTS"
-                insertbefore: '\s*\},\s*\"General GUI\"\s*'
-              register: configure_keyboard_gui_changes
+        - name: Create systemd user directory
+          ansible.builtin.file:
+            path: "{{ ansible_user_dir }}/.config/systemd/user"
+            state: directory
+            mode: '0755'
 
-            - name: Modify terminal related shortcuts
-              ansible.builtin.blockinfile:
-                path: "{{ configure_keyboard_kinto_config_path }}"
-                block: "{{ lookup('file', 'snippets/kinto/terminal_shortcuts') }}"
-                marker: "# {mark}: ANSIBLE MANAGED TERMINAL SHORTCUTS"
-                insertbefore: '\s*\},\s*\"terminals\"\s*'
-              register: configure_keyboard_terminal_changes
+        - name: Create keyszer systemd user service file
+          ansible.builtin.template:
+            src: keyszer.service.j2
+            dest: "{{ ansible_user_dir }}/.config/systemd/user/keyszer.service"
+            mode: '0644'
+          notify: Restart keyszer service
 
-        - name: Set fact if Kinto configuration has changed
-          ansible.builtin.set_fact:
-            configure_keyboard_is_kinto_config_changed: >-
-              {{
-                configure_keyboard_xfce_changes.changed or
-                configure_keyboard_gui_changes.changed or
-                configure_keyboard_terminal_changes.changed
-              }}
-
-        - name: Restart xkeysnail service after making changes to kinto.py
-          when: configure_keyboard_is_kinto_config_changed and not is_wsl
+        - name: Enable and start keyszer user service
           ansible.builtin.systemd:
-            name: xkeysnail
-            state: restarted
-          register: configure_keyboard_kinto_config_result
-          become: true
+            name: keyszer
+            scope: user
+            state: started
+            enabled: true
+            daemon_reload: true
 
     - name: Set fact if Kinto config result is changed
       ansible.builtin.set_fact:
