@@ -11,3 +11,9 @@
     - kinto-master
     - kinto.zip
   become: true
+
+- name: Restart keyszer service
+  ansible.builtin.systemd:
+    name: keyszer
+    scope: user
+    state: restarted
