@@ -16,6 +16,7 @@
 - name: Set fact if gh CLI is not authenticated
   ansible.builtin.set_fact:
     pre_flight_checks_is_gh_cli_not_authenticated: "{{ pre_flight_checks_gh_auth_status.rc != 0 }}"
+  tags: configure_git
 
 - name: Fail if gh CLI is not authenticated
   ansible.builtin.fail:
@@ -23,6 +24,17 @@
       gh CLI is not authenticated. This process is automated in the 'install.sh' script.
       Please run 'install.sh' or manually run 'gh auth login' before running this playbook.
   when: pre_flight_checks_is_gh_cli_not_authenticated
+  tags: configure_git
+
+- name: Check for required gh auth scopes
+  ansible.builtin.fail:
+    msg: |
+      The 'gh' command is not authenticated with the required scopes.
+      Please run the following command to grant the necessary permissions:
+      gh auth refresh -h github.com -s admin:public_key,admin:gpg_key
+  when:
+    - not pre_flight_checks_is_gh_cli_not_authenticated
+    - "'admin:public_key' not in pre_flight_checks_gh_auth_status.stdout or 'admin:gpg_key' not in pre_flight_checks_gh_auth_status.stdout"
   tags: configure_git
 
 - name: Install ssh-askpass for Debian
