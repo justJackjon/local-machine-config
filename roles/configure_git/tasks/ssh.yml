@@ -80,17 +80,78 @@
   changed_when: "'already exist' not in configure_git_add_ssh_key_result.stderr"
   failed_when: "configure_git_add_ssh_key_result.rc != 0 and 'already exist' not in configure_git_add_ssh_key_result.stderr"
 
-- name: Start ssh-agent
-  ansible.builtin.shell: eval "$(ssh-agent -s)"
-  args:
-    executable: /bin/bash
-  changed_when: false
+- name: Manage ssh-agent and keys across platforms
+  block:
+    - name: Install keychain for ssh-agent management
+      ansible.builtin.package:
+        name: keychain
+        state: present
+      become: true
+      when: is_debian_family or is_mac
 
-- name: Add SSH key to ssh-agent
-  ansible.builtin.shell: |
-    set -o pipefail
-    echo "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"
-  args:
-    executable: /bin/bash
-  when: not configure_git_is_ssh_key_present_locally
-  changed_when: true
+    - name: Configure bashrc to use keychain for ssh-agent management
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        line: 'eval `keychain --eval --agents ssh {{ configure_git_ssh_key_path }}`'
+        create: true
+        mode: '0644'
+      when: is_debian_family or is_mac
+
+    - name: Start ssh-agent for the current session (Linux/macOS)
+      ansible.builtin.shell: 'eval `keychain --eval --agents ssh {{ configure_git_ssh_key_path }}`'
+      args:
+        executable: /bin/bash
+      changed_when: false
+      when: is_debian_family or is_mac
+
+    - name: Ensure ssh-agent is running on Windows
+      ansible.windows.win_service:
+        name: ssh-agent
+        start_mode: auto
+        state: started
+      when: is_windows
+
+    - name: Get fingerprint of the managed SSH key
+      ansible.builtin.shell: |
+        set -o pipefail
+        ssh-keygen -l -f {{ configure_git_ssh_key_path }}.pub | awk '{print $2}'
+      register: configure_git_managed_ssh_key_fingerprint
+      changed_when: false
+      when: configure_git_is_ssh_key_present_locally
+      args:
+        executable: /bin/bash
+
+    - name: Ensure managed SSH key is added to the agent (Linux/macOS)
+      ansible.builtin.shell: |
+        set -o pipefail
+        if ! ssh-add -l | grep -q "{{ configure_git_managed_ssh_key_fingerprint.stdout }}"; then
+          ssh-add "{{ configure_git_ssh_key_path }}"
+        fi
+      args:
+        executable: /bin/bash
+      when: (is_debian_family or is_mac) and configure_git_is_ssh_key_present_locally
+      changed_when: false
+
+    - name: Ensure managed SSH key is added to the agent (Windows)
+      ansible.windows.win_shell: |
+        $fingerprint = "{{ configure_git_managed_ssh_key_fingerprint.stdout }}"
+        $keys = ssh-add -l
+        if ($keys -notmatch $fingerprint) {
+          ssh-add "{{ configure_git_ssh_key_path }}"
+        }
+      when: is_windows and configure_git_is_ssh_key_present_locally
+      changed_when: false
+
+    - name: Add newly created SSH key to ssh-agent (Linux/macOS)
+      ansible.builtin.shell: |
+        set -o pipefail
+        echo "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"
+      args:
+        executable: /bin/bash
+      when: (is_debian_family or is_mac) and not configure_git_is_ssh_key_present_locally
+      changed_when: true
+
+    - name: Add newly created SSH key to agent (Windows)
+      ansible.windows.win_shell: '"{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"'
+      when: is_windows and not configure_git_is_ssh_key_present_locally
+      changed_when: true
