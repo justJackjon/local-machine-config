@@ -124,6 +124,37 @@
           ansible.windows.win_shell: choco install neovim -y
           changed_when: false
 
+    - name: Install neovim providers (Unix)
+      when: is_debian_family or is_mac
+      block:
+        - name: Install pynvim for Python provider (Debian)
+          when: is_debian_family
+          become: true
+          ansible.builtin.apt:
+            name: python3-pynvim
+            state: present
+
+        - name: Install pynvim for Python provider (Mac)
+          when: is_mac
+          become: true
+          ansible.builtin.pip:
+            name: pynvim
+            executable: pip3
+
+        - name: Install neovim for Node.js provider (Unix)
+          ansible.builtin.command: pnpm add -g neovim
+          changed_when: false
+
+    - name: Install pynvim for Python provider (Windows)
+      when: is_windows
+      ansible.builtin.pip:
+        name: pynvim
+
+    - name: Install neovim for Node.js provider (Windows)
+      when: is_windows
+      ansible.windows.win_shell: pnpm add -g neovim
+      changed_when: false
+
     - name: Define Neovim config paths to backup (Debian/MacOS)
       when: is_debian_family or is_mac
       ansible.builtin.set_fact:
