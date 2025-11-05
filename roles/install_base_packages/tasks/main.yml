@@ -1,5 +1,12 @@
 - name: Install base packages
   block:
+    # NOTE: The following packages are required for lazyvim and its plugins.
+    # - fd-find: Required by lazyvim and snacks for file searching (fd)
+    # - lazygit: Required by lazyvim and snacks for git integration
+    # - luarocks: Required by lazy and mason for Lua plugin management
+    # - imagemagick: Required by snacks for image previews
+    # - sqlite3: Required by snacks for history and frecency
+    # - libsqlite3-dev: Required by snacks for history and frecency (dev headers)
     - name: Install required packages for Debian based systems
       when: is_debian_family
       become: true
@@ -16,6 +23,11 @@
           - ssh-askpass
           - fonts-noto-color-emoji
           - ripgrep
+          - fd-find
+          - luarocks
+          - imagemagick
+          - sqlite3
+          - libsqlite3-dev
         state: present
         update_cache: true
 
@@ -33,16 +45,17 @@
           ansible.builtin.file:
             path: /etc/apt/keyrings
             state: directory
-            mode: '0755'
+            mode: "0755"
 
         - name: Download GitHub CLI GPG key
           ansible.builtin.get_url:
             url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
             dest: /tmp/githubcli-archive-keyring.gpg
-            mode: '0644'
+            mode: "0644"
 
         - name: Add GitHub CLI GPG key to apt keyrings
-          ansible.builtin.shell: set -o pipefail && cat /tmp/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+          ansible.builtin.shell: >
+            set -o pipefail && cat /tmp/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
           args:
             creates: /etc/apt/keyrings/githubcli-archive-keyring.gpg
           changed_when: false
@@ -50,11 +63,12 @@
         - name: Set permissions for GitHub CLI GPG key
           ansible.builtin.file:
             path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
-            mode: '0644'
+            mode: "0644"
 
         - name: Add GitHub CLI apt repository
           ansible.builtin.apt_repository:
-            repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+            repo: |
+              deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main
             state: present
             filename: github-cli
 
@@ -63,6 +77,47 @@
             name: gh
             state: present
             update_cache: true
+
+    - name: Install lazygit
+      when: is_debian_family
+      become: true
+      block:
+        - name: Install lazygit from apt on Debian >= 13 or Ubuntu >= 25.10
+          when: >
+            (ansible_distribution == 'Debian' and ansible_distribution_version | float >= 13) or
+            (ansible_distribution == 'Ubuntu' and ansible_distribution_version | float >= 25.10)
+          ansible.builtin.apt:
+            name: lazygit
+            state: present
+            update_cache: true
+
+        - name: Install lazygit from source on older Debian/Ubuntu
+          when: >
+            (ansible_distribution == 'Debian' and ansible_distribution_version | float < 13) or
+            (ansible_distribution == 'Ubuntu' and ansible_distribution_version | float < 25.10)
+          block:
+            - name: Get latest lazygit version
+              ansible.builtin.uri:
+                url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+                return_content: true
+              register: install_base_packages_lazygit_release
+
+            - name: Set lazygit version fact
+              ansible.builtin.set_fact:
+                install_base_packages_lazygit_version: "{{ install_base_packages_lazygit_release.json.tag_name | regex_replace('^v', '') }}"
+
+            - name: Download and unarchive lazygit
+              ansible.builtin.unarchive:
+                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"
+                dest: /tmp
+                remote_src: true
+
+            - name: Install lazygit
+              ansible.builtin.copy:
+                src: /tmp/lazygit
+                dest: /usr/local/bin/lazygit
+                mode: "0755"
+                remote_src: true
 
     - name: Uninstall apt-managed fzf for Debian based systems
       when: is_debian_family
@@ -85,7 +140,6 @@
             method: GET
             return_content: true
           register: install_base_packages_fzf_release_info
-          changed_when: false
 
         - name: Set fzf_version fact
           ansible.builtin.set_fact:
@@ -93,7 +147,7 @@
 
         - name: Clone fzf repository
           ansible.builtin.git:
-            repo: 'https://github.com/junegunn/fzf.git'
+            repo: "https://github.com/junegunn/fzf.git"
             dest: "{{ ansible_env.HOME }}/.fzf"
             version: "{{ install_base_packages_fzf_version }}"
             depth: 1
@@ -124,8 +178,14 @@
         - name: Fail if Homebrew is not installed
           when: install_base_packages_homebrew_check.stdout == ''
           ansible.builtin.fail:
-            msg: 'Homebrew is not installed. Please install it first.'
+            msg: "Homebrew is not installed. Please install it first."
 
+        # NOTE: The following packages are required for lazyvim and its plugins.
+        # - fd: Required by lazyvim and snacks for file searching
+        # - lazygit: Required by lazyvim and snacks for git integration
+        # - luarocks: Required by lazy and mason for Lua plugin management
+        # - - imagemagick: Required by snacks for image previews
+        # - sqlite: Required by snacks for history and frecency
         - name: Install Homebrew packages
           community.general.homebrew:
             name:
@@ -143,6 +203,11 @@
               - ssh-askpass
               - fzf
               - ripgrep
+              - fd
+              - lazygit
+              - luarocks
+              - imagemagick
+              - sqlite
             state: present
             update_homebrew: true
 
@@ -151,9 +216,10 @@
         - name: Download nvm install script
           when: is_debian_family or is_mac
           ansible.builtin.get_url:
-            url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+            url: |
+              https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
             dest: /tmp/install_nvm.sh
-            mode: '0755'
+            mode: "0755"
 
         - name: Run nvm install script
           when: is_debian_family or is_mac
@@ -163,7 +229,8 @@
 
         - name: Install Node.js LTS for Debian and macOS
           when: is_debian_family or is_mac
-          ansible.builtin.shell: set -o pipefail && source {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install --lts
+          ansible.builtin.shell: >
+            set -o pipefail && source {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install --lts
           args:
             executable: /bin/bash
             creates: "{{ ansible_env.HOME }}/.nvm/versions/node"
@@ -179,7 +246,7 @@
           ansible.builtin.get_url:
             url: https://get.pnpm.io/install.sh
             dest: /tmp/install_pnpm.sh
-            mode: '0755'
+            mode: "0755"
 
         - name: Run pnpm install script
           when: is_debian_family and not install_base_packages_pnpm_stat_debian.stat.exists
@@ -195,6 +262,25 @@
             chdir: "{{ ansible_env.HOME }}"
           changed_when: false
 
+    - name: Install additional dependencies
+      block:
+        - name: Install tree-sitter-cli
+          ansible.builtin.command: pnpm add -g tree-sitter-cli
+          changed_when: false
+
+        - name: Install neovim npm package
+          ansible.builtin.command: pnpm add -g neovim
+          changed_when: false
+
+        - name: Install pynvim
+          ansible.builtin.command: pipx install --force pynvim
+          changed_when: false
+
+    # NOTE: The following packages are required for lazyvim and its plugins.
+    # - mingw-w64-x86_64-fd: Required by lazyvim and snacks for file searching
+    # - mingw-w64-x86_64-luarocks: Required by lazy and mason for Lua plugin management
+    # - mingw-w64-x86_64-imagemagick: Required by snacks for image previews
+    # - mingw-w64-x86_64-sqlite3: Required by lazyvim and snacks for history and frecency
     - name: Install required packages for Windows with MSYS2
       when: is_windows
       community.general.pacman:
@@ -209,6 +295,10 @@
           - tree
           - fzf
           - ripgrep
+          - mingw-w64-x86_64-fd
+          - mingw-w64-x86_64-luarocks
+          - mingw-w64-x86_64-imagemagick
+          - mingw-w64-x86_64-sqlite3
         state: present
         update_cache: true
 
@@ -218,6 +308,10 @@
         - name: Install nvm-windows
           chocolatey.chocolatey.win_chocolatey:
             name: nvm
+            state: present
+        - name: Install lazygit on Windows
+          chocolatey.chocolatey.win_chocolatey:
+            name: lazygit
             state: present
         - name: Install gh on Windows
           chocolatey.chocolatey.win_chocolatey:
@@ -243,7 +337,6 @@
           ansible.windows.win_shell: nvm install lts
           changed_when: false
 
-
     - name: Install pnpm on Windows
       when: is_windows and not pnpm_stat_windows.stat.exists
       ansible.windows.win_shell: iwr https://get.pnpm.io/install.ps1 -useb | iex
@@ -253,5 +346,5 @@
       when: is_windows and pnpm_stat_windows.stat.exists
       ansible.windows.win_shell: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe self-update"
       args:
-        chdir: '{{ ansible_env.USERPROFILE }}'
-      changed_when: false
+        chdir: "{{ ansible_env.USERPROFILE }}"
+        changed_when: false
