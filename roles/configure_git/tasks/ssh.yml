@@ -21,6 +21,8 @@
   ansible.builtin.pause:
     prompt: "Enter SSH key passphrase"
     echo: false
+  register: configure_git_ssh_passphrase_prompt
+  no_log: true
   when: not configure_git_is_ssh_key_present_locally
 
 - name: Confirm SSH key passphrase
@@ -34,7 +36,7 @@
 - name: Set fact if SSH key passphrases match
   ansible.builtin.set_fact:
     configure_git_is_ssh_passphrases_match: "{{ configure_git_ssh_passphrase_prompt.user_input == configure_git_ssh_passphrase_confirm.user_input }}"
-  when: configure_git_ssh_passphrase_prompt is defined
+  when: not configure_git_is_ssh_key_present_locally and configure_git_ssh_passphrase_prompt is defined
 
 - name: Fail if SSH key passphrases don't match
   ansible.builtin.fail:
