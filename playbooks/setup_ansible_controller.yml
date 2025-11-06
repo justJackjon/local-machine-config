@@ -69,19 +69,18 @@
       ansible.builtin.debug:
         msg:
           - "GitHub Configuration Instructions:"
-          - "1. Your SSH and GPG keys have been automatically added to GitHub."
-          - "   If you encounter issues, ensure you have authenticated the gh CLI by running 'gh auth login'."
-          - >-
-            You can also manually add your SSH key by following:
-            https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
-          - "   Your public SSH key is located at: {{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa.pub"
-          - >-
-            You can also manually add your GPG key by following:
-            https://docs.github.com/en/authentication/managing-commit-signature-verification/adding-a-new-gpg-key-to-your-github-account
-          - >-
-            To get your public GPG key, run:
-            gpg --armor --export --homedir {{ ansible_env.HOME }}/.gnupg/ansible-managed/github {{ configure_git_user_email }}
+          - "1. Your SSH and GPG keys have been automatically added to your GitHub account."
+          - "   If you have issues, ensure you are authenticated with the GitHub CLI by running 'gh auth login'."
+          - ""
+          - "2. IMPORTANT: You must start a new shell session (or run 'source ~/.bashrc') for the SSH agent to be available."
+          - "   Until you do, operations like 'git clone' that require SSH may fail."
+          - ""
           - "3. For work repositories, you can use a different git configuration by running the following commands inside the repository:"
           - '   git config --local user.name "Your Work Name"'
           - '   git config --local user.email "your-work@example.com"'
+          - ""
+          - "4. For manual key management:"
+          - "   - Your public SSH key is at: {{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa.pub"
+          - "   - To get your public GPG key, run:"
+          - "     gpg --armor --export --homedir {{ ansible_env.HOME }}/.gnupg/ansible-managed/github {{ configure_git_user_email }}"
       tags: configure_git
