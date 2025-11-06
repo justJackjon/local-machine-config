@@ -106,9 +106,11 @@
               ansible.builtin.set_fact:
                 install_base_packages_lazygit_version: "{{ install_base_packages_lazygit_release.json.tag_name | regex_replace('^v', '') }}"
 
+            # yamllint disable rule:line-length
             - name: Download and unarchive lazygit
               ansible.builtin.unarchive:
-                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"
+                src: >-
+                  https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz
                 dest: /tmp
                 remote_src: true
 
@@ -262,19 +264,28 @@
             chdir: "{{ ansible_env.HOME }}"
           changed_when: false
 
-    - name: Install additional dependencies
-      block:
-        - name: Install tree-sitter-cli
-          ansible.builtin.command: pnpm add -g tree-sitter-cli
-          changed_when: false
+        - name: Install additional dependencies
+          block:
+            - name: Allow tree-sitter-cli to run postinstall scripts
+              ansible.builtin.command: >
+                pnpm config set --global --json onlyBuiltDependencies '["tree-sitter-cli"]'
+              changed_when: false
 
-        - name: Install neovim npm package
-          ansible.builtin.command: pnpm add -g neovim
-          changed_when: false
+            - name: Install tree-sitter-cli
+              community.general.pnpm:
+                name: tree-sitter-cli
+                global: true
+                state: present
 
-        - name: Install pynvim
-          ansible.builtin.command: pipx install --force pynvim
-          changed_when: false
+            - name: Install neovim npm package
+              community.general.pnpm:
+                name: neovim
+                global: true
+                state: present
+
+            - name: Install pynvim
+              ansible.builtin.command: pipx install --force pynvim
+              changed_when: false
 
     # NOTE: The following packages are required for lazyvim and its plugins.
     # - mingw-w64-x86_64-fd: Required by lazyvim and snacks for file searching
