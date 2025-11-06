@@ -116,7 +116,7 @@
       when: is_windows
 
     - name: Configure PowerShell profile to load SSH key
-      ansible.windows.win_lineinfile:
+      community.windows.win_lineinfile:
         path: "{{ ansible_env.USERPROFILE }}\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1"
         line: "ssh-add {{ configure_git_ssh_key_path_win }}"
         create: true
