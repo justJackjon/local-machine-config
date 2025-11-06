@@ -92,16 +92,9 @@
     - name: Configure bashrc to use keychain for ssh-agent management
       ansible.builtin.lineinfile:
         path: "{{ ansible_env.HOME }}/.bashrc"
-        line: 'eval `keychain --eval --agents ssh {{ configure_git_ssh_key_path }}`'
+        line: "eval `keychain --eval --nogui --agents ssh {{ configure_git_ssh_key_path }}`"
         create: true
-        mode: '0644'
-      when: is_debian_family or is_mac
-
-    - name: Start ssh-agent for the current session (Linux/macOS)
-      ansible.builtin.shell: 'eval `keychain --eval --agents ssh {{ configure_git_ssh_key_path }}`'
-      args:
-        executable: /bin/bash
-      changed_when: false
+        mode: "0644"
       when: is_debian_family or is_mac
 
     - name: Ensure ssh-agent is running on Windows
@@ -111,47 +104,20 @@
         state: started
       when: is_windows
 
-    - name: Get fingerprint of the managed SSH key
-      ansible.builtin.shell: |
-        set -o pipefail
-        ssh-keygen -l -f {{ configure_git_ssh_key_path }}.pub | awk '{print $2}'
-      register: configure_git_managed_ssh_key_fingerprint
-      changed_when: false
-      when: configure_git_is_ssh_key_present_locally
-      args:
-        executable: /bin/bash
+    - name: Set Windows SSH key path
+      ansible.builtin.set_fact:
+        configure_git_ssh_key_path_win: "{{ ansible_env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
+      when: is_windows
 
-    - name: Ensure managed SSH key is added to the agent (Linux/macOS)
-      ansible.builtin.shell: |
-        set -o pipefail
-        if ! ssh-add -l | grep -q "{{ configure_git_managed_ssh_key_fingerprint.stdout }}"; then
-          ssh-add "{{ configure_git_ssh_key_path }}"
-        fi
-      args:
-        executable: /bin/bash
-      when: (is_debian_family or is_mac) and configure_git_is_ssh_key_present_locally
-      changed_when: false
+    - name: Ensure PowerShell profile directory exists
+      ansible.windows.win_file:
+        path: "{{ ansible_env.USERPROFILE }}\\Documents\\WindowsPowerShell"
+        state: directory
+      when: is_windows
 
-    - name: Ensure managed SSH key is added to the agent (Windows)
-      ansible.windows.win_shell: |
-        $fingerprint = "{{ configure_git_managed_ssh_key_fingerprint.stdout }}"
-        $keys = ssh-add -l
-        if ($keys -notmatch $fingerprint) {
-          ssh-add "{{ configure_git_ssh_key_path }}"
-        }
-      when: is_windows and configure_git_is_ssh_key_present_locally
-      changed_when: false
-
-    - name: Add newly created SSH key to ssh-agent (Linux/macOS)
-      ansible.builtin.shell: |
-        set -o pipefail
-        echo "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"
-      args:
-        executable: /bin/bash
-      when: (is_debian_family or is_mac) and not configure_git_is_ssh_key_present_locally
-      changed_when: true
-
-    - name: Add newly created SSH key to agent (Windows)
-      ansible.windows.win_shell: '"{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}" | ssh-add "{{ configure_git_ssh_key_path }}"'
-      when: is_windows and not configure_git_is_ssh_key_present_locally
-      changed_when: true
+    - name: Configure PowerShell profile to load SSH key
+      ansible.windows.win_lineinfile:
+        path: "{{ ansible_env.USERPROFILE }}\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1"
+        line: "ssh-add {{ configure_git_ssh_key_path_win }}"
+        create: true
+      when: is_windows
