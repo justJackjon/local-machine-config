@@ -296,38 +296,34 @@
       when: is_windows
       block:
         - name: Install Chocolatey packages
-          chocolatey.chocolatey.win_chocolatey:
-            name:
-              - nvm
-              - lazygit
-              - gh
-              - gnupg
-              - openssh
-              - alacritty
-              - ansible-lint
-              - cascadia-code-nerd-font
-            state: present
+          ansible.builtin.shell:
+            cmd: /c/ProgramData/chocolatey/bin/choco.exe install nvm lazygit gh gnupg openssh alacritty ansible-lint cascadia-code-nerd-font -y --no-progress
+          register: choco_install
+          changed_when: choco_install.stdout is defined and "Installing the following packages" in choco_install.stdout
 
         - name: Install Node.js LTS
-          ansible.windows.win_shell: nvm install lts
+          ansible.builtin.shell:
+            cmd: nvm install lts
           changed_when: false
 
         - name: Check if pnpm is installed on Windows
-          ansible.windows.win_stat:
-            path: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe"
-          register: pnpm_stat_windows
+          ansible.builtin.shell:
+            cmd: test -f "$LOCALAPPDATA/pnpm/pnpm.exe"
+          register: pnpm_check
+          changed_when: false
+          failed_when: false
 
         - name: Install pnpm on Windows
-          when: not pnpm_stat_windows.stat.exists
-          ansible.windows.win_shell: iwr https://get.pnpm.io/install.ps1 -useb | iex
+          when: pnpm_check.rc != 0
+          ansible.builtin.shell:
+            cmd: powershell.exe -Command "iwr https://get.pnpm.io/install.ps1 -useb | iex"
           changed_when: false
 
         - name: Update pnpm on Windows
-          when: pnpm_stat_windows.stat.exists
-          ansible.windows.win_shell: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe self-update"
-          args:
-            chdir: "{{ ansible_env.USERPROFILE }}"
-            changed_when: false
+          when: pnpm_check.rc == 0
+          ansible.builtin.shell:
+            cmd: "$LOCALAPPDATA/pnpm/pnpm.exe self-update"
+          changed_when: false
 
     - name: Install additional dependencies
       block:

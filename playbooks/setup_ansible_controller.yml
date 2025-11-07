@@ -2,8 +2,6 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  vars:
-    ansible_shell_type: "{{ 'powershell' if lookup('env', 'WINDIR') else 'sh' }}"
   pre_tasks:
     - name: Set python interpreter
       ansible.builtin.include_tasks: ../common/tasks/set_python_interpreter.yml

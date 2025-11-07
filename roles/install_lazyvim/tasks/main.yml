@@ -119,10 +119,12 @@
             state: present
             update_homebrew: true
 
-        - name: Install Neovim on Windows
+        - name: Install Neovim and Nerd Font on Windows
           when: is_windows
-          ansible.windows.win_shell: choco install neovim -y
-          changed_when: false
+          ansible.builtin.shell:
+            cmd: /c/ProgramData/chocolatey/bin/choco.exe install neovim cascadia-code-nerd-font -y --no-progress
+          register: choco_install_lazyvim
+          changed_when: choco_install_lazyvim.stdout is defined and "Installing the following packages" in choco_install_lazyvim.stdout
 
     - name: Install neovim providers (Unix)
       when: is_debian_family or is_mac
@@ -152,7 +154,8 @@
 
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
-      ansible.windows.win_shell: pnpm add -g neovim
+      ansible.builtin.shell:
+        cmd: pnpm add -g neovim
       changed_when: false
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
@@ -174,19 +177,23 @@
     - name: Backup current Neovim Configuration (Windows)
       when: is_windows
       block:
-        - name: Backup LOCALAPPDATA nvim
-          ansible.windows.win_shell: "Move-Item {{ install_lazyvim_nvim_config_dir }} {{ install_lazyvim_nvim_config_dir }}.bak"
-          failed_when: false
+        - name: Backup nvim config directory
+          ansible.builtin.shell:
+            cmd: mv "$LOCALAPPDATA/nvim" "$LOCALAPPDATA/nvim.bak"
+          failed_when: false # Ignore errors if the directory doesn't exist
 
-        - name: Backup LOCALAPPDATA nvim-data
-          ansible.windows.win_shell: Move-Item $env:LOCALAPPDATA\nvim-data $env:LOCALAPPDATA\nvim-data.bak
-          failed_when: false
+        - name: Backup nvim-data directory
+          ansible.builtin.shell:
+            cmd: mv "$LOCALAPPDATA/nvim-data" "$LOCALAPPDATA/nvim-data.bak"
+          failed_when: false # Ignore errors if the directory doesn't exist
 
         - name: Clone LazyVim starter
-          ansible.windows.win_shell: git clone https://github.com/LazyVim/starter $env:LOCALAPPDATA\nvim
+          ansible.builtin.shell:
+            cmd: git clone https://github.com/LazyVim/starter "$LOCALAPPDATA/nvim"
 
         - name: Remove .git folder
-          ansible.windows.win_shell: Remove-Item $env:LOCALAPPDATA\nvim\.git -Recurse -Force
+          ansible.builtin.shell:
+            cmd: rm -rf "$LOCALAPPDATA/nvim/.git"
 
     - name: Install LazyVim
       when: is_debian_family or is_mac
@@ -204,10 +211,6 @@
 
     - name: Install Nerd Font
       block:
-        - name: Install Nerd Font on Windows
-          when: is_windows
-          ansible.windows.win_shell: choco install cascadia-code-nerd-font -y
-          changed_when: false
 
         - name: Install Nerd Font on MacOS
           when: is_mac

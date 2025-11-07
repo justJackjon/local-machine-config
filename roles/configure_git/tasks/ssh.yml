@@ -98,26 +98,33 @@
       when: is_debian_family or is_mac
 
     - name: Ensure ssh-agent is running on Windows
-      ansible.windows.win_service:
-        name: ssh-agent
-        start_mode: auto
-        state: started
       when: is_windows
+      ansible.builtin.shell:
+        cmd: sc.exe config ssh-agent start=auto && sc.exe start ssh-agent
+      changed_when: false
 
     - name: Set Windows SSH key path
       ansible.builtin.set_fact:
         configure_git_ssh_key_path_win: "{{ ansible_env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
       when: is_windows
 
-    - name: Ensure PowerShell profile directory exists
-      ansible.windows.win_file:
-        path: "{{ ansible_env.USERPROFILE }}\\Documents\\WindowsPowerShell"
-        state: directory
+    - name: Set Windows PowerShell profile paths
       when: is_windows
+      ansible.builtin.set_fact:
+        configure_git_powershell_profile_dir_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') | replace('C:', '/c') | replace('\\\\', '/') }}"
+        configure_git_powershell_profile_path_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') | replace('C:', '/c') | replace('\\\\', '/') }}"
+
+    - name: Ensure PowerShell profile directory exists
+      when: is_windows
+      ansible.builtin.file:
+        path: "{{ configure_git_powershell_profile_dir_posix }}"
+        state: directory
+        mode: '0755'
 
     - name: Configure PowerShell profile to load SSH key
-      community.windows.win_lineinfile:
-        path: "{{ ansible_env.USERPROFILE }}\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1"
+      when: is_windows
+      ansible.builtin.lineinfile:
+        path: "{{ configure_git_powershell_profile_path_posix }}"
         line: "ssh-add {{ configure_git_ssh_key_path_win }}"
         create: true
-      when: is_windows
+        mode: '0644'
