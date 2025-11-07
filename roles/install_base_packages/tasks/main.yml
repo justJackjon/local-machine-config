@@ -292,7 +292,7 @@
         name: tldr
         state: present
 
-    - name: Install nvm and Node.js on Windows
+    - name: Configure Windows-native packages
       when: is_windows
       block:
         - name: Install Chocolatey packages
@@ -307,27 +307,29 @@
               - ansible-lint
               - cascadia-code-nerd-font
             state: present
+
         - name: Install Node.js LTS
           ansible.windows.win_shell: nvm install lts
           changed_when: false
 
-    - name: Check if pnpm is installed on Windows
-      when: is_windows
-      ansible.windows.win_stat:
-        path: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe"
-      register: pnpm_stat_windows
+        - name: Check if pnpm is installed on Windows
+          ansible.windows.win_stat:
+            path: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe"
+          register: pnpm_stat_windows
 
-    - name: Install pnpm on Windows
-      when: is_windows and not pnpm_stat_windows.stat.exists
-      ansible.windows.win_shell: iwr https://get.pnpm.io/install.ps1 -useb | iex
-      changed_when: false
+        - name: Install pnpm on Windows
+          when: not pnpm_stat_windows.stat.exists
+          ansible.windows.win_shell: iwr https://get.pnpm.io/install.ps1 -useb | iex
+          changed_when: false
 
-    - name: Update pnpm on Windows
-      when: is_windows and pnpm_stat_windows.stat.exists
-      ansible.windows.win_shell: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe self-update"
-      args:
-        chdir: "{{ ansible_env.USERPROFILE }}"
-        changed_when: false
+        - name: Update pnpm on Windows
+          when: pnpm_stat_windows.stat.exists
+          ansible.windows.win_shell: "{{ ansible_env.LOCALAPPDATA }}\\pnpm\\pnpm.exe self-update"
+          args:
+            chdir: "{{ ansible_env.USERPROFILE }}"
+            changed_when: false
+      vars:
+        ansible_shell_type: powershell
 
     - name: Install additional dependencies
       block:
