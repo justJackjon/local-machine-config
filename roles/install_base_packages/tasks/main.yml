@@ -277,8 +277,8 @@
           - bash-completion
           - stow
           - tree
-          - fzf
-          - ripgrep
+          - mingw-w64-x86_64-fzf
+          - mingw-w64-x86_64-ripgrep
           - mingw-w64-x86_64-fd
           - mingw-w64-x86_64-luarocks
           - mingw-w64-x86_64-imagemagick
