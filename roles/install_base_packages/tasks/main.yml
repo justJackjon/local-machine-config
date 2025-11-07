@@ -333,6 +333,10 @@
           chocolatey.chocolatey.win_chocolatey:
             name: ansible-lint
             state: present
+        - name: Install Caskaydia Cove Nerd Font on Windows
+          chocolatey.chocolatey.win_chocolatey:
+            name: cascadia-code-nerd-font
+            state: present
         - name: Install Node.js LTS
           ansible.windows.win_shell: nvm install lts
           changed_when: false

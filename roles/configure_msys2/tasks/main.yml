@@ -1,0 +1,68 @@
+- name: Configure MSYS2 specific settings
+  when: is_windows
+  block:
+    - name: 'Update nsswitch.conf file to configure home (`~`) to be the Windows user directory'
+      ansible.builtin.lineinfile:
+        path: '/etc/nsswitch.conf'
+        line: 'db_home: windows'
+
+    - name: Update mingw64.ini file to inherit the full Windows PATH
+      ansible.builtin.lineinfile:
+        path: '/mingw64.ini'
+        regexp: '^#MSYS2_PATH_TYPE=inherit'
+        line: 'MSYS2_PATH_TYPE=inherit'
+
+- name: Set up local configuration files if none are present
+  when: is_windows
+  block:
+    - name: Check if .bash_profile exists
+      ansible.builtin.stat:
+        path: '/c/Users/{{ ansible_user_id }}/.bash_profile'
+      register: bash_profile_exists
+
+    - name: Create .bash_profile
+      when: not bash_profile_exists.stat.exists
+      ansible.builtin.copy:
+        content: |
+          if [ -f ~/.bashrc ]; then
+            source ~/.bashrc
+          fi
+        dest: '/c/Users/{{ ansible_user_id }}/.bash_profile'
+
+    - name: Check if .bashrc exists
+      ansible.builtin.stat:
+        path: '/c/Users/{{ ansible_user_id }}/.bashrc'
+      register: bashrc_exists
+
+    - name: Create .bashrc
+      when: not bashrc_exists.stat.exists
+      ansible.builtin.copy:
+        content: ''
+        dest: '/c/Users/{{ ansible_user_id }}/.bashrc'
+
+- name: Install Dracula Theme and Configure MINTTY
+  when: is_windows
+  tags: dracula_theme
+  block:
+    - name: Check if Dracula theme is installed
+      ansible.builtin.stat:
+        path: '/usr/share/mintty/themes/dracula'
+      register: dracula_installed
+
+    - name: Download Dracula theme for MINTTY
+      when: not dracula_installed.stat.exists
+      ansible.builtin.get_url:
+        # NOTE: Potentially brittle, and whilst we could use git, we don't really expect any changes to the remote.
+        url: https://raw.githubusercontent.com/dracula/mintty/master/dracula.minttyrc
+        dest: '/usr/share/mintty/themes/dracula'
+
+    - name: Ensure .minttyrc file exists
+      ansible.builtin.file:
+        path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+        state: touch
+
+    - name: Update .minttyrc to use Dracula theme
+      ansible.builtin.lineinfile:
+        path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+        regexp: '^ThemeFile='
+        line: 'ThemeFile=dracula'

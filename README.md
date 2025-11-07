@@ -11,7 +11,20 @@ This project includes a cross-platform installation script to automate the setup
 - Clone this repository to `~/repos` (Windows) or `~/Repos` (Linux/macOS).
 - Execute the main Ansible playbook to configure the system.
 
-To start the setup, run the following command in your terminal:
+### Windows Installation
+
+To start the setup on Windows, run the following command from an **elevated PowerShell prompt**:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1'))
+```
+
+> [!WARNING]
+> Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1)
+
+### Linux and macOS Installation
+
+To start the setup on Linux or macOS, run the following command in your terminal:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh)"

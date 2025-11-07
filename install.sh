@@ -40,6 +40,10 @@ esac
 
 info "Detected OS: ${os}"
 
+if [ "$os" == "Windows" ]; then
+  error "This script is not intended for Windows. Please run 'install.ps1' from an elevated PowerShell prompt."
+fi
+
 if [ "$os" == "Linux" ]; then
   info "Running on Linux"
   note "This script is designed for Debian-based distributions (e.g., Ubuntu, Mint) using apt-get."
@@ -90,37 +94,13 @@ elif [ "$os" == "macOS" ]; then
   info "Authenticating gh CLI (user interaction required)..."
   gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   info "gh CLI authentication complete."
-
-elif [ "$os" == "Windows" ]; then
-  info "Running on Windows"
-  note "Please ensure you are running this script in a Git Bash or similar shell."
-
-  if ! command -v choco &>/dev/null; then
-    error "Chocolatey not found. Please install it first."
-    info "See https://chocolatey.org/install"
-    exit 1
-  fi
-
-  info "Installing dependencies (git, ansible) via Chocolatey..."
-  choco install git ansible -y
-
-  info "Installing Ansible collections..."
-  ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto community.windows
-
-  info "Authenticating gh CLI (user interaction required)..."
-  gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
-  info "gh CLI authentication complete."
 else
   info "Unsupported OS: ${os}"
   exit 1
 fi
 
 # Clone repository
-if [ "$os" == "macOS" ] || [ "$os" == "Linux" ]; then
-  REPO_DIR="$HOME/Repos"
-else
-  REPO_DIR="$HOME/repos"
-fi
+REPO_DIR="$HOME/Repos"
 
 info "Cloning repository to ${REPO_DIR}/local-machine-config..."
 mkdir -p "${REPO_DIR}"

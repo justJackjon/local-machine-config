@@ -73,3 +73,16 @@
     line: "source {{ ansible_env.HOME }}/.dotfilesrc"
     create: true
     mode: '0644'
+
+- name: Install and Configure Starship
+  when: is_windows
+  block:
+    - name: Install Starship via pacman
+      community.general.pacman:
+        name: mingw-w64-x86_64-starship
+        state: present
+
+    - name: Configure Starship for use with bash
+      ansible.builtin.lineinfile:
+        path: '/c/Users/{{ ansible_user_id }}/.bashrc'
+        line: 'eval "$(starship init bash)"'

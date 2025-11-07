@@ -49,3 +49,18 @@
     name: openssh
     state: present
   when: pre_flight_checks_is_darwin_os_family
+
+- name: Check if playbook is run with administrative privileges (Windows)
+  when: is_windows
+  block:
+    - name: Attempt to create a file in a system directory
+      ansible.builtin.file:
+        path: "C:/Windows/Temp/test"
+        state: touch
+      register: admin_check
+      ignore_errors: true
+
+    - name: Fail if playbook is not run with administrative privileges
+      ansible.builtin.fail:
+        msg: "This playbook must be run with administrative privileges. Please re-run the playbook as an administrator."
+      when: admin_check.failed

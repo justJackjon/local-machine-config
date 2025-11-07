@@ -46,6 +46,9 @@
     - role: install_wsl_gui
       when: is_wsl | default(false)
 
+    - role: configure_msys2
+      when: is_windows
+
     - configure_shell
     - role: configure_keyboard
       tags: configure_keyboard
