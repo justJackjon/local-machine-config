@@ -276,7 +276,6 @@
           - mingw-w64-x86_64-python-setuptools
           - bash-completion
           - stow
-          - xclip
           - tldr
           - tree
           - fzf

@@ -114,5 +114,5 @@ The playbooks in this repository will install and configure the following softwa
 ## TODO:
 
 - Install tmux
-- Manage keys
 - On XFCE desktop, add 'Workspace Switcher' plugin to top panel
+- Create a common clipboard API (e.g., `pbcopy`/`pbpaste` wrappers) to abstract away platform-specific commands like `xclip`, `pbcopy`, and `/dev/clipboard`.
