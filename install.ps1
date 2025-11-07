@@ -102,9 +102,24 @@ function Install-LocalMachineConfig {
     Write-Info "Installing Ansible collections..."
     & $msys2Shell -lc "ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto community.windows"
 
+    # Check if gh is installed
+    $ghCheck = & $msys2Shell -lc "command -v gh"
+    if (-not $ghCheck) {
+        # Install gh
+        Write-Info "Installing GitHub CLI..."
+        & $msys2Shell -lc "pacman -S --noconfirm mingw-w64-x86_64-github-cli"
+        if ($LASTEXITCODE -ne 0) {
+            Write-ErrorMsg "Failed to install GitHub CLI."
+        }
+    }
+
     Write-Info "Authenticating gh CLI (user interaction required)..."
     & $msys2Shell -lc "gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key"
-    Write-Info "gh CLI authentication complete."
+    if ($LASTEXITCODE -eq 0) {
+        Write-Info "gh CLI authentication complete."
+    } else {
+        Write-WarningMsg "gh CLI authentication failed. You may need to run 'gh auth login' manually in an MSYS2 terminal."
+    }
 
     # Create a shortcut to the MSYS2 terminal on the public desktop
     $shell = New-Object -COM WScript.Shell
@@ -116,9 +131,11 @@ function Install-LocalMachineConfig {
 
     # Execute playbook
     Write-Info "Executing Ansible playbook..."
-    Push-Location $LOCAL_REPO_PATH
-    & $msys2Shell -lc "ansible-playbook -i hosts playbooks/setup_ansible_controller.yml --ask-become-pass"
-    Pop-Location
+    $msys2LocalRepoPath = (& $msys2Shell -lc "cygpath -u '$LOCAL_REPO_PATH'" | Out-String).Trim()
+    & $msys2Shell -lc "cd `"$msys2LocalRepoPath`" && ansible-playbook -i hosts playbooks/setup_ansible_controller.yml --ask-become-pass"
+    if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMsg "Ansible playbook execution failed."
+    }
 
     Write-Info "`nSetup complete! Please review the output above for any errors.`n"
   } catch {
