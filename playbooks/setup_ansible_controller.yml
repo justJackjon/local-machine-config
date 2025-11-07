@@ -37,6 +37,9 @@
       tags: always
 
   roles:
+    - role: configure_msys2
+      when: is_windows
+
     - role: install_base_packages
       tags: [install_base_packages, configure_git]
 
@@ -45,9 +48,6 @@
 
     - role: install_wsl_gui
       when: is_wsl | default(false)
-
-    - role: configure_msys2
-      when: is_windows
 
     - configure_shell
     - role: configure_keyboard

@@ -151,7 +151,7 @@ function Install-LocalMachineConfig {
     # Execute playbook
     Write-Info "Executing Ansible playbook..."
     $msys2LocalRepoPath = (& $msys2Shell -lc "cygpath -u '$LOCAL_REPO_PATH'" | Out-String).Trim()
-    & $msys2Shell -lc "cd `"$msys2LocalRepoPath`" && ansible-playbook -i hosts playbooks/setup_ansible_controller.yml --ask-become-pass"
+    & $msys2Shell -lc "cd `"$msys2LocalRepoPath`" && ansible-playbook -i hosts playbooks/setup_ansible_controller.yml"
 
     if ($LASTEXITCODE -ne 0) {
       Write-ErrorMsg "Ansible playbook execution failed."
