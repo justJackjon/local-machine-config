@@ -197,7 +197,7 @@
               - ansible-lint
               - gh
               - gnupg
-              - tldr
+              - tlrc # NOTE: (tldr rust client)
               - tree
               - alacritty
               - ssh-askpass
@@ -276,7 +276,6 @@
           - mingw-w64-x86_64-python-setuptools
           - bash-completion
           - stow
-          - tldr
           - tree
           - fzf
           - ripgrep
@@ -286,6 +285,12 @@
           - mingw-w64-x86_64-sqlite3
         state: present
         update_cache: true
+
+    - name: Install tldr (python client) on Windows
+      when: is_windows
+      ansible.builtin.pip:
+        name: tldr
+        state: present
 
     - name: Install nvm and Node.js on Windows
       when: is_windows
