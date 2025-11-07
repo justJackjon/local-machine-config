@@ -264,7 +264,7 @@
 
     # NOTE: The following packages are required for lazyvim and its plugins.
     # - mingw-w64-x86_64-fd: Required by lazyvim and snacks for file searching
-    # - mingw-w64-x86_64-luarocks: Required by lazy and mason for Lua plugin management
+    # - mingw-w64-x86_64-lua-luarocks: Required by lazy and mason for Lua plugin management
     # - mingw-w64-x86_64-imagemagick: Required by snacks for image previews
     # - mingw-w64-x86_64-sqlite3: Required by lazyvim and snacks for history and frecency
     - name: Install required packages for Windows with MSYS2
@@ -328,8 +328,6 @@
           args:
             chdir: "{{ ansible_env.USERPROFILE }}"
             changed_when: false
-      vars:
-        ansible_shell_type: powershell
 
     - name: Install additional dependencies
       block:
