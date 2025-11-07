@@ -295,11 +295,21 @@
     - name: Configure Windows-native packages
       when: is_windows
       block:
-        - name: Install Chocolatey packages
+        - name: Add scoop 'extras' bucket
           ansible.builtin.shell:
-            cmd: /c/ProgramData/chocolatey/bin/choco.exe install nvm lazygit gh gnupg openssh alacritty ansible-lint cascadia-code-nerd-font -y --no-progress
-          register: choco_install
-          changed_when: choco_install.stdout is defined and "Installing the following packages" in choco_install.stdout
+            cmd: scoop bucket add extras
+          changed_when: false
+
+        - name: Add scoop 'nerd-fonts' bucket
+          ansible.builtin.shell:
+            cmd: scoop bucket add nerd-fonts
+          changed_when: false
+
+        - name: Install packages with scoop
+          ansible.builtin.shell:
+            cmd: scoop install nvm gh gnupg openssh neovim lazygit alacritty cascadia-code-nf
+          register: scoop_install
+          changed_when: scoop_install.stdout is defined and "Installing" in scoop_install.stdout
 
         - name: Install Node.js LTS
           ansible.builtin.shell:
@@ -324,6 +334,11 @@
           ansible.builtin.shell:
             cmd: "$LOCALAPPDATA/pnpm/pnpm.exe self-update"
           changed_when: false
+
+        - name: Install ansible-lint via pipx on Windows
+          community.general.pipx:
+            name: ansible-lint
+            state: present
 
     - name: Install additional dependencies
       block:

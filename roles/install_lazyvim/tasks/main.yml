@@ -119,12 +119,7 @@
             state: present
             update_homebrew: true
 
-        - name: Install Neovim and Nerd Font on Windows
-          when: is_windows
-          ansible.builtin.shell:
-            cmd: /c/ProgramData/chocolatey/bin/choco.exe install neovim cascadia-code-nerd-font -y --no-progress
-          register: choco_install_lazyvim
-          changed_when: choco_install_lazyvim.stdout is defined and "Installing the following packages" in choco_install_lazyvim.stdout
+
 
     - name: Install neovim providers (Unix)
       when: is_debian_family or is_mac

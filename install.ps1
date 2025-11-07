@@ -49,14 +49,13 @@ $LOCAL_REPO_PATH = "$REPO_DIR\local-machine-config"
 
 function Install-LocalMachineConfig {
   try {
-    # Check if Chocolatey is installed
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-      # Install Chocolatey
-      Set-ExecutionPolicy Bypass -Scope Process -Force
-      [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
-      iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+    # Check if Scoop is installed
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+      Write-Info "Installing Scoop..."
+      Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+      Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
     } else {
-      Write-Host "Chocolatey is already installed."
+      Write-Host "Scoop is already installed."
     }
 
     # Check if MSYS2 is installed
