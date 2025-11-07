@@ -103,7 +103,7 @@ function Install-LocalMachineConfig {
     & $msys2Shell -lc "ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto community.windows"
 
     # Check if gh is installed
-    $ghCheck = & $msys2Shell -lc "command -v gh"
+    $ghCheck = & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && command -v gh"
     if (-not $ghCheck) {
         # Install gh
         Write-Info "Installing GitHub CLI..."
@@ -114,7 +114,7 @@ function Install-LocalMachineConfig {
     }
 
     Write-Info "Authenticating gh CLI (user interaction required)..."
-    & $msys2Shell -lc "gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key"
+    & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key"
     if ($LASTEXITCODE -eq 0) {
         Write-Info "gh CLI authentication complete."
     } else {
