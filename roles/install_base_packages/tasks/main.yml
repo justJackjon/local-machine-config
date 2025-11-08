@@ -327,9 +327,10 @@
 
         - name: Install packages with scoop
           ansible.builtin.shell:
-            cmd: "{{ scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadia-code-nf"
+            cmd: "{{ scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadiacode-nf"
           register: scoop_install
-          changed_when: scoop_install.stdout is defined and "Installing" in scoop_install.stdout
+          changed_when: scoop_install.stdout is defined and "successfully" in scoop_install.stdout
+          failed_when: scoop_install.rc != 0 and "successfully" not in scoop_install.stdout
 
         - name: Install Node.js LTS
           ansible.builtin.shell:
