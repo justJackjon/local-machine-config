@@ -356,6 +356,11 @@
             cmd: "$LOCALAPPDATA/pnpm/pnpm self-update"
           changed_when: false
 
+        - name: Run pnpm setup
+          ansible.builtin.shell:
+            cmd: "$LOCALAPPDATA/pnpm/pnpm setup"
+          changed_when: false
+
         # NOTE: We use pip directly here because the pipx module has environment
         #       and pathing issues when run from within MSYS2.
         - name: Install ansible-lint via pip on Windows
