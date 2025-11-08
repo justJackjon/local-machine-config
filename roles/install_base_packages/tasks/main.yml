@@ -306,7 +306,15 @@
         - name: Set scoop_executable_path fact
           ansible.builtin.set_fact:
             scoop_executable_path: "{{ scoop_exe_path_raw.stdout }}"
+            scoop_shims_path: "{{ scoop_exe_path_raw.stdout | dirname }}"
 
+        - name: Set paths for scoop-installed executables
+          ansible.builtin.set_fact:
+            nvm_executable_path: "{{ scoop_shims_path }}/nvm"
+            pnpm_executable_path: "{{ scoop_shims_path }}/pnpm"
+
+        # NOTE: We use the full path to executables installed by scoop because the PATH
+        # is not updated for the current running shell session on the first run.
         - name: Add scoop 'extras' bucket
           ansible.builtin.shell:
             cmd: "{{ scoop_executable_path }} bucket add extras"
@@ -325,12 +333,12 @@
 
         - name: Install Node.js LTS
           ansible.builtin.shell:
-            cmd: nvm install lts
+            cmd: "{{ nvm_executable_path }} install lts"
           changed_when: false
 
         - name: Check if pnpm is installed on Windows
           ansible.builtin.shell:
-            cmd: test -f "$LOCALAPPDATA/pnpm/pnpm.exe"
+            cmd: test -f "{{ pnpm_executable_path }}"
           register: pnpm_check
           changed_when: false
           failed_when: false
@@ -344,7 +352,7 @@
         - name: Update pnpm on Windows
           when: pnpm_check.rc == 0
           ansible.builtin.shell:
-            cmd: "$LOCALAPPDATA/pnpm/pnpm.exe self-update"
+            cmd: "{{ pnpm_executable_path }} self-update"
           changed_when: false
 
         - name: Install ansible-lint via pipx on Windows
