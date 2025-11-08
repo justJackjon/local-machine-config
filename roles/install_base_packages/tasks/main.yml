@@ -277,6 +277,8 @@
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-setuptools
           - mingw-w64-x86_64-python-cffi
+          - mingw-w64-x86_64-python-cryptography
+          - mingw-w64-x86_64-rust
           - bash-completion
           - stow
           - tree
