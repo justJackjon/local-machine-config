@@ -360,7 +360,7 @@
 
         - name: Install ansible-lint via pipx on Windows
           ansible.builtin.shell:
-            cmd: pipx install ansible-lint
+            cmd: pipx install --python /usr/bin/python3 ansible-lint
           changed_when: false
 
     - name: Install additional dependencies
