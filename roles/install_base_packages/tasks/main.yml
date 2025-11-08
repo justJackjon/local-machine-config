@@ -271,6 +271,7 @@
       when: is_windows
       community.general.pacman:
         name:
+          - base-devel
           - mingw-w64-x86_64-python
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-setuptools
