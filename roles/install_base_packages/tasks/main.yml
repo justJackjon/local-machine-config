@@ -353,15 +353,10 @@
             cmd: "$LOCALAPPDATA/pnpm/pnpm self-update"
           changed_when: false
 
-        - name: Install pipx on Windows
+        - name: Install ansible-lint via pip on Windows
           ansible.builtin.pip:
-            name: pipx
+            name: ansible-lint
             state: present
-
-        - name: Install ansible-lint via pipx on Windows
-          ansible.builtin.shell:
-            cmd: pipx install --python /usr/bin/python3 ansible-lint
-          changed_when: false
 
     - name: Install additional dependencies
       block:
