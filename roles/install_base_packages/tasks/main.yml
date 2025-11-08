@@ -295,19 +295,31 @@
     - name: Configure Windows-native packages
       when: is_windows
       block:
+        # NOTE: On the first playbook run, the MSYS2 shell will not have inherited the Windows PATH,
+        # so we need to use the full path to the scoop executable.
+        - name: Get scoop executable path
+          ansible.builtin.shell:
+            cmd: cygpath -u "{{ ansible_env.USERPROFILE }}/scoop/shims/scoop.exe"
+          register: scoop_exe_path_raw
+          changed_when: false
+
+        - name: Set scoop_executable_path fact
+          ansible.builtin.set_fact:
+            scoop_executable_path: "{{ scoop_exe_path_raw.stdout }}"
+
         - name: Add scoop 'extras' bucket
           ansible.builtin.shell:
-            cmd: scoop bucket add extras
+            cmd: "{{ scoop_executable_path }} bucket add extras"
           changed_when: false
 
         - name: Add scoop 'nerd-fonts' bucket
           ansible.builtin.shell:
-            cmd: scoop bucket add nerd-fonts
+            cmd: "{{ scoop_executable_path }} bucket add nerd-fonts"
           changed_when: false
 
         - name: Install packages with scoop
           ansible.builtin.shell:
-            cmd: scoop install nvm gh gnupg openssh neovim lazygit alacritty cascadia-code-nf
+            cmd: "{{ scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadia-code-nf"
           register: scoop_install
           changed_when: scoop_install.stdout is defined and "Installing" in scoop_install.stdout
 

@@ -15,9 +15,19 @@
 - name: Set up local configuration files if none are present
   when: is_windows
   block:
+    - name: Get user's home directory path in POSIX format
+      ansible.builtin.shell:
+        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+      register: win_home_dir_raw
+      changed_when: false
+
+    - name: Set user's home directory fact
+      ansible.builtin.set_fact:
+        win_home_dir: "{{ win_home_dir_raw.stdout }}"
+
     - name: Check if .bash_profile exists
       ansible.builtin.stat:
-        path: '/c/Users/{{ ansible_user_id }}/.bash_profile'
+        path: '{{ win_home_dir }}/.bash_profile'
       register: bash_profile_exists
 
     - name: Create .bash_profile
@@ -27,18 +37,18 @@
           if [ -f ~/.bashrc ]; then
             source ~/.bashrc
           fi
-        dest: '/c/Users/{{ ansible_user_id }}/.bash_profile'
+        dest: '{{ win_home_dir }}/.bash_profile'
 
     - name: Check if .bashrc exists
       ansible.builtin.stat:
-        path: '/c/Users/{{ ansible_user_id }}/.bashrc'
+        path: '{{ win_home_dir }}/.bashrc'
       register: bashrc_exists
 
     - name: Create .bashrc
       when: not bashrc_exists.stat.exists
       ansible.builtin.copy:
         content: ''
-        dest: '/c/Users/{{ ansible_user_id }}/.bashrc'
+        dest: '{{ win_home_dir }}/.bashrc'
 
 - name: Install Dracula Theme and Configure MINTTY
   when: is_windows
@@ -58,11 +68,11 @@
 
     - name: Ensure .minttyrc file exists
       ansible.builtin.file:
-        path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+        path: '{{ win_home_dir }}/.minttyrc'
         state: touch
 
     - name: Update .minttyrc to use Dracula theme
       ansible.builtin.lineinfile:
-        path: '/c/Users/{{ ansible_user_id }}/.minttyrc'
+        path: '{{ win_home_dir }}/.minttyrc'
         regexp: '^ThemeFile='
         line: 'ThemeFile=dracula'
