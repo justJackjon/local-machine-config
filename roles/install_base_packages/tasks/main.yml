@@ -357,9 +357,9 @@
             state: present
 
         - name: Install ansible-lint via pipx on Windows
-          community.general.pipx:
-            name: ansible-lint
-            state: present
+          ansible.builtin.shell:
+            cmd: pipx install ansible-lint
+          changed_when: false
 
     - name: Install additional dependencies
       block:
@@ -373,8 +373,8 @@
             - neovim
 
         - name: Install additional pipx dependencies
-          community.general.pipx:
-            name: "{{ item }}"
-            state: present
+          ansible.builtin.shell:
+            cmd: pipx install {{ item }}
           with_items:
             - pynvim
+          changed_when: false
