@@ -299,7 +299,7 @@
         # so we need to use the full path to the scoop executable.
         - name: Get scoop executable path
           ansible.builtin.shell:
-            cmd: cygpath -u "{{ ansible_env.USERPROFILE }}/scoop/shims/scoop.exe"
+            cmd: cygpath -u "{{ ansible_env.USERPROFILE }}/scoop/shims/scoop"
           register: scoop_exe_path_raw
           changed_when: false
 
