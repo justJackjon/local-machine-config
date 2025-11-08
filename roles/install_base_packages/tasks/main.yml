@@ -377,6 +377,7 @@
           changed_when: false
           environment:
             PNPM_HOME: "$LOCALAPPDATA/pnpm"
+            PATH: "$LOCALAPPDATA/pnpm:{{ ansible_env.PATH }}"
 
         - name: Install additional pipx dependencies
           ansible.builtin.shell:
