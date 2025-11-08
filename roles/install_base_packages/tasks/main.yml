@@ -276,6 +276,7 @@
           - mingw-w64-x86_64-python
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-setuptools
+          - mingw-w64-x86_64-python-cffi
           - bash-completion
           - stow
           - tree
@@ -357,6 +358,7 @@
           ansible.builtin.pip:
             name: ansible-lint
             state: present
+            extra_args: --break-system-packages
 
     - name: Install additional dependencies
       block:
