@@ -272,6 +272,7 @@
       community.general.pacman:
         name:
           - base-devel
+          - libffi-devel
           - mingw-w64-x86_64-python
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-setuptools
