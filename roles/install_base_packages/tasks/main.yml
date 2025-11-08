@@ -329,8 +329,7 @@
 
         - name: Install Node.js LTS
           ansible.builtin.shell:
-            cmd: source /c/Users/{{ ansible_user_id }}/scoop/apps/nvm/current/nvm.sh && nvm install lts
-            executable: /bin/bash
+            cmd: "{{ win_home_dir }}/scoop/apps/nvm/current/nvm.exe install lts"
           changed_when: false
 
         - name: Check if pnpm is installed on Windows
