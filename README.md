@@ -116,3 +116,4 @@ The playbooks in this repository will install and configure the following softwa
 - Install tmux
 - On XFCE desktop, add 'Workspace Switcher' plugin to top panel
 - Create a common clipboard API (e.g., `pbcopy`/`pbpaste` wrappers) to abstract away platform-specific commands like `xclip`, `pbcopy`, and `/dev/clipboard`.
+- Refactor to set fully qualified executable paths (e.g., for scoop, nvm, pnpm) as global facts in an early `pre_tasks` block. This will provide a central, commented location to manage paths and solve the "first-run PATH issue" more cleanly than repeating logic in each role.
