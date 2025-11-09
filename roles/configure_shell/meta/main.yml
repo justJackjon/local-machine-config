@@ -1,0 +1,3 @@
+dependencies:
+  - role: configure_msys2
+    when: is_windows
