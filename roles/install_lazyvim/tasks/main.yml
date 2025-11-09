@@ -150,7 +150,7 @@
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
       ansible.builtin.shell:
-        cmd: pnpm add -g neovim
+        cmd: "{{ win_home_dir }}/AppData/Local/pnpm/pnpm add -g neovim"
       changed_when: false
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
