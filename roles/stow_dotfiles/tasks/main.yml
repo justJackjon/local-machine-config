@@ -48,7 +48,7 @@
     update: true
     accept_hostkey: true
   vars:
-    ansible_git_executable: '"/c/Program Files/Git/cmd/git.exe"'
+    ansible_git_executable: "{{ '/c/Program Files/Git/cmd/git.exe' | quote if is_windows else omit }}"
 
 - name: Stow dotfiles with --adopt and restore git changes
   ansible.builtin.shell:
