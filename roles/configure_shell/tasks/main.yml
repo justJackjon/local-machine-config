@@ -63,10 +63,10 @@
 
     - name: Activate global argcomplete for Windows (MSYS2)
       when: is_windows
-      ansible.builtin.shell: set -o pipefail && yes | /mingw64/bin/activate-global-python-argcomplete --user
-      args:
-        executable: /bin/bash
+      ansible.builtin.shell:
+        cmd: set -o pipefail && yes | head -n 1 | /mingw64/bin/activate-global-python-argcomplete --user
       changed_when: false
+      failed_when: false # This command can have a non-zero exit code on success
 
 - name: Source .dotfilesrc in .bashrc
   ansible.builtin.lineinfile:
