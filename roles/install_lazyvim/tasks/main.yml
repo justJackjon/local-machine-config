@@ -177,12 +177,12 @@
       block:
         - name: Backup nvim config directory
           ansible.builtin.shell:
-            cmd: mv "$LOCALAPPDATA/nvim" "$LOCALAPPDATA/nvim.bak"
+            cmd: mv "$LOCALAPPDATA/nvim" "$LOCALAPPDATA/nvim.bak-{{ ansible_date_time.iso8601_basic_short }}"
           failed_when: false # Ignore errors if the directory doesn't exist
 
         - name: Backup nvim-data directory
           ansible.builtin.shell:
-            cmd: mv "$LOCALAPPDATA/nvim-data" "$LOCALAPPDATA/nvim-data.bak"
+            cmd: mv "$LOCALAPPDATA/nvim-data" "$LOCALAPPDATA/nvim-data.bak-{{ ansible_date_time.iso8601_basic_short }}"
           failed_when: false # Ignore errors if the directory doesn't exist
 
         - name: Clone LazyVim starter
