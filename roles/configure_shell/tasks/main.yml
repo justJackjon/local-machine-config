@@ -38,6 +38,7 @@
             name: mingw-w64-x86_64-python-argcomplete
             state: present
             update_cache: true
+            extra_args: --overwrite "*"
 
     - name: Find Python user base
       when: is_mac
