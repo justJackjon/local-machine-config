@@ -1,6 +1,10 @@
+- name: Set dotfiles repository path
+  ansible.builtin.set_fact:
+    stow_dotfiles_repo_path: "{{ win_home_dir if is_windows else ansible_env.HOME }}/.dotfiles"
+
 - name: Ensure .dotfiles directory exists
   ansible.builtin.file:
-    path: "{{ ansible_env.HOME }}/.dotfiles"
+    path: "{{ stow_dotfiles_repo_path }}"
     state: directory
     mode: "0755"
 
@@ -9,7 +13,7 @@
   #       so we use `ansible.builtin.command` here.
   ansible.builtin.command: git status --porcelain
   args:
-    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+    chdir: "{{ stow_dotfiles_repo_path }}"
   register: stow_dotfiles_git_status
   changed_when: false
   failed_when: false
@@ -23,7 +27,7 @@
   #       so we use `ansible.builtin.command` here.
   ansible.builtin.command: git stash
   args:
-    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+    chdir: "{{ stow_dotfiles_repo_path }}"
   when: stow_dotfiles_is_dotfiles_repo_dirty
   register: stow_dotfiles_git_stash
   changed_when: false
@@ -39,15 +43,17 @@
 - name: Clone or update .dotfiles repository
   ansible.builtin.git:
     repo: "{{ stow_dotfiles_repo_url }}"
-    dest: "{{ ansible_env.HOME }}/.dotfiles"
+    dest: "{{ stow_dotfiles_repo_path }}"
     version: main
     update: true
     accept_hostkey: true
+  vars:
+    ansible_git_executable: '"/c/Program Files/Git/cmd/git.exe"'
 
 - name: Stow dotfiles with --adopt and restore git changes
   ansible.builtin.shell:
     cmd: |
-      cd "{{ ansible_env.HOME }}/.dotfiles"
+      cd "{{ stow_dotfiles_repo_path }}"
       # NOTE: The --adopt flag is used to take ownership of existing files in the home directory
       #       that would otherwise conflict with stow's symlinking process. This allows stow
       #       to create symlinks for these files and move the original files into the .dotfiles
@@ -57,7 +63,7 @@
       stow */ --adopt
       git restore .
   args:
-    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+    chdir: "{{ stow_dotfiles_repo_path }}"
   changed_when: true
 
 - name: Unstash local changes # noqa: command-instead-of-module
@@ -65,6 +71,6 @@
   #       so we use `ansible.builtin.command` here.
   ansible.builtin.command: git stash pop
   args:
-    chdir: "{{ ansible_env.HOME }}/.dotfiles"
+    chdir: "{{ stow_dotfiles_repo_path }}"
   when: stow_dotfiles_is_git_stash_successful
   changed_when: false
