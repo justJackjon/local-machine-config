@@ -35,7 +35,7 @@
         - name: Install argcomplete on Windows MSYS2 systems using Pacman
           when: is_windows
           community.general.pacman:
-            name: mingw-w64-x86__64-python-argcomplete
+            name: mingw-w64-x86_64-python-argcomplete
             state: present
             update_cache: true
 
