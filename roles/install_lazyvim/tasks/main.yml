@@ -152,6 +152,9 @@
       ansible.builtin.shell:
         cmd: "{{ win_home_dir }}/AppData/Local/pnpm/pnpm add -g neovim"
       changed_when: false
+      environment:
+        PNPM_HOME: "{{ win_home_dir }}/AppData/Local/pnpm"
+        PATH: "{{ win_home_dir }}/AppData/Local/pnpm:{{ ansible_env.PATH }}"
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
       when: is_debian_family or is_mac
