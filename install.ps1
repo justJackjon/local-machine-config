@@ -85,7 +85,12 @@ function Install-LocalMachineConfig {
     }
 
     # Open MSYS2 terminal and install Ansible
-    $msys2Path = if (Test-Path -Path "C:\tools\msys64") { "C:\msys64" } else { "$env:USERPROFILE\scoop\apps\msys2\current" }
+    $msys2Path = switch ($true) {
+      { Test-Path -Path "C:\tools\msys64" } { "C:\tools\msys64"; break }
+      { Test-Path -Path "C:\msys64" } { "C:\msys64"; break }
+      default { "$env:USERPROFILE\scoop\apps\msys2\current" }
+    }
+
     $msys2Shell = Join-Path -Path $msys2Path -ChildPath "usr\bin\bash.exe"
 
     # Check if Ansible is installed
