@@ -130,18 +130,9 @@ function Install-LocalMachineConfig {
     }
 
     # Create a shortcut to the MSYS2 terminal
-    $isElevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    $shortcutPath = ""
-
-    if ($isElevated) {
-      $shortcutPath = "C:\Users\Public\Desktop\MSYS2 Terminal.lnk"
-    } else {
+    try {
       $userDesktop = [System.Environment]::GetFolderPath('Desktop')
       $shortcutPath = Join-Path -Path $userDesktop -ChildPath "MSYS2 Terminal.lnk"
-      Write-WarningMsg "Running without administrator privileges. A shortcut will be created on your personal desktop instead of the public desktop."
-    }
-
-    try {
       $shell = New-Object -COM WScript.Shell
       $shortcut = $shell.CreateShortcut($shortcutPath)
       $shortcut.TargetPath = Join-Path -Path $msys2Path -ChildPath "mingw64.exe"
