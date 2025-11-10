@@ -57,7 +57,7 @@ if [ "$os" == "Linux" ]; then
   pipx install ansible ansible-core
 
   info "Installing Ansible collections..."
-  "$HOME/.local/bin/ansible-galaxy" collection install community.general chocolatey.chocolatey ansible.windows community.crypto community.windows
+  "$HOME/.local/bin/ansible-galaxy" collection install community.general ansible.windows community.crypto community.windows
 
   info "Killing any running Chrome processes to ensure a clean browser session for authentication..."
   pkill -f "chrome" || true
@@ -89,7 +89,7 @@ elif [ "$os" == "macOS" ]; then
   brew update
 
   info "Installing dependencies (git, ansible)..."
-  ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto community.windows
+  ansible-galaxy collection install community.general ansible.windows community.crypto community.windows
 
   info "Authenticating gh CLI (user interaction required)..."
   gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key

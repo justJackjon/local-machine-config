@@ -71,7 +71,7 @@ function Install-LocalMachineConfig {
 
     if (-not $msys2Installed) {
       # Install MSYS2
-      choco install msys2 -y
+      scoop install msys2
     } else {
       Write-Host "MSYS2 is already installed."
     }
@@ -79,13 +79,13 @@ function Install-LocalMachineConfig {
     # Check if Git for Windows is installed
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
       # Install Git for Windows
-      choco install git -y
+      scoop install git
     } else {
       Write-Host "Git for Windows is already installed."
     }
 
     # Open MSYS2 terminal and install Ansible
-    $msys2Path = if (Test-Path -Path "C:\tools\msys64") { "C:\tools\msys64" } else { "C:\msys64" }
+    $msys2Path = if (Test-Path -Path "C:\tools\msys64") { "C:\msys64" } else { "$env:USERPROFILE\scoop\apps\msys2\current" }
     $msys2Shell = Join-Path -Path $msys2Path -ChildPath "usr\bin\bash.exe"
 
     # Check if Ansible is installed
@@ -100,7 +100,7 @@ function Install-LocalMachineConfig {
     }
 
     Write-Info "Installing Ansible collections..."
-    & $msys2Shell -lc "ansible-galaxy collection install community.general chocolatey.chocolatey ansible.windows community.crypto community.windows"
+    & $msys2Shell -lc "ansible-galaxy collection install community.general ansible.windows community.crypto community.windows"
 
     # Check if gh is installed
     $ghCheck = & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && command -v gh"
@@ -146,7 +146,7 @@ function Install-LocalMachineConfig {
       Write-WarningMsg "Failed to create MSYS2 terminal shortcut: $($_.Exception.Message)"
     }
 
-    Write-Info "Chocolatey, MSYS2, Git for Windows, and Ansible are installed."
+    Write-Info "Scoop, MSYS2, Git for Windows, and Ansible are installed."
 
     # Execute playbook
     Write-Info "Executing Ansible playbook..."
