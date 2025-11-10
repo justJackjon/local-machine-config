@@ -1,16 +1,19 @@
 - name: Set operating system facts
-  set_fact:
+  ansible.builtin.set_fact:
     is_debian_family: '{{ ansible_os_family == "Debian" }}'
     is_mac: '{{ ansible_os_family == "Darwin" }}'
     is_windows: '{{ ansible_env.OS is defined and ansible_env.OS == "Windows_NT" }}'
+  tags: always
 
 - name: Check for WSL
-  command: uname -r
+  ansible.builtin.command: uname -r
   register: uname_output
   changed_when: false
   when: ansible_os_family == "Debian"
+  tags: always
 
 - name: Set WSL fact
-  set_fact:
+  ansible.builtin.set_fact:
     is_wsl: "{{ uname_output.stdout is defined and ('microsoft' in uname_output.stdout | lower or 'wsl' in uname_output.stdout | lower) }}"
   when: ansible_os_family == "Debian"
+  tags: always

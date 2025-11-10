@@ -1,0 +1,8 @@
+- name: Configure Git
+  ansible.builtin.include_tasks: ssh.yml
+
+- name: Configure GPG
+  ansible.builtin.include_tasks: gpg.yml
+
+- name: Configure Git settings
+  ansible.builtin.include_tasks: git_config.yml

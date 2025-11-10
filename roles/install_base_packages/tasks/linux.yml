@@ -1,0 +1,221 @@
+- name: Install debian packages
+  when: is_debian_family
+  block:
+    # NOTE: The following packages are required for lazyvim and its plugins.
+    #       - fd-find: Required by lazyvim and snacks for file searching (fd)
+    #       - lazygit: Required by lazyvim and snacks for git integration
+    #       - luarocks: Required by lazy and mason for Lua plugin management
+    #       - imagemagick: Required by snacks for image previews
+    #       - sqlite3: Required by snacks for history and frecency
+    #       - libsqlite3-dev: Required by snacks for history and frecency (dev headers)
+    - name: Install required packages for Debian based systems
+      become: true
+      ansible.builtin.apt:
+        name:
+          - python3-pip
+          - pipx
+          - bash-completion
+          - stow
+          - gnupg
+          - xclip
+          - tldr
+          - tree
+          - alacritty
+          - ssh-askpass
+          - fonts-noto-color-emoji
+          - ripgrep
+          - fd-find
+          - luarocks
+          - imagemagick
+          - sqlite3
+          - libsqlite3-dev
+        state: latest
+        update_cache: true
+
+    - name: Install gh for Debian based systems
+      become: true
+      block:
+        - name: Ensure wget is installed
+          ansible.builtin.apt:
+            name: wget
+            state: present
+            update_cache: true
+
+        - name: Create /etc/apt/keyrings directory
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Download GitHub CLI GPG key
+          ansible.builtin.get_url:
+            url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+            dest: /tmp/githubcli-archive-keyring.gpg
+            mode: "0644"
+
+        - name: Add GitHub CLI GPG key to apt keyrings
+          ansible.builtin.shell: >
+            set -o pipefail && cat /tmp/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+          args:
+            creates: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+          changed_when: false
+
+        - name: Set permissions for GitHub CLI GPG key
+          ansible.builtin.file:
+            path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+            mode: "0644"
+
+        - name: Add GitHub CLI apt repository
+          ansible.builtin.apt_repository:
+            repo: |
+              deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main
+            state: present
+            filename: github-cli
+
+        - name: Install gh
+          ansible.builtin.apt:
+            name: gh
+            state: present
+            update_cache: true
+
+    - name: Install lazygit
+      become: true
+      block:
+        - name: Install lazygit from apt on Debian >= 13 or Ubuntu >= 25.10
+          when: >
+            (ansible_distribution == 'Debian' and ansible_distribution_version | float >= 13) or
+            (ansible_distribution == 'Ubuntu' and ansible_distribution_version | float >= 25.10)
+          ansible.builtin.apt:
+            name: lazygit
+            state: present
+            update_cache: true
+
+        - name: Install lazygit from source on older Debian/Ubuntu
+          when: >
+            (ansible_distribution == 'Debian' and ansible_distribution_version | float < 13) or
+            (ansible_distribution == 'Ubuntu' and ansible_distribution_version | float < 25.10)
+          block:
+            - name: Get latest lazygit version
+              ansible.builtin.uri:
+                url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+                return_content: true
+              register: install_base_packages_lazygit_release
+
+            - name: Set lazygit version fact
+              ansible.builtin.set_fact:
+                install_base_packages_lazygit_version: "{{ install_base_packages_lazygit_release.json.tag_name | regex_replace('^v', '') }}"
+
+            - name: Download and unarchive lazygit
+              ansible.builtin.unarchive:
+                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"
+                dest: /tmp
+                remote_src: true
+
+            - name: Install lazygit
+              ansible.builtin.copy:
+                src: /tmp/lazygit
+                dest: /usr/local/bin/lazygit
+                mode: "0755"
+                remote_src: true
+
+    - name: Uninstall apt-managed fzf for Debian based systems
+      become: true
+      ansible.builtin.apt:
+        name: fzf
+        state: absent
+        autoremove: true
+      # NOTE: We are uninstalling the apt-managed version of fzf because it is often outdated
+      #       and causes compatibility issues with fzf-lua. We will install fzf from source instead.
+
+    - name: Install fzf from source for Debian based systems
+      block:
+        # NOTE: The apt package for fzf is often outdated, leading to compatibility issues with fzf-lua.
+        #       Installing directly from source ensures the latest version with all features.
+        - name: Get latest fzf release tag
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/junegunn/fzf/releases/latest
+            method: GET
+            return_content: true
+          register: install_base_packages_fzf_release_info
+
+        - name: Set fzf_version fact
+          ansible.builtin.set_fact:
+            install_base_packages_fzf_version: "{{ install_base_packages_fzf_release_info.json.tag_name }}"
+
+        - name: Clone fzf repository
+          ansible.builtin.git:
+            repo: "https://github.com/junegunn/fzf.git"
+            dest: "{{ ansible_env.HOME }}/.fzf"
+            version: "{{ install_base_packages_fzf_version }}"
+            depth: 1
+            force: true
+          changed_when: false # noqa: latest[git]
+
+        - name: Run fzf install script
+          ansible.builtin.command: "{{ ansible_env.HOME }}/.fzf/install --all"
+          args:
+            creates: "{{ ansible_env.HOME }}/.fzf/bin/fzf"
+          changed_when: false
+
+    - name: Install nvm, node and pnpm
+      block:
+        - name: Download nvm install script
+          ansible.builtin.get_url:
+            url: |
+              https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+            dest: /tmp/install_nvm.sh
+            mode: "0755"
+
+        - name: Run nvm install script
+          ansible.builtin.command: /tmp/install_nvm.sh
+          args:
+            creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+
+        - name: Install Node.js LTS
+          ansible.builtin.shell: >
+            set -o pipefail && source {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install --lts
+          args:
+            executable: /bin/bash
+            creates: "{{ ansible_env.HOME }}/.nvm/versions/node"
+
+        - name: Check if pnpm is installed
+          ansible.builtin.stat:
+            path: "{{ ansible_env.HOME }}/.local/share/pnpm/pnpm"
+          register: install_base_packages_pnpm_stat_debian
+
+        - name: Download pnpm install script
+          when: not install_base_packages_pnpm_stat_debian.stat.exists
+          ansible.builtin.get_url:
+            url: https://get.pnpm.io/install.sh
+            dest: /tmp/install_pnpm.sh
+            mode: "0755"
+
+        - name: Run pnpm install script
+          when: not install_base_packages_pnpm_stat_debian.stat.exists
+          ansible.builtin.command: sh /tmp/install_pnpm.sh
+          changed_when: false
+
+        - name: Update pnpm
+          when: install_base_packages_pnpm_stat_debian.stat.exists
+          ansible.builtin.shell:
+            cmd: "{{ ansible_env.HOME }}/.local/share/pnpm/pnpm self-update"
+          args:
+            executable: /bin/bash
+            chdir: "{{ ansible_env.HOME }}"
+          changed_when: false
+
+    - name: Install pnpm packages
+      community.general.pnpm:
+        global: true
+        state: latest
+      with_items:
+        - tree-sitter-cli
+        - neovim
+
+    - name: Install pipx packages
+      ansible.builtin.command:
+        cmd: pipx install {{ item }}
+      with_items:
+        - ansible-lint
+        - pynvim
+      changed_when: false

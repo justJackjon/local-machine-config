@@ -1,0 +1,25 @@
+- name: Get current nofile soft limit
+  # NOTE: ulimit is a shell built-in command, so it requires the shell module.
+  ansible.builtin.shell: ulimit -Sn  # noqa: command-instead-of-shell
+  register: configure_system_soft_limit
+  changed_when: false
+
+- name: Get current nofile hard limit
+  # NOTE: ulimit is a shell built-in command, so it requires the shell module.
+  ansible.builtin.shell: ulimit -Hn  # noqa: command-instead-of-shell
+  register: configure_system_hard_limit
+  changed_when: false
+
+- name: Increase the number of open files limit
+  when:
+    - (configure_system_soft_limit.stdout | int < configure_system_max_open_files) or
+      (configure_system_hard_limit.stdout | int < configure_system_max_open_files)
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/security/limits.conf
+    block: |
+      # Increased for development environment
+      {{ ansible_user_id }} soft nofile {{ configure_system_max_open_files }}
+      {{ ansible_user_id }} hard nofile {{ configure_system_max_open_files }}
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for nofile limit"
+    mode: '0644'

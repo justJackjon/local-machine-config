@@ -11,7 +11,20 @@ This project includes a cross-platform installation script to automate the setup
 - Clone this repository to `~/repos` (Windows) or `~/Repos` (Linux/macOS).
 - Execute the main Ansible playbook to configure the system.
 
-To start the setup, run the following command in your terminal:
+### Windows Installation
+
+To start the setup on Windows, run the following command from an **elevated PowerShell prompt**:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1'))
+```
+
+> [!WARNING]
+> Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1)
+
+### Linux and macOS Installation
+
+To start the setup on Linux or macOS, run the following command in your terminal:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh)"
@@ -19,6 +32,10 @@ To start the setup, run the following command in your terminal:
 
 > [!WARNING]
 > Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh)
+
+## Post-Installation
+
+After the main playbook has finished, you will need to start a new shell session (or run `source ~/.bashrc`) for all changes to take effect. This is especially important for interacting with services like GitHub, as the `ssh-agent` will only be started in new shell sessions.
 
 ## Features
 
@@ -97,5 +114,6 @@ The playbooks in this repository will install and configure the following softwa
 ## TODO:
 
 - Install tmux
-- Manage keys
 - On XFCE desktop, add 'Workspace Switcher' plugin to top panel
+- Create a common clipboard API (e.g., `pbcopy`/`pbpaste` wrappers) to abstract away platform-specific commands like `xclip`, `pbcopy`, and `/dev/clipboard`.
+- Refactor to set fully qualified executable paths (e.g., for scoop, nvm, pnpm) as global facts in an early `pre_tasks` block. This will provide a central, commented location to manage paths and solve the "first-run PATH issue" more cleanly than repeating logic in each role.

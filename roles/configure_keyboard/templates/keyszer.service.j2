@@ -1,0 +1,12 @@
+[Unit]
+Description=Keyszer - Kinto Keymapping Service
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart={{ ansible_user_dir }}/.local/bin/keyszer -c {{ ansible_user_dir }}/.config/kinto/kinto.py --watch
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

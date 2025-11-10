@@ -1,25 +1,69 @@
 - name: Update and upgrade apt packages
-  apt:
-    update_cache: yes
+  ansible.builtin.apt:
+    update_cache: true
     upgrade: dist
-  become: yes
+  become: true
 
-- name: Install XFCE, XRDP, and Net-tools
-  apt:
+- name: Install XFCE, XRDP, Net-tools, and XFCE Terminal
+  ansible.builtin.apt:
     name:
       - xfce4
       - xrdp
       - net-tools
     state: present
-  become: yes
+  become: true
 
-- name: Configure XRDP to use XFCE
-  shell: echo xfce4-session > ~/.xsession
-  args:
-    creates: ~/.xsession
+- name: Set alacritty as the default terminal emulator
+  become: true
+  community.general.alternatives:
+    name: x-terminal-emulator
+    path: /usr/bin/alacritty
+    link: /usr/bin/x-terminal-emulator
+
+- name: Remove IBus to prevent Wayland/X11 conflict
+  ansible.builtin.apt:
+    name: ibus
+    state: absent
+  become: true
+
+- name: Allow all users to start an X session
+  ansible.builtin.lineinfile:
+    path: /etc/X11/Xwrapper.config
+    regexp: "^allowed_users=.*"
+    line: "allowed_users=anybody"
+    owner: root
+    group: root
+    mode: "0644"
+    create: true
+  become: true
+
+- name: Configure XRDP startup script to fix D-Bus and start XFCE
+  ansible.builtin.copy:
+    dest: /etc/xrdp/startwm.sh
+    mode: "0755"
+    owner: root
+    group: root
+    content: |
+      #!/bin/sh
+
+      # Unset stale D-Bus and session variables
+      unset DBUS_SESSION_BUS_ADDRESS
+      unset XDG_RUNTIME_DIR
+
+      # Set input method to XIM (X Input Method)
+      export GTK_IM_MODULE=xim
+      export QT_IM_MODULE=xim
+
+      # Source user profile to get all environment settings
+      . /etc/profile
+
+      # Use startxfce4, which handles dbus-launch and other session setup
+      startxfce4
+  become: true
 
 - name: Restart XRDP service
-  service:
+  ansible.builtin.service:
     name: xrdp
     state: restarted
-  become: yes
+  become: true
+  when: not is_inside_xfce

@@ -1,4 +1,4 @@
-kinto_config_path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
-xfce4_shortcut_deletion_script_path: "scripts/remove_xfce4_workspace_switch_shortcuts.sh"
-xfce4_shortcut_creation_script_path: "scripts/create_xfce4_workspace_switch_shortcuts.sh"
-macos_shortcut_creation_script_path: "scripts/create_macos_workspace_switch_shortcuts.sh"
+configure_keyboard_kinto_config_path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
+configure_keyboard_xfce4_shortcut_deletion_script_path: "scripts/remove_xfce4_workspace_switch_shortcuts.sh"
+configure_keyboard_xfce4_shortcut_creation_script_path: "scripts/create_xfce4_workspace_switch_shortcuts.sh"
+configure_keyboard_macos_shortcut_creation_script_path: "scripts/create_macos_workspace_switch_shortcuts.sh"

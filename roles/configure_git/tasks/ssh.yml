@@ -1,0 +1,130 @@
+- name: Set SSH key path
+  ansible.builtin.set_fact:
+    configure_git_ssh_key_path: "{{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa"
+
+- name: Check for existing SSH key
+  ansible.builtin.stat:
+    path: "{{ configure_git_ssh_key_path }}"
+  register: configure_git_ssh_key_stat
+
+- name: Set fact if SSH key is present locally
+  ansible.builtin.set_fact:
+    configure_git_is_ssh_key_present_locally: "{{ configure_git_ssh_key_stat.stat.exists }}"
+
+- name: Create managed directory for SSH key
+  ansible.builtin.file:
+    path: "{{ configure_git_ssh_key_path | dirname }}"
+    state: directory
+    mode: "0700"
+
+- name: Prompt for SSH key passphrase
+  ansible.builtin.pause:
+    prompt: "Enter SSH key passphrase"
+    echo: false
+  register: configure_git_ssh_passphrase_prompt
+  no_log: true
+  when: not configure_git_is_ssh_key_present_locally
+
+- name: Confirm SSH key passphrase
+  ansible.builtin.pause:
+    prompt: "Confirm SSH key passphrase"
+    echo: false
+  register: configure_git_ssh_passphrase_confirm
+  no_log: true
+  when: not configure_git_is_ssh_key_present_locally
+
+- name: Set fact if SSH key passphrases match
+  ansible.builtin.set_fact:
+    configure_git_is_ssh_passphrases_match: "{{ configure_git_ssh_passphrase_prompt.user_input == configure_git_ssh_passphrase_confirm.user_input }}"
+  when: not configure_git_is_ssh_key_present_locally and configure_git_ssh_passphrase_prompt is defined
+
+- name: Fail if SSH key passphrases don't match
+  ansible.builtin.fail:
+    msg: "SSH key passphrases don't match!"
+  when: not configure_git_is_ssh_key_present_locally and not configure_git_is_ssh_passphrases_match
+
+- name: Create SSH key for GitHub
+  community.crypto.openssh_keypair:
+    path: "{{ configure_git_ssh_key_path }}"
+    passphrase: "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}"
+    comment: "{{ configure_git_user_email }}"
+    type: ed25519
+  when: not configure_git_is_ssh_key_present_locally
+
+- name: Read SSH public key
+  ansible.builtin.slurp:
+    src: "{{ configure_git_ssh_key_path }}.pub"
+  register: configure_git_ssh_public_key
+
+- name: Get remote SSH public keys from GitHub
+  ansible.builtin.shell: |
+    set -o pipefail
+    gh api /user/keys | jq -r '.[].key'
+  args:
+    executable: /bin/bash
+  register: configure_git_remote_ssh_keys
+  changed_when: false
+
+- name: Set fact if SSH key is already on GitHub
+  ansible.builtin.set_fact:
+    configure_git_is_ssh_key_already_on_github: "{{ (configure_git_ssh_public_key.content | b64decode) in configure_git_remote_ssh_keys.stdout_lines }}"
+
+- name: Add SSH key to GitHub
+  ansible.builtin.shell: |
+    set -o pipefail
+    echo "{{ configure_git_ssh_public_key.content | b64decode }}" | gh ssh-key add -t "{{ ansible_hostname }} SSH Key (ansible-managed)" -
+  args:
+    executable: /bin/bash
+  register: configure_git_add_ssh_key_result
+  when: not configure_git_is_ssh_key_already_on_github
+  changed_when: "'already exist' not in configure_git_add_ssh_key_result.stderr"
+  failed_when: "configure_git_add_ssh_key_result.rc != 0 and 'already exist' not in configure_git_add_ssh_key_result.stderr"
+
+- name: Manage ssh-agent and keys across platforms
+  block:
+    - name: Install keychain for ssh-agent management
+      ansible.builtin.package:
+        name: keychain
+        state: present
+      become: true
+      when: is_debian_family or is_mac
+
+    - name: Configure bashrc to use keychain for ssh-agent management
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        line: "eval `keychain --eval --nogui --agents ssh {{ configure_git_ssh_key_path }}`"
+        create: true
+        mode: "0644"
+      when: is_debian_family or is_mac
+
+    - name: Ensure ssh-agent is running on Windows
+      when: is_windows
+      ansible.builtin.shell:
+        cmd: sc.exe config ssh-agent start=auto && sc.exe start ssh-agent
+      changed_when: false
+
+    - name: Set Windows SSH key path
+      ansible.builtin.set_fact:
+        configure_git_ssh_key_path_win: "{{ ansible_env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
+      when: is_windows
+
+    - name: Set Windows PowerShell profile paths
+      when: is_windows
+      ansible.builtin.set_fact:
+        configure_git_powershell_profile_dir_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') | replace('C:', '/c') | replace('\\\\', '/') }}"
+        configure_git_powershell_profile_path_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') | replace('C:', '/c') | replace('\\\\', '/') }}"
+
+    - name: Ensure PowerShell profile directory exists
+      when: is_windows
+      ansible.builtin.file:
+        path: "{{ configure_git_powershell_profile_dir_posix }}"
+        state: directory
+        mode: '0755'
+
+    - name: Configure PowerShell profile to load SSH key
+      when: is_windows
+      ansible.builtin.lineinfile:
+        path: "{{ configure_git_powershell_profile_path_posix }}"
+        line: "ssh-add {{ configure_git_ssh_key_path_win }}"
+        create: true
+        mode: '0644'

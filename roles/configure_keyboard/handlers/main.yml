@@ -1,0 +1,19 @@
+- name: Apply custom key mappings with xmodmap
+  ansible.builtin.command:
+    cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
+  changed_when: false
+
+- name: Remove files downloaded by Kinto install script
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
+    state: absent
+  loop:
+    - kinto-master
+    - kinto.zip
+  become: true
+
+- name: Restart keyszer service
+  ansible.builtin.systemd:
+    name: keyszer
+    scope: user
+    state: restarted
