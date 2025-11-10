@@ -271,14 +271,9 @@
       when: is_windows
       community.general.pacman:
         name:
-          - base-devel
-          - libffi-devel
           - mingw-w64-x86_64-python
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-setuptools
-          - mingw-w64-x86_64-python-cffi
-          - mingw-w64-x86_64-python-cryptography
-          - mingw-w64-x86_64-rust
           - bash-completion
           - stow
           - tree
@@ -366,14 +361,6 @@
           ansible.builtin.shell:
             cmd: "{{ pnpm_executable_path }} self-update"
           changed_when: false
-
-        # NOTE: We use pip directly here because the pipx module has environment
-        #       and pathing issues when run from within MSYS2.
-        - name: Install ansible-lint via pip on Windows
-          ansible.builtin.pip:
-            name: ansible-lint
-            state: present
-            extra_args: --break-system-packages
 
     - name: Install additional dependencies
       block:
