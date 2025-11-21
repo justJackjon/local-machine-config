@@ -24,6 +24,8 @@
             name: python3-argcomplete
             state: present
 
+
+
         - name: Install argcomplete on macOS systems using Pip
           when: is_mac # NOTE: Changed from 'not is_windows'
           ansible.builtin.pip:
@@ -52,6 +54,8 @@
       args:
         executable: /bin/bash
       changed_when: false
+      register: argcomplete_activation # NOTE: Ignored rc=141 (SIGPIPE) as script completes successfully. Only fail on other non-zero exit codes.
+      failed_when: argcomplete_activation.rc != 0 and argcomplete_activation.rc != 141
 
     - name: Manually create global argcomplete hook for Debian (workaround for buggy script)
       when: is_debian_family
@@ -59,7 +63,7 @@
       ansible.builtin.copy:
         src: python-argcomplete.sh
         dest: /etc/bash_completion.d/python-argcomplete.sh
-        mode: '0644'
+        mode: "0644"
 
     - name: Activate global argcomplete for Windows (MSYS2)
       when: is_windows
@@ -73,7 +77,7 @@
     path: "{{ ansible_env.HOME }}/.bashrc"
     line: "source {{ ansible_env.HOME }}/.dotfilesrc"
     create: true
-    mode: '0644'
+    mode: "0644"
 
 - name: Install and Configure Starship
   when: is_windows
@@ -88,4 +92,4 @@
         path: "{{ win_home_dir if is_windows else ansible_env.HOME }}/.bashrc"
         line: 'eval "$(starship init bash)"'
         create: true
-        mode: '0644'
+        mode: "0644"

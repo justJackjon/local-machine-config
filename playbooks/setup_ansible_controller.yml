@@ -31,9 +31,18 @@
 
     - name: Ensure 'packaging' library is installed for Ansible's Python environment (macOS)
       when: ansible_facts.os_family == 'Darwin'
-      ansible.builtin.command: /opt/homebrew/opt/python@3.12/bin/pip3 install packaging --break-system-packages --user
-      changed_when: false
-      failed_when: false # NOTE: Allow this to fail if packaging is already installed or if pip is not found...
+      ansible.builtin.command: "{{ ansible_python_interpreter }} -m pip install --user --break-system-packages packaging"
+      register: packaging_install
+      changed_when: true
+      failed_when: packaging_install.rc != 0 and packaging_install.rc != 141 # NOTE: Ignored rc=141 (SIGPIPE) as script completes successfully. Only fail on other non-zero exit codes.
+      tags: always
+
+    - name: Ensure 'bcrypt' library is installed for Ansible's Python environment (macOS)
+      when: ansible_facts.os_family == 'Darwin'
+      ansible.builtin.command: "{{ ansible_python_interpreter }} -m pip install --user --break-system-packages bcrypt"
+      register: bcrypt_install
+      changed_when: true
+      failed_when: bcrypt_install.rc != 0 and bcrypt_install.rc != 141 # NOTE: Ignored rc=141 (SIGPIPE) as script completes successfully. Only fail on other non-zero exit codes.
       tags: always
 
   roles:

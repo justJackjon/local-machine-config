@@ -8,7 +8,7 @@
 
 - name: Set python interpreter for macOS
   ansible.builtin.set_fact:
-    ansible_python_interpreter: "/opt/homebrew/bin/python3.12"
+    ansible_python_interpreter: "/opt/homebrew/bin/python3"
   when: "'Darwin' in os_result.stdout"
   tags: always
 
