@@ -86,7 +86,6 @@
       ansible.builtin.package:
         name: keychain
         state: present
-      become: true
       when: is_debian_family or is_mac
 
     - name: Configure bashrc to use keychain for ssh-agent management

@@ -124,6 +124,10 @@
     - name: Install neovim providers (Unix)
       when: is_debian_family or is_mac
       block:
+        - name: Set pnpm home directory for Unix
+          ansible.builtin.set_fact:
+            pnpm_home_dir: "{{ ansible_env.HOME }}/.local/share/pnpm"
+
         - name: Install pynvim for Python provider (Debian)
           when: is_debian_family
           become: true
@@ -134,13 +138,15 @@
         - name: Install pynvim for Python provider (Mac)
           when: is_mac
           become: true
-          ansible.builtin.pip:
-            name: pynvim
-            executable: pip3
+          ansible.builtin.command: "{{ ansible_python_interpreter }} -m pip install --user --break-system-packages pynvim"
+          changed_when: false
 
         - name: Install neovim for Node.js provider (Unix)
           ansible.builtin.command: pnpm add -g neovim
           changed_when: false
+          environment:
+            PNPM_HOME: "{{ pnpm_home_dir }}"
+            PATH: "{{ pnpm_home_dir }}:{{ ansible_env.PATH }}"
 
     - name: Install pynvim for Python provider (Windows)
       when: is_windows

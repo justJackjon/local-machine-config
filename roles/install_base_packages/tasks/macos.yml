@@ -18,6 +18,11 @@
     #       - luarocks: Required by lazy and mason for Lua plugin management
     #       - - imagemagick: Required by snacks for image previews
     #       - sqlite: Required by snacks for history and frecency
+    - name: Tap the 'theseal/ssh-askpass' repository
+      community.general.homebrew_tap:
+        name: theseal/ssh-askpass
+        state: present
+
     - name: Install Homebrew packages
       community.general.homebrew:
         name:
@@ -32,7 +37,7 @@
           - tlrc # NOTE: (tldr rust client)
           - tree
           - alacritty
-          - ssh-askpass
+          - theseal/ssh-askpass/ssh-askpass
           - fzf
           - ripgrep
           - fd
@@ -40,6 +45,7 @@
           - luarocks
           - imagemagick
           - sqlite
+          - pipx
         state: latest
         update_homebrew: true
 
@@ -64,6 +70,12 @@
             executable: /bin/bash
             creates: "{{ ansible_env.HOME }}/.nvm/versions/node"
 
+    - name: Ensure pnpm global directory exists
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/.local/share/pnpm"
+        state: directory
+        mode: '0755'
+
     - name: Install pnpm packages
       community.general.pnpm:
         name: "{{ item }}"
@@ -72,10 +84,14 @@
       with_items:
         - tree-sitter-cli
         - neovim
+      environment:
+        PNPM_HOME: "{{ ansible_env.HOME }}/.local/share/pnpm"
+        PATH: "{{ ansible_env.HOME }}/.local/share/pnpm:{{ ansible_env.PATH }}"
 
     - name: Install pipx packages
       community.general.pipx:
         name: "{{ item }}"
         state: latest
+        executable: /opt/homebrew/bin/pipx
       with_items:
         - pynvim
