@@ -104,14 +104,14 @@
 
         - name: Uninstall xkeysnail (if present via pipx)
           ansible.builtin.command: pipx uninstall xkeysnail
-          register: xkeysnail_uninstall_result
-          changed_when: "'uninstalled' in xkeysnail_uninstall_result.stdout"
+          register: configure_keyboard_xkeysnail_uninstall_result
+          changed_when: "'uninstalled' in configure_keyboard_xkeysnail_uninstall_result.stdout"
           failed_when: false
 
         - name: Install keyszer via pipx
           ansible.builtin.command: pipx install keyszer
-          register: keyszer_install_result
-          changed_when: "'installed' in keyszer_install_result.stdout"
+          register: configure_keyboard_keyszer_install_result
+          changed_when: "'installed' in configure_keyboard_keyszer_install_result.stdout"
 
         - name: Create Kinto config directory
           ansible.builtin.file:

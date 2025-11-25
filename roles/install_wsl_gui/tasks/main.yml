@@ -13,7 +13,7 @@
     state: present
   become: true
 
-- name: Set alacritty as the default terminal emulator
+- name: Set alacritty as the default terminal emulator  # noqa: syntax-check[unknown-module]
   become: true
   community.general.alternatives:
     name: x-terminal-emulator

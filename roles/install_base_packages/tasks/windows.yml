@@ -37,32 +37,32 @@
         - name: Get scoop executable path
           ansible.builtin.command:
             cmd: cygpath -u "{{ ansible_env.USERPROFILE }}/scoop/shims/scoop"
-          register: scoop_exe_path_raw
+          register: install_base_packages_scoop_exe_path_raw
           changed_when: false
 
         # NOTE: We use the full path to executables installed by scoop because the PATH
         #       is not updated for the current running shell session on the first run.
         - name: Set scoop_executable_path fact
           ansible.builtin.set_fact:
-            scoop_executable_path: "{{ scoop_exe_path_raw.stdout }}"
-            scoop_shims_path: "{{ scoop_exe_path_raw.stdout | dirname }}"
+            install_base_packages_scoop_executable_path: "{{ install_base_packages_scoop_exe_path_raw.stdout }}"
+            install_base_packages_scoop_shims_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | dirname }}"
 
         - name: Add scoop 'extras' bucket
           ansible.builtin.command:
-            cmd: "{{ scoop_executable_path }} bucket add extras"
+            cmd: "{{ install_base_packages_scoop_executable_path }} bucket add extras"
           changed_when: false
 
         - name: Add scoop 'nerd-fonts' bucket
           ansible.builtin.command:
-            cmd: "{{ scoop_executable_path }} bucket add nerd-fonts"
+            cmd: "{{ install_base_packages_scoop_executable_path }} bucket add nerd-fonts"
           changed_when: false
 
         - name: Install packages with scoop
           ansible.builtin.command:
-            cmd: "{{ scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadiacode-nf"
-          register: scoop_install
-          changed_when: scoop_install.stdout is defined and "successfully" in scoop_install.stdout
-          failed_when: scoop_install.rc != 0 and "successfully" not in scoop_install.stdout
+            cmd: "{{ install_base_packages_scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadiacode-nf"
+          register: install_base_packages_scoop_install
+          changed_when: install_base_packages_scoop_install.stdout is defined and "successfully" in install_base_packages_scoop_install.stdout
+          failed_when: install_base_packages_scoop_install.rc != 0 and "successfully" not in install_base_packages_scoop_install.stdout
 
         - name: Install Node.js LTS
           ansible.builtin.command:
@@ -74,45 +74,45 @@
         - name: Get user's home directory path in POSIX format
           ansible.builtin.command:
             cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
-          register: win_home_dir_raw
+          register: install_base_packages_win_home_dir_raw
           changed_when: false
 
         - name: Set Windows-specific paths
           ansible.builtin.set_fact:
-            pnpm_executable_path: "{{ win_home_dir_raw.stdout }}/AppData/Local/pnpm/pnpm"
-            pnpm_home_path: "{{ win_home_dir_raw.stdout }}/AppData/Local/pnpm"
+            install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm/pnpm"
+            install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm"
 
         - name: Check if pnpm is installed on Windows
           ansible.builtin.command:
-            cmd: test -f "{{ pnpm_executable_path }}"
-          register: pnpm_check
+            cmd: test -f "{{ install_base_packages_pnpm_executable_path }}"
+          register: install_base_packages_pnpm_check
           changed_when: false
           failed_when: false
 
         - name: Install pnpm on Windows
-          when: pnpm_check.rc != 0
+          when: install_base_packages_pnpm_check.rc != 0
           ansible.builtin.command:
             cmd: powershell.exe -Command "iwr https://get.pnpm.io/install.ps1 -useb | iex"
           changed_when: false
 
         - name: Update pnpm on Windows
-          when: pnpm_check.rc == 0
+          when: install_base_packages_pnpm_check.rc == 0
           ansible.builtin.command:
-            cmd: "{{ pnpm_executable_path }} self-update"
+            cmd: "{{ install_base_packages_pnpm_executable_path }} self-update"
           changed_when: false
 
         # NOTE: We use the shell module here because the pnpm module fails to find the
         #       pnpm executable on the first run (as the PATH is not updated).
         - name: Install pnpm packages
           ansible.builtin.command:
-            cmd: "{{ pnpm_executable_path }} add -g {{ item }}"
+            cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
           with_items:
             - tree-sitter-cli
             - neovim
           changed_when: false
           environment:
-            PNPM_HOME: "{{ pnpm_home_path }}"
-            PATH: "{{ pnpm_home_path }}:{{ ansible_env.PATH }}"
+            PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
+            PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
 
     - name: Install pipx packages
       ansible.builtin.command:
