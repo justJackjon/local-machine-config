@@ -30,7 +30,7 @@
 
             - name: Fail if Homebrew is not installed
               ansible.builtin.fail:
-                msg: 'Homebrew is not installed. Please install Homebrew first.'
+                msg: "Homebrew is not installed. Please install Homebrew first."
               when: install_lazyvim_brew_check.rc != 0
 
         - name: Ensure Windows dependencies are installed
@@ -40,8 +40,8 @@
               ansible.builtin.stat:
                 path: "{{ item }}"
               loop:
-                - '/c/msys64/mingw64.exe'
-                - '/c/tools/msys64/mingw64.exe'
+                - "/c/msys64/mingw64.exe"
+                - "/c/tools/msys64/mingw64.exe"
               register: install_lazyvim_msys2_check
 
             - name: Fail if MSYS2 is not installed on Windows
@@ -50,7 +50,7 @@
                   install_lazyvim_msys2_check.results | selectattr('stat.exists', 'equalto', false)
                   | list | length == install_lazyvim_msys2_check.results | length
               ansible.builtin.fail:
-                msg: 'MSYS2 is not installed. Please install MSYS2 before running this playbook.'
+                msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
 
             - name: Check if Chocolatey is installed
               ansible.builtin.command: choco -v
@@ -60,7 +60,7 @@
 
             - name: Fail if Chocolatey is not installed
               ansible.builtin.fail:
-                msg: 'Chocolatey is not installed. Please install Chocolatey first.'
+                msg: "Chocolatey is not installed. Please install Chocolatey first."
               when: install_lazyvim_choco_check.rc != 0
 
     - name: Install Neovim
@@ -92,7 +92,7 @@
               ansible.builtin.get_url:
                 url: "https://github.com/neovim/neovim/releases/latest/download/{{ install_lazyvim_nvim_archive_name }}"
                 dest: "/tmp/{{ install_lazyvim_nvim_archive_name }}"
-                mode: '0644'
+                mode: "0644"
 
             - name: Remove existing Neovim directory
               ansible.builtin.file:
@@ -119,8 +119,6 @@
             state: present
             update_homebrew: true
 
-
-
     - name: Install neovim providers (Unix)
       when: is_debian_family or is_mac
       block:
@@ -133,13 +131,13 @@
           become: true
           ansible.builtin.apt:
             name: python3-pynvim
-            state: present
+            state: latest
 
         - name: Install pynvim for Python provider (Mac)
           when: is_mac
-          become: true
-          ansible.builtin.command: "{{ ansible_python_interpreter }} -m pip install --user --break-system-packages pynvim"
-          changed_when: false
+          ansible.builtin.pip:
+            name: pynvim
+            state: latest
 
         - name: Install neovim for Node.js provider (Unix)
           ansible.builtin.command: pnpm add -g neovim
@@ -204,7 +202,7 @@
       block:
         - name: Clone LazyVim starter
           ansible.builtin.git:
-            repo: 'https://github.com/LazyVim/starter'
+            repo: "https://github.com/LazyVim/starter"
             dest: "{{ install_lazyvim_nvim_config_dir }}"
             version: main
 
@@ -215,7 +213,6 @@
 
     - name: Install Nerd Font
       block:
-
         - name: Install Nerd Font on MacOS
           when: is_mac
           community.general.homebrew_cask:
@@ -230,8 +227,8 @@
               check_mode: false
               ansible.builtin.get_url:
                 url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
-                dest: '/tmp/CascadiaCode.tar.gz'
-                mode: '0644'
+                dest: "/tmp/CascadiaCode.tar.gz"
+                mode: "0644"
               register: install_lazyvim_download
               notify:
                 - Update font cache
@@ -241,12 +238,12 @@
               ansible.builtin.file:
                 path: "{{ ansible_env.HOME }}/.local/share/fonts"
                 state: directory
-                mode: '0755'
+                mode: "0755"
 
             - name: Unarchive font
               ansible.builtin.unarchive:
-                src: '/tmp/CascadiaCode.tar.gz'
-                dest: '{{ ansible_env.HOME }}/.local/share/fonts'
+                src: "/tmp/CascadiaCode.tar.gz"
+                dest: "{{ ansible_env.HOME }}/.local/share/fonts"
                 remote_src: true
                 creates: "{{ ansible_env.HOME }}/.local/share/fonts/CaskaydiaCoveNerdFont-Regular.ttf"
 
@@ -259,15 +256,15 @@
               ansible.builtin.file:
                 path: "{{ ansible_env.HOME }}/.config/xfce4/terminal"
                 state: directory
-                mode: '0755'
+                mode: "0755"
 
             - name: Configure XFCE Terminal to use Nerd Font
               ansible.builtin.lineinfile:
                 path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
-                regexp: '^FontName='
-                line: 'FontName=CaskaydiaCove Nerd Font 10'
+                regexp: "^FontName="
+                line: "FontName=CaskaydiaCove Nerd Font 10"
                 create: true
-                mode: '0644'
+                mode: "0644"
 
     - name: Configure Terminal app to use Nerd Font on MacOS
       when: is_mac
@@ -303,10 +300,10 @@
               ansible.builtin.file:
                 path: "{{ install_lazyvim_minttyrc_file }}"
                 state: touch
-                mode: '0644'
+                mode: "0644"
 
             - name: Update .minttyrc to use Nerd Font
               ansible.builtin.lineinfile:
                 path: "{{ install_lazyvim_minttyrc_file }}"
-                regexp: '^Font='
-                line: 'Font=CaskaydiaCove Nerd Font'
+                regexp: "^Font="
+                line: "Font=CaskaydiaCove Nerd Font"

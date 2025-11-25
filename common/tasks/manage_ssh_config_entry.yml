@@ -1,0 +1,67 @@
+---
+# NOTE: USAGE:
+# - ansible.builtin.include_tasks: ../../common/tasks/manage_ssh_config_entry.yml
+#   vars:
+#     ssh_config_host: "myhost"
+#     ssh_config_block: |
+#       Host myhost
+#           HostName 1.2.3.4
+#           User myuser
+#     ssh_config_marker: "# {mark} ANSIBLE MANAGED BLOCK FOR MYHOST" # Optional
+#     ssh_config_path: "~/.ssh/config" # Optional
+
+- name: "SSH Config Manager for {{ ssh_config_host }}"
+  block:
+    - name: Set SSH config manager defaults
+      ansible.builtin.set_fact:
+        _ssh_config_path: "{{ ssh_config_path | default(ansible_env.HOME ~ '/.ssh/config') }}"
+        _ssh_config_marker: "{{ ssh_config_marker | default('# {mark} ANSIBLE MANAGED BLOCK ' ~ ssh_config_host) }}"
+        _ssh_config_block_position: "{{ ssh_config_block_position | default('bottom') }}"
+
+    - name: Ensure SSH config directory exists
+      ansible.builtin.file:
+        path: "{{ _ssh_config_path | dirname }}"
+        state: directory
+        mode: "0700"
+
+    - name: Ensure managed SSH block is present for {{ ssh_config_host }}
+      ansible.builtin.blockinfile:
+        path: "{{ _ssh_config_path }}"
+        marker: "{{ _ssh_config_marker }}"
+        block: "{{ ssh_config_block }}"
+        create: true
+        mode: "0600"
+        insertbefore: "{{ 'BOF' if _ssh_config_block_position == 'top' else omit }}"
+      register: initial_block_add
+
+    - name: Check for duplicate host entries for {{ ssh_config_host }}
+      ansible.builtin.shell:
+        cmd: "grep -cE '^[[:space:]]*Host[[:space:]]+{{ ssh_config_host | regex_escape }}[[:space:]]*$' {{ _ssh_config_path }}"
+      register: host_count
+      changed_when: false
+      failed_when: host_count.rc > 1 # grep returns 1 if not found, 0 if found.
+
+    # This block only runs if duplicates were found.
+    - name: Resolve duplicate SSH entries for {{ ssh_config_host }}
+      when: host_count.stdout | int > 1
+      block:
+        - name: Temporarily remove managed block to isolate legacy config
+          ansible.builtin.blockinfile:
+            path: "{{ _ssh_config_path }}"
+            marker: "{{ _ssh_config_marker }}"
+            state: absent
+
+        - name: Remove legacy unmanaged host definition for {{ ssh_config_host }}
+          ansible.builtin.replace:
+            path: "{{ _ssh_config_path }}"
+            regexp: '(?msi)^\s*Host\s+{{ ssh_config_host | regex_escape }}\s*$.*?(?=^\s*Host|\Z)'
+            replace: ""
+
+        - name: Restore managed block for {{ ssh_config_host }}
+          ansible.builtin.blockinfile:
+            path: "{{ _ssh_config_path }}"
+            marker: "{{ _ssh_config_marker }}"
+            block: "{{ ssh_config_block }}"
+            create: true
+            mode: "0600"
+            insertbefore: "{{ 'BOF' if _ssh_config_block_position == 'top' else omit }}"

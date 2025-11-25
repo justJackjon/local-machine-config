@@ -1,21 +1,9 @@
 # NOTE: We cannot rely on ansible gathered facts until the interpreter has been set.
-# Therefore, we will use `uname` to determine the operating system.
+#       Therefore, we will use `uname` to determine the operating system.
 - name: Check operating system
   ansible.builtin.raw: uname -s
   register: os_result
   changed_when: false
-  tags: always
-
-- name: Set python interpreter for macOS
-  ansible.builtin.set_fact:
-    ansible_python_interpreter: "/opt/homebrew/bin/python3"
-  when: "'Darwin' in os_result.stdout"
-  tags: always
-
-- name: Set python interpreter for Linux
-  ansible.builtin.set_fact:
-    ansible_python_interpreter: "/usr/bin/python3"
-  when: "'Linux' in os_result.stdout"
   tags: always
 
 - name: Set python interpreter for MSYS2 on Windows
@@ -23,3 +11,68 @@
     ansible_python_interpreter: "/usr/bin/python3"
   when: "'msys' in os_result.stdout | lower or 'mingw' in os_result.stdout | lower"
   tags: always
+
+- name: Set and manage python interpreter for Unix systems
+  when: "'Linux' in os_result.stdout or 'Darwin' in os_result.stdout"
+  tags: always
+  block:
+    - name: Set initial python interpreter
+      ansible.builtin.set_fact:
+        ansible_python_interpreter: "{{ '/opt/homebrew/bin/python3' if 'Darwin' in os_result.stdout else '/usr/bin/python3' }}"
+
+    - name: Manage python dependencies on Debian-like systems
+      when: "'Linux' in os_result.stdout"
+      block:
+        - name: Check for debian-like OS on Linux systems
+          ansible.builtin.raw: cat /etc/os-release
+          register: os_release_result
+          changed_when: false
+
+        - name: Install python3-venv package on Debian-like systems
+          ansible.builtin.apt:
+            name: python3-venv
+            state: present
+            update_cache: true
+          become: true
+          when:
+            - "os_release_result.stdout is defined"
+            - "'debian' in os_release_result.stdout or 'ubuntu' in os_release_result.stdout"
+
+    - name: Manage python dependencies on macOS
+      when: "'Darwin' in os_result.stdout"
+      block:
+        - name: Uninstall any conflicting python-packaging packages
+          ansible.builtin.command:
+            cmd: "{{ ansible_python_interpreter }} -m pip uninstall -y python-packaging --break-system-packages"
+          register: uninstall_result
+          changed_when: "'Successfully uninstalled' in uninstall_result.stdout"
+
+        # NOTE: ansible.builtin.pip is dependent on python-packaging
+        - name: Install python-packaging for brew managed pip
+          community.general.homebrew:
+            name: python-packaging
+            state: latest
+            update_homebrew: true
+
+    - name: Get user's home directory on Unix
+      ansible.builtin.raw: echo $HOME
+      register: user_home_result
+      changed_when: false
+
+    - name: Set unix_home_path fact
+      ansible.builtin.set_fact:
+        unix_home_path: "{{ user_home_result.stdout | trim }}"
+
+    - name: Ensure virtual environment exists and has required packages
+      ansible.builtin.pip:
+        name:
+          - pexpect
+          - bcrypt
+          - cryptography
+        state: latest
+        virtualenv: "{{ unix_home_path }}/.venvs/local-machine-config"
+        virtualenv_command: "{{ ansible_python_interpreter }} -m venv"
+
+    - name: Set ansible_python_interpreter to use the new venv
+      ansible.builtin.set_fact:
+        ansible_python_interpreter: "{{ unix_home_path }}/.venvs/local-machine-config/bin/python"

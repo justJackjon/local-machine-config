@@ -2,6 +2,7 @@
   hosts: localhost
   connection: local
   gather_facts: false
+
   pre_tasks:
     - name: Set python interpreter
       ansible.builtin.include_tasks: ../common/tasks/set_python_interpreter.yml
@@ -28,22 +29,6 @@
     - name: Execute pre-flight checks
       ansible.builtin.include_tasks: ../roles/pre_flight_checks/tasks/main.yml
       tags: configure_git
-
-    - name: Ensure 'packaging' library is installed for Ansible's Python environment (macOS)
-      when: ansible_facts.os_family == 'Darwin'
-      ansible.builtin.command: "{{ ansible_python_interpreter }} -m pip install --user --break-system-packages packaging"
-      register: packaging_install
-      changed_when: true
-      failed_when: packaging_install.rc != 0 and packaging_install.rc != 141 # NOTE: Ignored rc=141 (SIGPIPE) as script completes successfully. Only fail on other non-zero exit codes.
-      tags: always
-
-    - name: Ensure 'bcrypt' library is installed for Ansible's Python environment (macOS)
-      when: ansible_facts.os_family == 'Darwin'
-      ansible.builtin.command: "{{ ansible_python_interpreter }} -m pip install --user --break-system-packages bcrypt"
-      register: bcrypt_install
-      changed_when: true
-      failed_when: bcrypt_install.rc != 0 and bcrypt_install.rc != 141 # NOTE: Ignored rc=141 (SIGPIPE) as script completes successfully. Only fail on other non-zero exit codes.
-      tags: always
 
   roles:
     - role: configure_msys2
@@ -84,7 +69,7 @@
           - "1. Your SSH and GPG keys have been automatically added to your GitHub account."
           - "   If you have issues, ensure you are authenticated with the GitHub CLI by running 'gh auth login'."
           - ""
-          - "2. IMPORTANT: You must start a new shell session (or run 'source ~/.bashrc') for the SSH agent to be available."
+          - "2. IMPORTANT: You may need to start a new shell session (or run 'source ~/.bashrc') for the SSH agent to be available."
           - "   Until you do, operations like 'git clone' that require SSH may fail."
           - ""
           - "3. For work repositories, you can use a different git configuration by running the following commands inside the repository:"

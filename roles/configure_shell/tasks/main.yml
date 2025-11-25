@@ -24,15 +24,11 @@
             name: python3-argcomplete
             state: present
 
-
-
         - name: Install argcomplete on macOS systems using Pip
-          when: is_mac # NOTE: Changed from 'not is_windows'
+          when: is_mac
           ansible.builtin.pip:
-            name:
-              - argcomplete
+            name: argcomplete
             state: present
-            extra_args: "--user --break-system-packages" # NOTE: Simplified from ternary
 
         - name: Install argcomplete on Windows MSYS2 systems using Pacman
           when: is_windows
@@ -47,6 +43,7 @@
       ansible.builtin.command: "{{ ansible_python_interpreter }} -m site --user-base"
       register: configure_shell_python_user_base
       changed_when: false
+      failed_when: configure_shell_python_user_base.rc != 0 and configure_shell_python_user_base.stdout | length == 0
 
     - name: Activate global argcomplete for macOS
       when: is_mac
@@ -70,7 +67,8 @@
       ansible.builtin.shell:
         cmd: set -o pipefail && yes | head -n 1 | /mingw64/bin/activate-global-python-argcomplete --user
       changed_when: false
-      failed_when: false # This command can have a non-zero exit code on success
+      register: argcomplete_activation_win
+      failed_when: argcomplete_activation_win.rc != 0 and argcomplete_activation_win.rc != 141
 
 - name: Source .dotfilesrc in .bashrc
   ansible.builtin.lineinfile:
