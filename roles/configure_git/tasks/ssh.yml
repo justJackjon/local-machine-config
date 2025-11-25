@@ -82,48 +82,82 @@
 
 - name: Manage ssh-agent and keys across platforms
   block:
-    - name: Install keychain for ssh-agent management
-      ansible.builtin.package:
-        name: keychain
-        state: present
-      when: is_debian_family or is_mac
+    - name: Linux-specific keychain setup
+      when: is_debian_family
+      block:
+        - name: Install keychain for ssh-agent management
+          ansible.builtin.package:
+            name: keychain
+            state: present
 
-    - name: Configure bashrc to use keychain for ssh-agent management
-      ansible.builtin.lineinfile:
-        path: "{{ ansible_env.HOME }}/.bashrc"
-        line: "eval `keychain --eval --nogui --agents ssh {{ configure_git_ssh_key_path }}`"
-        create: true
-        mode: "0644"
-      when: is_debian_family or is_mac
+        - name: Configure bashrc to use keychain for ssh-agent management
+          ansible.builtin.lineinfile:
+            path: "{{ ansible_env.HOME }}/.bashrc"
+            line: "eval `keychain --eval --nogui --agents ssh {{ configure_git_ssh_key_path }}`"
+            create: true
+            mode: "0644"
 
-    - name: Ensure ssh-agent is running on Windows
+    - name: macOS-specific ssh_config setup
+      when: is_mac
+      block:
+        - name: Ensure managed SSH block is present for all hosts
+          ansible.builtin.include_tasks: ../../../common/tasks/manage_ssh_config_entry.yml
+          vars:
+            ssh_config_block_position: "top"
+            ssh_config_host: "*"
+            ssh_config_marker: "# {mark} ANSIBLE MANAGED BLOCK FOR GLOBAL HOST CONFIGURATION"
+            ssh_config_block: |
+              Host *
+                IgnoreUnknown UseKeychain
+
+        - name: Configure SSH config for GitHub to use ansible-managed key
+          ansible.builtin.include_tasks: ../../../common/tasks/manage_ssh_config_entry.yml
+          vars:
+            ssh_config_host: "github.com"
+            ssh_config_marker: "# {mark} ANSIBLE MANAGED BLOCK FOR GITHUB"
+            ssh_config_block: |
+              Host github.com
+                AddKeysToAgent yes
+                UseKeychain yes
+                IdentityFile {{ configure_git_ssh_key_path }}
+
+        - name: Add key to ssh-agent
+          when:
+            - not configure_git_is_ssh_key_present_locally
+            - configure_git_ssh_passphrase_prompt.user_input is defined
+            - configure_git_ssh_passphrase_prompt.user_input | length > 0
+          ansible.builtin.expect:
+            command: /usr/bin/ssh-add --apple-use-keychain {{ configure_git_ssh_key_path }}
+            responses:
+              Enter passphrase: "{{ configure_git_ssh_passphrase_prompt.user_input }}"
+          no_log: true
+
+    - name: Windows-specific ssh-agent setup
       when: is_windows
-      ansible.builtin.shell:
-        cmd: sc.exe config ssh-agent start=auto && sc.exe start ssh-agent
-      changed_when: false
+      block:
+        - name: Ensure ssh-agent is running on Windows
+          ansible.builtin.shell:
+            cmd: sc.exe config ssh-agent start=auto && sc.exe start ssh-agent
+          changed_when: false
 
-    - name: Set Windows SSH key path
-      ansible.builtin.set_fact:
-        configure_git_ssh_key_path_win: "{{ ansible_env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
-      when: is_windows
+        - name: Set Windows SSH key path
+          ansible.builtin.set_fact:
+            configure_git_ssh_key_path_win: "{{ ansible_env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
 
-    - name: Set Windows PowerShell profile paths
-      when: is_windows
-      ansible.builtin.set_fact:
-        configure_git_powershell_profile_dir_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') | replace('C:', '/c') | replace('\\\\', '/') }}"
-        configure_git_powershell_profile_path_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') | replace('C:', '/c') | replace('\\\\', '/') }}"
+        - name: Set Windows PowerShell profile paths
+          ansible.builtin.set_fact:
+            configure_git_powershell_profile_dir_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') | replace('C:', '/c') | replace('\\\\', '/') }}"
+            configure_git_powershell_profile_path_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') | replace('C:', '/c') | replace('\\\\', '/') }}"
 
-    - name: Ensure PowerShell profile directory exists
-      when: is_windows
-      ansible.builtin.file:
-        path: "{{ configure_git_powershell_profile_dir_posix }}"
-        state: directory
-        mode: '0755'
+        - name: Ensure PowerShell profile directory exists
+          ansible.builtin.file:
+            path: "{{ configure_git_powershell_profile_dir_posix }}"
+            state: directory
+            mode: "0755"
 
-    - name: Configure PowerShell profile to load SSH key
-      when: is_windows
-      ansible.builtin.lineinfile:
-        path: "{{ configure_git_powershell_profile_path_posix }}"
-        line: "ssh-add {{ configure_git_ssh_key_path_win }}"
-        create: true
-        mode: '0644'
+        - name: Configure PowerShell profile to load SSH key
+          ansible.builtin.lineinfile:
+            path: "{{ configure_git_powershell_profile_path_posix }}"
+            line: "ssh-add {{ configure_git_ssh_key_path_win }}"
+            create: true
+            mode: "0644"

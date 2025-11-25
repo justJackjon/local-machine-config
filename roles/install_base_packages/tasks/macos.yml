@@ -18,11 +18,6 @@
     #       - luarocks: Required by lazy and mason for Lua plugin management
     #       - - imagemagick: Required by snacks for image previews
     #       - sqlite: Required by snacks for history and frecency
-    - name: Tap the 'theseal/ssh-askpass' repository
-      community.general.homebrew_tap:
-        name: theseal/ssh-askpass
-        state: present
-
     - name: Install Homebrew packages
       community.general.homebrew:
         name:
@@ -37,7 +32,6 @@
           - tlrc # NOTE: (tldr rust client)
           - tree
           - alacritty
-          - theseal/ssh-askpass/ssh-askpass
           - fzf
           - ripgrep
           - fd
@@ -74,7 +68,7 @@
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/.local/share/pnpm"
         state: directory
-        mode: '0755'
+        mode: "0755"
 
     - name: Install pnpm packages
       community.general.pnpm:
