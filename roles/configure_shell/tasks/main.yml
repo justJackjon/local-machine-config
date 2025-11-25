@@ -45,14 +45,21 @@
       changed_when: false
       failed_when: configure_shell_python_user_base.rc != 0 and configure_shell_python_user_base.stdout | length == 0
 
+    # NOTE: The following task ignores exit code 141 (SIGPIPE) because the 'yes'
+    #       command's output pipe is closed prematurely by the argcomplete script,
+    #       which is expected behavior.
     - name: Activate global argcomplete for macOS
       when: is_mac
-      ansible.builtin.shell: set -o pipefail && yes | {{ configure_shell_python_user_base.stdout }}/bin/activate-global-python-argcomplete --user
+      ansible.builtin.shell: >
+        set -o pipefail && yes |
+        {{ configure_shell_python_user_base.stdout }}/bin/activate-global-python-argcomplete --user
       args:
         executable: /bin/bash
       changed_when: false
-      register: argcomplete_activation # NOTE: Ignored rc=141 (SIGPIPE) as script completes successfully. Only fail on other non-zero exit codes.
-      failed_when: argcomplete_activation.rc != 0 and argcomplete_activation.rc != 141
+      register: configure_shell_argcomplete_activation
+      failed_when: >
+        configure_shell_argcomplete_activation.rc != 0 and
+        configure_shell_argcomplete_activation.rc != 141
 
     - name: Manually create global argcomplete hook for Debian (workaround for buggy script)
       when: is_debian_family
@@ -64,11 +71,15 @@
 
     - name: Activate global argcomplete for Windows (MSYS2)
       when: is_windows
-      ansible.builtin.shell:
-        cmd: set -o pipefail && yes | head -n 1 | /mingw64/bin/activate-global-python-argcomplete --user
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        yes | head -n 1 |
+        /mingw64/bin/activate-global-python-argcomplete --user
       changed_when: false
-      register: argcomplete_activation_win
-      failed_when: argcomplete_activation_win.rc != 0 and argcomplete_activation_win.rc != 141
+      register: configure_shell_argcomplete_activation_win
+      failed_when: >
+        configure_shell_argcomplete_activation_win.rc != 0 and
+        configure_shell_argcomplete_activation_win.rc != 141
 
 - name: Source .dotfilesrc in .bashrc
   ansible.builtin.lineinfile:

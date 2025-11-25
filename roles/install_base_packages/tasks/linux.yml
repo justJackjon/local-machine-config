@@ -107,7 +107,7 @@
 
             - name: Download and unarchive lazygit
               ansible.builtin.unarchive:
-                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"
+                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"  # noqa: line-length
                 dest: /tmp
                 remote_src: true
 

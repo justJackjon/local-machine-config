@@ -97,7 +97,7 @@
             create: true
             mode: "0644"
 
-    - name: macOS-specific ssh_config setup
+    - name: MacOS-specific ssh_config setup
       when: is_mac
       block:
         - name: Ensure managed SSH block is present for all hosts
@@ -146,8 +146,18 @@
 
         - name: Set Windows PowerShell profile paths
           ansible.builtin.set_fact:
-            configure_git_powershell_profile_dir_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') | replace('C:', '/c') | replace('\\\\', '/') }}"
-            configure_git_powershell_profile_path_posix: "{{ (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') | replace('C:', '/c') | replace('\\\\', '/') }}"
+            configure_git_powershell_profile_dir_posix: >-
+              {{
+                (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') |
+                replace('C:', '/c') |
+                replace('\\\\', '/')
+              }}
+            configure_git_powershell_profile_path_posix: >-
+              {{
+                (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') |
+                replace('C:', '/c') |
+                replace('\\\\', '/')
+              }}
 
         - name: Ensure PowerShell profile directory exists
           ansible.builtin.file:

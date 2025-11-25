@@ -124,7 +124,7 @@
       block:
         - name: Set pnpm home directory for Unix
           ansible.builtin.set_fact:
-            pnpm_home_dir: "{{ ansible_env.HOME }}/.local/share/pnpm"
+            install_lazyvim_pnpm_home_dir: "{{ ansible_env.HOME }}/.local/share/pnpm"
 
         - name: Install pynvim for Python provider (Debian)
           when: is_debian_family
@@ -143,8 +143,8 @@
           ansible.builtin.command: pnpm add -g neovim
           changed_when: false
           environment:
-            PNPM_HOME: "{{ pnpm_home_dir }}"
-            PATH: "{{ pnpm_home_dir }}:{{ ansible_env.PATH }}"
+            PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
+            PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ ansible_env.PATH }}"
 
     - name: Install pynvim for Python provider (Windows)
       when: is_windows
@@ -153,7 +153,7 @@
 
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "{{ win_home_dir }}/AppData/Local/pnpm/pnpm add -g neovim"
       changed_when: false
       environment:
@@ -179,23 +179,44 @@
     - name: Backup current Neovim Configuration (Windows)
       when: is_windows
       block:
+        - name: Check for nvim config directory
+          ansible.builtin.stat:
+            path: "{{ ansible_env.LOCALAPPDATA }}/nvim"
+          register: install_lazyvim_nvim_config_dir_stat
+
         - name: Backup nvim config directory
-          ansible.builtin.shell:
-            cmd: mv "$LOCALAPPDATA/nvim" "$LOCALAPPDATA/nvim.bak-{{ ansible_date_time.iso8601_basic_short }}"
-          failed_when: false # Ignore errors if the directory doesn't exist
+          when: install_lazyvim_nvim_config_dir_stat.stat.exists
+          ansible.builtin.command:
+            cmd: mv "{{ ansible_env.LOCALAPPDATA }}/nvim" "{{ ansible_env.LOCALAPPDATA }}/nvim.bak-{{ ansible_date_time.iso801_basic_short }}"
+          changed_when: true
+
+        - name: Check for nvim-data directory
+          ansible.builtin.stat:
+            path: "{{ ansible_env.LOCALAPPDATA }}/nvim-data"
+          register: install_lazyvim_nvim_data_dir_stat
 
         - name: Backup nvim-data directory
-          ansible.builtin.shell:
-            cmd: mv "$LOCALAPPDATA/nvim-data" "$LOCALAPPDATA/nvim-data.bak-{{ ansible_date_time.iso8601_basic_short }}"
-          failed_when: false # Ignore errors if the directory doesn't exist
+          when: install_lazyvim_nvim_data_dir_stat.stat.exists
+          ansible.builtin.command:
+            cmd: mv "{{ ansible_env.LOCALAPDATA }}/nvim-data" "{{ ansible_env.LOCALAPPDATA }}/nvim-data.bak-{{ ansible_date_time.iso8601_basic_short }}"
+          changed_when: true
 
         - name: Clone LazyVim starter
-          ansible.builtin.shell:
-            cmd: git clone https://github.com/LazyVim/starter "$LOCALAPPDATA/nvim"
+          ansible.builtin.git:
+            repo: "https://github.com/LazyVim/starter"
+            dest: "{{ ansible_env.LOCALAPPDATA }}/nvim"
+            version: main
+
+        - name: Check for .git folder
+          ansible.builtin.stat:
+            path: "{{ ansible_env.LOCALAPPDATA }}/nvim/.git"
+          register: install_lazyvim_git_folder_stat
 
         - name: Remove .git folder
-          ansible.builtin.shell:
-            cmd: rm -rf "$LOCALAPPDATA/nvim/.git"
+          when: install_lazyvim_git_folder_stat.stat.exists
+          ansible.builtin.command:
+            cmd: rm -rf "{{ ansible_env.LOCALAPPDATA }}/nvim/.git"
+          changed_when: true
 
     - name: Install LazyVim
       when: is_debian_family or is_mac
