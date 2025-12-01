@@ -52,7 +52,7 @@ if [ "$os" == "Linux" ]; then
   sudo apt-get update
 
   info "Installing dependencies (git, python3, ansible)..."
-  sudo apt-get install -y git python3 python3-pip python3-venv pipx
+  sudo apt-get install -y git python3 python3-pip python3-venv pipx gh
   pipx ensurepath
   pipx install ansible ansible-core
 
@@ -88,6 +88,7 @@ elif [ "$os" == "macOS" ]; then
   brew update
 
   info "Installing dependencies (git, ansible)..."
+  brew install git ansible gh
   ansible-galaxy collection install community.general ansible.windows community.crypto community.windows
 
   info "Authenticating gh CLI (user interaction required)..."
