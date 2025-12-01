@@ -81,3 +81,10 @@
           - "   - To get your public GPG key, run:"
           - "     gpg --armor --export --homedir {{ ansible_env.HOME }}/.gnupg/ansible-managed/github {{ configure_git_user_email }}"
       tags: configure_git
+
+    - name: Add final instructions for Kinto on WSL2
+      ansible.builtin.debug:
+        msg:
+          - "Kinto is not supported on WSL2 due to limitations with the `uinput` kernel module."
+          - "To enable macOS-style keybindings, please run this playbook on your Windows host."
+      when: is_wsl
