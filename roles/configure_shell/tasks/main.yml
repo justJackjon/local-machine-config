@@ -75,6 +75,8 @@
         set -o pipefail &&
         yes | head -n 1 |
         /mingw64/bin/activate-global-python-argcomplete --user
+      args:
+        executable: /bin/bash
       changed_when: false
       register: configure_shell_argcomplete_activation_win
       failed_when: >

@@ -20,7 +20,7 @@
           - xclip
           - tldr
           - tree
-          - alacritty
+          - jq
           - ssh-askpass
           - fonts-noto-color-emoji
           - ripgrep
@@ -29,53 +29,66 @@
           - imagemagick
           - sqlite3
           - libsqlite3-dev
+          - libfontconfig1-dev
+          - pkg-config
         state: latest
         update_cache: true
+
+    - name: Install Rust via rustup
+      become: true
+      block:
+        - name: Check if rustup is installed
+          ansible.builtin.stat:
+            path: "/root/.cargo/bin/rustup"
+          register: rustup_stat_root
+
+        - name: Download rustup installer
+          when: not rustup_stat_root.stat.exists
+          ansible.builtin.get_url:
+            url: https://sh.rustup.rs
+            dest: /tmp/rustup-init.sh
+            mode: "0755"
+
+        - name: Run rustup installer for root user
+          when: not rustup_stat_root.stat.exists
+          ansible.builtin.command: /tmp/rustup-init.sh -y
+          changed_when: true
+
+    - name: Install Alacritty via cargo for Debian based systems
+      become: true
+      community.general.cargo:
+        name: alacritty
+        state: present
+      environment:
+        PATH: "/root/.cargo/bin:{{ ansible_env.PATH }}"
+        CARGO_INSTALL_ROOT: "/usr/local"
 
     - name: Install gh for Debian based systems
       become: true
       block:
-        - name: Ensure wget is installed
-          ansible.builtin.apt:
-            name: wget
-            state: present
-            update_cache: true
-
-        - name: Create /etc/apt/keyrings directory
+        - name: Create apt keyrings directory
           ansible.builtin.file:
             path: /etc/apt/keyrings
             state: directory
             mode: "0755"
 
-        - name: Download GitHub CLI GPG key
+        - name: Download GitHub CLI GPG keyring
           ansible.builtin.get_url:
             url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
-            dest: /tmp/githubcli-archive-keyring.gpg
-            mode: "0644"
-
-        - name: Add GitHub CLI GPG key to apt keyrings
-          ansible.builtin.shell: >
-            set -o pipefail && cat /tmp/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
-          args:
-            creates: /etc/apt/keyrings/githubcli-archive-keyring.gpg
-          changed_when: false
-
-        - name: Set permissions for GitHub CLI GPG key
-          ansible.builtin.file:
-            path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
-            mode: "0644"
+            dest: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+            mode: '0644'
+            force: true
 
         - name: Add GitHub CLI apt repository
           ansible.builtin.apt_repository:
-            repo: |
-              deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main
+            repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'i386' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
             state: present
             filename: github-cli
 
-        - name: Install gh
+        - name: Install latest gh CLI
           ansible.builtin.apt:
             name: gh
-            state: present
+            state: latest
             update_cache: true
 
     - name: Install lazygit
@@ -107,7 +120,7 @@
 
             - name: Download and unarchive lazygit
               ansible.builtin.unarchive:
-                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"  # noqa: line-length
+                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz" # noqa: line-length
                 dest: /tmp
                 remote_src: true
 

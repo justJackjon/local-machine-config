@@ -22,15 +22,32 @@
   ansible.builtin.set_fact:
     stow_dotfiles_is_dotfiles_repo_dirty: "{{ stow_dotfiles_git_status.stdout != '' }}"
 
-- name: Stash local changes if any # noqa: command-instead-of-module
-  # NOTE: The ansible.builtin.git module does not support `git stash`,
-  #       so we use `ansible.builtin.command` here.
-  ansible.builtin.command: git stash
-  args:
-    chdir: "{{ stow_dotfiles_repo_path }}"
+- name: Resolve conflicts and stash local changes if any
   when: stow_dotfiles_is_dotfiles_repo_dirty
-  register: stow_dotfiles_git_stash
-  changed_when: false
+  block:
+    - name: Get list of unmerged files
+      ansible.builtin.command: git diff --name-only --diff-filter=U
+      args:
+        chdir: "{{ stow_dotfiles_repo_path }}"
+      register: stow_dotfiles_unmerged_files
+      changed_when: false
+      failed_when: false
+
+    - name: Reset unmerged files to resolve conflicts
+      ansible.builtin.command: "git checkout HEAD -- {{ item }}"
+      args:
+        chdir: "{{ stow_dotfiles_repo_path }}"
+      with_items: "{{ stow_dotfiles_unmerged_files.stdout_lines }}"
+      when: "stow_dotfiles_unmerged_files.stdout != ''"
+
+    - name: Stash local changes # noqa: command-instead-of-module
+      # NOTE: The ansible.builtin.git module does not support `git stash`,
+      #       so we use `ansible.builtin.command` here.
+      ansible.builtin.command: git stash
+      args:
+        chdir: "{{ stow_dotfiles_repo_path }}"
+      register: stow_dotfiles_git_stash
+      changed_when: false
 
 - name: Set fact if git stash was successful
   ansible.builtin.set_fact:
