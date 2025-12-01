@@ -26,6 +26,18 @@
   when: pre_flight_checks_is_gh_cli_not_authenticated
   tags: configure_git
 
+- name: Get gh CLI version
+  ansible.builtin.shell: "gh --version | head -n 1 | cut -d ' ' -f 3"
+  register: pre_flight_checks_gh_version
+  changed_when: false
+  failed_when: false
+  tags: configure_git
+
+- name: Set gh CLI version fact
+  ansible.builtin.set_fact:
+    pre_flight_checks_gh_version_number: "{{ pre_flight_checks_gh_version.stdout | trim }}"
+  tags: configure_git
+
 - name: Check for required gh auth scopes
   ansible.builtin.fail:
     msg: |
@@ -34,6 +46,8 @@
       gh auth refresh -h github.com -s admin:public_key,admin:gpg_key
   when:
     - not pre_flight_checks_is_gh_cli_not_authenticated
+    - pre_flight_checks_gh_version_number is defined
+    - pre_flight_checks_gh_version_number is version('2.48.0', '>=')
     - "'admin:public_key' not in pre_flight_checks_gh_auth_status.stdout or 'admin:gpg_key' not in pre_flight_checks_gh_auth_status.stdout"
   tags: configure_git
 
