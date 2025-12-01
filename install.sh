@@ -69,13 +69,12 @@ if [ "$os" == "Linux" ]; then
     # The gh version is 2.48.0 or higher, use --skip-ssh-key...
     gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   else
-    # The gh version is older, --skip-ssh-key flag not available.
+    # The gh version is older, --git-protocol and --skip-ssh-key flags not available.
     # The --clipboard flag is also only available in gh 2.79.0 or higher, see: https://github.com/cli/cli/releases/tag/v2.79.0
     warning "When prompted to 'Generate a new SSH key to add to your GitHub account?', please answer 'n'. Ansible will handle SSH key generation."
     note "The --skip-ssh-key flag is not available in your gh CLI version (${GH_VERSION}). See: https://github.com/cli/cli/releases/tag/v2.48.0 for release notes."
-    gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key
+    gh auth login --web -h github.com -s public_repo,admin:public_key,admin:gpg_key
   fi
-  info "gh CLI authentication complete."
 
 elif [ "$os" == "macOS" ]; then
   info "Running on macOS"
@@ -93,11 +92,12 @@ elif [ "$os" == "macOS" ]; then
 
   info "Authenticating gh CLI (user interaction required)..."
   gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
-  info "gh CLI authentication complete."
 else
   info "Unsupported OS: ${os}"
   exit 1
 fi
+
+info "gh CLI authentication complete."
 
 # Clone repository
 REPO_DIR="$HOME/Repos"
@@ -107,9 +107,31 @@ mkdir -p "${REPO_DIR}"
 git clone https://github.com/justjackjon/local-machine-config.git "${REPO_DIR}/local-machine-config" 2>/dev/null || {
   info "Repository already cloned. Pulling latest changes."
   cd "${REPO_DIR}/local-machine-config"
-  git stash --include-untracked >/dev/null 2>&1 || true
-  git pull >/dev/null 2>&1
-  git stash pop >/dev/null 2>&1 || true
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+  if [ "$current_branch" == "main" ]; then
+    info "On 'main' branch. Stashing and pulling latest changes..."
+    git stash --all >/dev/null 2>&1 || true
+
+    # After stashing, verify the working directory is clean before pulling.
+    if ! git diff-index --quiet HEAD -- || ! git diff-index --cached --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+      error "Working directory is still dirty after 'git stash --all'. Aborting."
+      git status --short >&2
+
+      exit 1
+    fi
+
+    if ! git_output=$(git pull 2>&1); then
+      error "git pull failed with the following error:"
+      echo "${git_output}" >&2
+
+      exit 1
+    fi
+
+    git stash pop >/dev/null 2>&1 || true
+  else
+    info "On branch '$current_branch'. Skipping 'git pull' to preserve local work."
+  fi
 }
 
 # Execute playbook
