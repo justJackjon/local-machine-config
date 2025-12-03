@@ -1,6 +1,6 @@
 - name: Set dotfiles repository path
   ansible.builtin.set_fact:
-    stow_dotfiles_repo_path: "{{ win_home_dir if is_windows else ansible_env.HOME }}/.dotfiles"
+    stow_dotfiles_repo_path: "{{ win_home_dir if is_windows else ansible_facts.env.HOME }}/.dotfiles"
 
 - name: Ensure .dotfiles directory exists
   ansible.builtin.file:

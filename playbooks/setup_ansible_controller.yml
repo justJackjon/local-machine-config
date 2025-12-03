@@ -77,9 +77,9 @@
           - '   git config --local user.email "your-work@example.com"'
           - ""
           - "4. For manual key management:"
-          - "   - Your public SSH key is at: {{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa.pub"
+          - "   - Your public SSH key is at: {{ ansible_facts.env.HOME }}/.ssh/ansible-managed/github/id_rsa.pub"
           - "   - To get your public GPG key, run:"
-          - "     gpg --armor --export --homedir {{ ansible_env.HOME }}/.gnupg/ansible-managed/github {{ configure_git_user_email }}"
+          - "     gpg --armor --export --homedir {{ ansible_facts.env.HOME }}/.gnupg/ansible-managed/github {{ configure_git_user_email }}"
       tags: configure_git
 
     - name: Add final instructions for Kinto on WSL2

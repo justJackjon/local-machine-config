@@ -10,7 +10,7 @@
             line: /opt/homebrew/bin/bash
             state: present
         - name: Change default shell to Homebrew's Bash
-          ansible.builtin.command: chsh -s /opt/homebrew/bin/bash {{ ansible_user_id }}
+          ansible.builtin.command: chsh -s /opt/homebrew/bin/bash {{ ansible_facts.user_id }}
           changed_when: false
 
 - name: Enable tab completion for Ansible CLI commands
@@ -40,7 +40,7 @@
 
     - name: Find Python user base
       when: is_mac
-      ansible.builtin.command: "{{ ansible_python_interpreter }} -m site --user-base"
+      ansible.builtin.command: "{{ ansible_facts.python.executable }} -m site --user-base"
       register: configure_shell_python_user_base
       changed_when: false
       failed_when: configure_shell_python_user_base.rc != 0 and configure_shell_python_user_base.stdout | length == 0
@@ -85,8 +85,8 @@
 
 - name: Source .dotfilesrc in .bashrc
   ansible.builtin.lineinfile:
-    path: "{{ ansible_env.HOME }}/.bashrc"
-    line: "source {{ ansible_env.HOME }}/.dotfilesrc"
+    path: "{{ ansible_facts.env.HOME }}/.bashrc"
+    line: "source {{ ansible_facts.env.HOME }}/.dotfilesrc"
     create: true
     mode: "0644"
 
@@ -100,7 +100,7 @@
 
     - name: Configure Starship for use with bash
       ansible.builtin.lineinfile:
-        path: "{{ win_home_dir if is_windows else ansible_env.HOME }}/.bashrc"
+        path: "{{ win_home_dir if is_windows else ansible_facts.env.HOME }}/.bashrc"
         line: 'eval "$(starship init bash)"'
         create: true
         mode: "0644"

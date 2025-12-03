@@ -14,7 +14,7 @@
   block:
     - name: Set SSH config manager defaults
       ansible.builtin.set_fact:
-        _ssh_config_path: "{{ ssh_config_path | default(ansible_env.HOME ~ '/.ssh/config') }}"
+        _ssh_config_path: "{{ ssh_config_path | default(ansible_facts.env.HOME ~ '/.ssh/config') }}"
         _ssh_config_marker: "{{ ssh_config_marker | default('# {mark} ANSIBLE MANAGED BLOCK ' ~ ssh_config_host) }}"
         _ssh_config_block_position: "{{ ssh_config_block_position | default('bottom') }}"
 

@@ -1,5 +1,5 @@
 - name: Set architecture facts
   ansible.builtin.set_fact:
-    is_amd64: "{{ ansible_architecture == 'x86_64' }}"
-    is_arm64: "{{ ansible_architecture == 'aarch64' or ansible_architecture == 'arm64' }}"
+    is_amd64: "{{ ansible_facts.architecture == 'x86_64' }}"
+    is_arm64: "{{ ansible_facts.architecture == 'aarch64' or ansible_facts.architecture == 'arm64' }}"
   tags: always

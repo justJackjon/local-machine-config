@@ -3,7 +3,7 @@
     - name: Set OS specific facts
       when: is_windows
       ansible.builtin.set_fact:
-        install_lazyvim_minttyrc_file: "{{ '/c/Users/' + ansible_user_id + '/.minttyrc' if is_windows else '~/.minttyrc' }}"
+        install_lazyvim_minttyrc_file: "{{ '/c/Users/' + ansible_facts.user_id + '/.minttyrc' if is_windows else '~/.minttyrc' }}"
 
     - name: Set general facts
       ansible.builtin.set_fact:
@@ -76,11 +76,11 @@
 
             - name: Set Neovim architecture string
               ansible.builtin.set_fact:
-                install_lazyvim_nvim_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else '' }}"
+                install_lazyvim_nvim_arch: "{{ 'x86_64' if ansible_facts.architecture == 'x86_64' else 'arm64' if ansible_facts.architecture == 'aarch64' else '' }}"
 
             - name: Fail if architecture is not supported
               ansible.builtin.fail:
-                msg: "Unsupported architecture: {{ ansible_architecture }}"
+                msg: "Unsupported architecture: {{ ansible_facts.architecture }}"
               when: install_lazyvim_nvim_arch == ''
 
             - name: Set Neovim archive and directory names
@@ -124,7 +124,7 @@
       block:
         - name: Set pnpm home directory for Unix
           ansible.builtin.set_fact:
-            install_lazyvim_pnpm_home_dir: "{{ ansible_env.HOME }}/.local/share/pnpm"
+            install_lazyvim_pnpm_home_dir: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
 
         - name: Install pynvim for Python provider (Debian)
           when: is_debian_family
@@ -144,7 +144,7 @@
           changed_when: false
           environment:
             PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
-            PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ ansible_env.PATH }}"
+            PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ ansible_facts.env.PATH }}"
 
     - name: Install pynvim for Python provider (Windows)
       when: is_windows
@@ -181,41 +181,41 @@
       block:
         - name: Check for nvim config directory
           ansible.builtin.stat:
-            path: "{{ ansible_env.LOCALAPPDATA }}/nvim"
+            path: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim"
           register: install_lazyvim_nvim_config_dir_stat
 
         - name: Backup nvim config directory
           when: install_lazyvim_nvim_config_dir_stat.stat.exists
           ansible.builtin.command:
-            cmd: mv "{{ ansible_env.LOCALAPPDATA }}/nvim" "{{ ansible_env.LOCALAPPDATA }}/nvim.bak-{{ ansible_date_time.iso801_basic_short }}"
+            cmd: mv "{{ ansible_facts.env.LOCALAPPDATA }}/nvim" "{{ ansible_facts.env.LOCALAPPDATA }}/nvim.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
           changed_when: true
 
         - name: Check for nvim-data directory
           ansible.builtin.stat:
-            path: "{{ ansible_env.LOCALAPPDATA }}/nvim-data"
+            path: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim-data"
           register: install_lazyvim_nvim_data_dir_stat
 
         - name: Backup nvim-data directory
           when: install_lazyvim_nvim_data_dir_stat.stat.exists
           ansible.builtin.command:
-            cmd: mv "{{ ansible_env.LOCALAPDATA }}/nvim-data" "{{ ansible_env.LOCALAPPDATA }}/nvim-data.bak-{{ ansible_date_time.iso8601_basic_short }}"
+            cmd: mv "{{ ansible_facts.env.LOCALAPPDATA }}/nvim-data" "{{ ansible_facts.env.LOCALAPPDATA }}/nvim-data.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
           changed_when: true
 
         - name: Clone LazyVim starter
           ansible.builtin.git:
             repo: "https://github.com/LazyVim/starter"
-            dest: "{{ ansible_env.LOCALAPPDATA }}/nvim"
+            dest: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim"
             version: main
 
         - name: Check for .git folder
           ansible.builtin.stat:
-            path: "{{ ansible_env.LOCALAPPDATA }}/nvim/.git"
+            path: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim/.git"
           register: install_lazyvim_git_folder_stat
 
         - name: Remove .git folder
           when: install_lazyvim_git_folder_stat.stat.exists
           ansible.builtin.command:
-            cmd: rm -rf "{{ ansible_env.LOCALAPPDATA }}/nvim/.git"
+            cmd: rm -rf "{{ ansible_facts.env.LOCALAPPDATA }}/nvim/.git"
           changed_when: true
 
     - name: Install LazyVim
@@ -257,16 +257,16 @@
 
             - name: Ensure font directory exists
               ansible.builtin.file:
-                path: "{{ ansible_env.HOME }}/.local/share/fonts"
+                path: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
                 state: directory
                 mode: "0755"
 
             - name: Unarchive font
               ansible.builtin.unarchive:
                 src: "/tmp/CascadiaCode.tar.gz"
-                dest: "{{ ansible_env.HOME }}/.local/share/fonts"
+                dest: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
                 remote_src: true
-                creates: "{{ ansible_env.HOME }}/.local/share/fonts/CaskaydiaCoveNerdFont-Regular.ttf"
+                creates: "{{ ansible_facts.env.HOME }}/.local/share/fonts/CaskaydiaCoveNerdFont-Regular.ttf"
 
     - name: Configure the terminal emulator to use the new Nerd Font
       block:
@@ -275,13 +275,13 @@
           block:
             - name: Ensure XFCE Terminal configuration directory exists
               ansible.builtin.file:
-                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal"
+                path: "{{ ansible_facts.env.HOME }}/.config/xfce4/terminal"
                 state: directory
                 mode: "0755"
 
             - name: Configure XFCE Terminal to use Nerd Font
               ansible.builtin.lineinfile:
-                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
+                path: "{{ ansible_facts.env.HOME }}/.config/xfce4/terminal/terminalrc"
                 regexp: "^FontName="
                 line: "FontName=CaskaydiaCove Nerd Font 10"
                 create: true
