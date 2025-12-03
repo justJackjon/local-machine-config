@@ -55,18 +55,18 @@
         - name: Run nvm install script
           ansible.builtin.command: /tmp/install_nvm.sh
           args:
-            creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+            creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
         - name: Install Node.js LTS
           ansible.builtin.shell: >
-            set -o pipefail && source {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install --lts
+            set -o pipefail && source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh && nvm install --lts
           args:
             executable: /bin/bash
-            creates: "{{ ansible_env.HOME }}/.nvm/versions/node"
+            creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
 
     - name: Ensure pnpm global directory exists
       ansible.builtin.file:
-        path: "{{ ansible_env.HOME }}/.local/share/pnpm"
+        path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
         state: directory
         mode: "0755"
 
@@ -79,8 +79,8 @@
         - tree-sitter-cli
         - neovim
       environment:
-        PNPM_HOME: "{{ ansible_env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_env.HOME }}/.local/share/pnpm:{{ ansible_env.PATH }}"
+        PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
+        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.PATH }}"
 
     - name: Install pipx packages
       community.general.pipx:

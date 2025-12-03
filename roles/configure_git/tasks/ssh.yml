@@ -1,6 +1,6 @@
 - name: Set SSH key path
   ansible.builtin.set_fact:
-    configure_git_ssh_key_path: "{{ ansible_env.HOME }}/.ssh/ansible-managed/github/id_rsa"
+    configure_git_ssh_key_path: "{{ ansible_facts.env.HOME }}/.ssh/ansible-managed/github/id_rsa"
 
 - name: Check for existing SSH key
   ansible.builtin.stat:
@@ -72,7 +72,7 @@
 - name: Add SSH key to GitHub
   ansible.builtin.shell: |
     set -o pipefail
-    echo "{{ configure_git_ssh_public_key.content | b64decode }}" | gh ssh-key add -t "{{ ansible_hostname }} SSH Key (ansible-managed)" -
+    echo "{{ configure_git_ssh_public_key.content | b64decode }}" | gh ssh-key add -t "{{ ansible_facts.hostname }} SSH Key (ansible-managed)" -
   args:
     executable: /bin/bash
   register: configure_git_add_ssh_key_result
@@ -96,7 +96,7 @@
 
         - name: Configure bashrc to use keychain for ssh-agent management
           ansible.builtin.lineinfile:
-            path: "{{ ansible_env.HOME }}/.bashrc"
+            path: "{{ ansible_facts.env.HOME }}/.bashrc"
             line: "eval `keychain --eval --nogui --agents ssh {{ configure_git_ssh_key_path }}`"
             create: true
             mode: "0644"
@@ -146,19 +146,19 @@
 
         - name: Set Windows SSH key path
           ansible.builtin.set_fact:
-            configure_git_ssh_key_path_win: "{{ ansible_env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
+            configure_git_ssh_key_path_win: "{{ ansible_facts.env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
 
         - name: Set Windows PowerShell profile paths
           ansible.builtin.set_fact:
             configure_git_powershell_profile_dir_posix: >-
               {{
-                (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') |
+                (ansible_facts.env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') |
                 replace('C:', '/c') |
                 replace('\\\\', '/')
               }}
             configure_git_powershell_profile_path_posix: >-
               {{
-                (ansible_env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') |
+                (ansible_facts.env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') |
                 replace('C:', '/c') |
                 replace('\\\\', '/')
               }}
