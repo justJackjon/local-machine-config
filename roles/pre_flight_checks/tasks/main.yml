@@ -6,7 +6,7 @@
   ansible.builtin.set_fact:
     pre_flight_checks_is_darwin_os_family: "{{ ansible_facts.os_family == \"Darwin\" }}"
 
-- name: Check if gh CLI is authenticated
+- name: Check gh authentication status
   ansible.builtin.command: gh auth status
   register: pre_flight_checks_gh_auth_status
   changed_when: false

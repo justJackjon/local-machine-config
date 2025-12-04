@@ -46,7 +46,7 @@
 - name: Get remote GPG keys from GitHub
   ansible.builtin.shell: |
     set -o pipefail
-    gh api /user/gpg_keys | jq -r '.[].key_id'
+    gh api user/gpg_keys | jq -r '.[].key_id'
   args:
     executable: /bin/bash
   register: configure_git_remote_gpg_keys

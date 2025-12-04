@@ -44,8 +44,10 @@
       when: is_wsl | default(false)
 
     - configure_shell
+
     - role: configure_keyboard
       tags: configure_keyboard
+
     - install_browser
     - install_lazyvim
     - stow_dotfiles
