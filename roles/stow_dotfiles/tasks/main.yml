@@ -1,6 +1,12 @@
+- name: Get user's home directory path in POSIX format
+  ansible.builtin.command:
+    cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+  register: stow_dotfiles_win_home_dir
+  changed_when: false
+
 - name: Set dotfiles repository path
   ansible.builtin.set_fact:
-    stow_dotfiles_repo_path: "{{ win_home_dir if is_windows else ansible_facts.env.HOME }}/.dotfiles"
+    stow_dotfiles_repo_path: "{{ stow_dotfiles_win_home_dir.stdout if is_windows else ansible_facts.env.HOME }}/.dotfiles"
 
 - name: Ensure .dotfiles directory exists
   ansible.builtin.file:

@@ -99,7 +99,7 @@ function Install-LocalMachineConfig {
     if (-not $ansibleCheck) {
       # Install Ansible
       & $msys2Shell -lc "pacman -Syu --noconfirm"
-      & $msys2Shell -lc "pacman -S --noconfirm ansible"
+      & $msys2Shell -lc "pacman -S --noconfirm base-devel ansible"
     } else {
       Write-Host "Ansible is already installed."
     }

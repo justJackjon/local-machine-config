@@ -42,6 +42,7 @@
               loop:
                 - "/c/msys64/mingw64.exe"
                 - "/c/tools/msys64/mingw64.exe"
+                - "/c/Users/John.Butcher/scoop/apps/msys2/current/mingw64.exe"
               register: install_lazyvim_msys2_check
 
             - name: Fail if MSYS2 is not installed on Windows
@@ -51,17 +52,6 @@
                   | list | length == install_lazyvim_msys2_check.results | length
               ansible.builtin.fail:
                 msg: "MSYS2 is not installed. Please install MSYS2 before running this playbook."
-
-            - name: Check if Chocolatey is installed
-              ansible.builtin.command: choco -v
-              register: install_lazyvim_choco_check
-              failed_when: install_lazyvim_choco_check.rc != 0
-              changed_when: false
-
-            - name: Fail if Chocolatey is not installed
-              ansible.builtin.fail:
-                msg: "Chocolatey is not installed. Please install Chocolatey first."
-              when: install_lazyvim_choco_check.rc != 0
 
     - name: Install Neovim
       block:
@@ -146,19 +136,20 @@
             PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
             PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ ansible_facts.env.PATH }}"
 
-    - name: Install pynvim for Python provider (Windows)
-      when: is_windows
-      ansible.builtin.pip:
-        name: pynvim
+    - name: Get user's home directory path in POSIX format
+      ansible.builtin.command:
+        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+      register: install_lazyvim_win_home_dir
+      changed_when: false
 
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
       ansible.builtin.command:
-        cmd: "{{ win_home_dir }}/AppData/Local/pnpm/pnpm add -g neovim"
+        cmd: "{{ install_lazyvim_win_home_dir.stdout }}/AppData/Local/pnpm/pnpm add -g neovim"
       changed_when: false
       environment:
-        PNPM_HOME: "{{ win_home_dir }}/AppData/Local/pnpm"
-        PATH: "{{ win_home_dir }}/AppData/Local/pnpm:{{ ansible_env.PATH }}"
+        PNPM_HOME: "{{ install_lazyvim_win_home_dir.stdout }}/AppData/Local/pnpm"
+        PATH: "{{ install_lazyvim_win_home_dir.stdout }}/AppData/Local/pnpm:{{ ansible_env.PATH }}"
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
       when: is_debian_family or is_mac
@@ -206,6 +197,7 @@
             repo: "https://github.com/LazyVim/starter"
             dest: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim"
             version: main
+            executable: /c/PROGRA~1/Git/cmd/git
 
         - name: Check for .git folder
           ansible.builtin.stat:

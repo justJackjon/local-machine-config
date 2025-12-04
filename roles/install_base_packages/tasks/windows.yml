@@ -13,15 +13,21 @@
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-pipx
           - mingw-w64-x86_64-python-setuptools
-          - bash-completion
-          - stow
-          - tree
+          - mingw-w64-x86_64-toolchain
+          - mingw-w64-x86_64-rust
+          - mingw-w64-x86_64-python-cffi
+          - mingw-w64-x86_64-python-bcrypt
+          - mingw-w64-x86_64-python-cryptography
           - mingw-w64-x86_64-fzf
           - mingw-w64-x86_64-ripgrep
+          - mingw-w64-x86_64-jq
           - mingw-w64-x86_64-fd
           - mingw-w64-x86_64-lua-luarocks
           - mingw-w64-x86_64-imagemagick
           - mingw-w64-x86_64-sqlite3
+          - bash-completion
+          - stow
+          - tree
         state: latest
         update_cache: true
 
@@ -63,11 +69,6 @@
           register: install_base_packages_scoop_install
           changed_when: install_base_packages_scoop_install.stdout is defined and "successfully" in install_base_packages_scoop_install.stdout
           failed_when: install_base_packages_scoop_install.rc != 0 and "successfully" not in install_base_packages_scoop_install.stdout
-
-        - name: Install Node.js LTS
-          ansible.builtin.command:
-            cmd: "{{ win_home_dir }}/scoop/apps/nvm/current/nvm.exe install lts"
-          changed_when: false
 
     - name: Install pnpm packages
       block:
@@ -114,9 +115,7 @@
             PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
             PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
 
-    - name: Install pipx packages
+    - name: Install Node.js LTS
       ansible.builtin.command:
-        cmd: pipx install {{ item }}
-      with_items:
-        - pynvim
+        cmd: "{{ install_base_packages_win_home_dir_raw.stdout }}/scoop/apps/nvm/current/nvm.exe install lts"
       changed_when: false

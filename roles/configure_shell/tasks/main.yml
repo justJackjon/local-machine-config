@@ -38,6 +38,8 @@
             update_cache: true
             extra_args: --overwrite "*"
 
+- name: Enable global python argcomplete
+  block:
     - name: Find Python user base
       when: is_mac
       ansible.builtin.command: "{{ ansible_facts.python.executable }} -m site --user-base"
@@ -69,19 +71,26 @@
         dest: /etc/bash_completion.d/python-argcomplete.sh
         mode: "0644"
 
-    - name: Activate global argcomplete for Windows (MSYS2)
-      when: is_windows
-      ansible.builtin.shell: >
-        set -o pipefail &&
-        yes | head -n 1 |
-        /mingw64/bin/activate-global-python-argcomplete --user
-      args:
-        executable: /bin/bash
+    - name: Get user's home directory path in POSIX format
+      ansible.builtin.command:
+        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+      register: configure_shell_win_home_dir
       changed_when: false
-      register: configure_shell_argcomplete_activation_win
-      failed_when: >
-        configure_shell_argcomplete_activation_win.rc != 0 and
-        configure_shell_argcomplete_activation_win.rc != 141
+
+    - name: Configure Starship for use with bash
+      ansible.builtin.lineinfile:
+        path: "{{ configure_shell_win_home_dir.stdout if is_windows else ansible_facts.env.HOME }}/.bashrc"
+        line: 'eval "$(starship init bash)"'
+        create: true
+        mode: "0644"
+
+    - name: Manually create global argcomplete hook for Windows (MSYS2)
+      when: is_windows
+      ansible.builtin.lineinfile:
+        path: "{{ configure_shell_win_home_dir.stdout if is_windows else ansible_facts.env.HOME }}/.bashrc"
+        line: "source /mingw64/lib/python3.12/site-packages/argcomplete/bash_completion.d/_python-argcomplete"
+        create: true
+        mode: "0644"
 
 - name: Source .dotfilesrc in .bashrc
   ansible.builtin.lineinfile:
@@ -97,10 +106,3 @@
       community.general.pacman:
         name: mingw-w64-x86_64-starship
         state: present
-
-    - name: Configure Starship for use with bash
-      ansible.builtin.lineinfile:
-        path: "{{ win_home_dir if is_windows else ansible_facts.env.HOME }}/.bashrc"
-        line: 'eval "$(starship init bash)"'
-        create: true
-        mode: "0644"

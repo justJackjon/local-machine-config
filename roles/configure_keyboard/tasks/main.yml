@@ -1,5 +1,5 @@
 # NOTE: The logic of this role was not changed when it was converted from a playbook.
-# There is extensive refactoring required to make it OS agnostic, however, this was out of scope for the conversion work.
+#       There is extensive refactoring required to make it OS agnostic, however, this was out of scope for the conversion work.
 - name: Configure Keyboard
   block:
     - name: Set OS and hardware facts

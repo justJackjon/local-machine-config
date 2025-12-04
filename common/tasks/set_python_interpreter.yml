@@ -1,16 +1,43 @@
 # NOTE: We cannot rely on ansible gathered facts until the interpreter has been set.
-#       Therefore, we will use `uname` to determine the operating system.
-- name: Check operating system
-  ansible.builtin.raw: uname -s
-  register: os_result
-  changed_when: false
+#       Therefore, we must gather required facts manually.
+- name: Manually set required facts prior to ansible gathered facts execution
   tags: always
+  block:
+    - name: Check operating system
+      ansible.builtin.raw: uname -s
+      register: os_result
+      changed_when: false
+      tags: always
 
-- name: Set python interpreter for MSYS2 on Windows
-  ansible.builtin.set_fact:
-    ansible_python_interpreter: "/usr/bin/python3"
+    - name: Get user's home directory on Unix
+      ansible.builtin.raw: echo $HOME
+      register: user_home_result
+      changed_when: false
+
+    - name: Set unix_home_path fact
+      ansible.builtin.set_fact:
+        unix_home_path: "{{ user_home_result.stdout | trim }}"
+
+- name: Set and manage python interpreter for MSYS2 on Windows
   when: "'msys' in os_result.stdout | lower or 'mingw' in os_result.stdout | lower"
   tags: always
+  block:
+    - name: Set initial python interpreter for MSYS2 on Windows
+      ansible.builtin.set_fact:
+        ansible_python_interpreter: "/usr/bin/python3"
+
+    - name: Ensure virtual environment exists and has required packages
+      ansible.builtin.pip:
+        name:
+          - pip # NOTE: We need to install pip for python in the venv.
+          - pipx
+        state: latest
+        virtualenv: "{{ unix_home_path }}/.venvs/local-machine-config"
+        virtualenv_command: "{{ ansible_python_interpreter }} -m venv --system-site-packages"
+
+    - name: Set ansible_python_interpreter to use the new venv
+      ansible.builtin.set_fact:
+        ansible_python_interpreter: "{{ unix_home_path }}/.venvs/local-machine-config/bin/python"
 
 - name: Set and manage python interpreter for Unix systems
   when: "'Linux' in os_result.stdout or 'Darwin' in os_result.stdout"
@@ -53,15 +80,6 @@
             name: python-packaging
             state: latest
             update_homebrew: true
-
-    - name: Get user's home directory on Unix
-      ansible.builtin.raw: echo $HOME
-      register: user_home_result
-      changed_when: false
-
-    - name: Set unix_home_path fact
-      ansible.builtin.set_fact:
-        unix_home_path: "{{ user_home_result.stdout | trim }}"
 
     - name: Ensure virtual environment exists and has required packages
       ansible.builtin.pip:

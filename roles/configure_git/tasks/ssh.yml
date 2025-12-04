@@ -44,12 +44,20 @@
   when: not configure_git_is_ssh_key_present_locally and not configure_git_is_ssh_passphrases_match
 
 - name: Create SSH key for GitHub
-  community.crypto.openssh_keypair:
-    path: "{{ configure_git_ssh_key_path }}"
-    passphrase: "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}"
-    comment: "{{ configure_git_user_email }}"
-    type: ed25519
   when: not configure_git_is_ssh_key_present_locally
+  block:
+    - name: Create SSH key on Windows
+      ansible.builtin.command:
+        cmd: 'ssh-keygen -t ed25519 -C "{{ configure_git_user_email }}" -N "{{ configure_git_ssh_passphrase_prompt.user_input | default("") }}" -f "{{ configure_git_ssh_key_path }}"'
+      when: is_windows
+
+    - name: Create SSH key on non-Windows systems
+      community.crypto.openssh_keypair:
+        path: "{{ configure_git_ssh_key_path }}"
+        passphrase: "{{ configure_git_ssh_passphrase_prompt.user_input | default(omit) }}"
+        comment: "{{ configure_git_user_email }}"
+        type: ed25519
+      when: not is_windows
 
 - name: Read SSH public key
   ansible.builtin.slurp:
@@ -59,7 +67,7 @@
 - name: Get remote SSH public keys from GitHub
   ansible.builtin.shell: |
     set -o pipefail
-    gh api /user/keys | jq -r '.[].key'
+    gh api user/keys | jq -r '.[].key'
   args:
     executable: /bin/bash
   register: configure_git_remote_ssh_keys
@@ -139,39 +147,31 @@
     - name: Windows-specific ssh-agent setup
       when: is_windows
       block:
-        - name: Ensure ssh-agent is running on Windows
-          ansible.builtin.shell:
-            cmd: sc.exe config ssh-agent start=auto && sc.exe start ssh-agent
-          changed_when: false
-
-        - name: Set Windows SSH key path
-          ansible.builtin.set_fact:
-            configure_git_ssh_key_path_win: "{{ ansible_facts.env.USERPROFILE }}\\.ssh\\ansible-managed\\github\\id_rsa"
-
-        - name: Set Windows PowerShell profile paths
-          ansible.builtin.set_fact:
-            configure_git_powershell_profile_dir_posix: >-
-              {{
-                (ansible_facts.env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell') |
-                replace('C:', '/c') |
-                replace('\\\\', '/')
-              }}
-            configure_git_powershell_profile_path_posix: >-
-              {{
-                (ansible_facts.env.USERPROFILE + '\\\\Documents\\\\WindowsPowerShell\\\\Microsoft.PowerShell_profile.ps1') |
-                replace('C:', '/c') |
-                replace('\\\\', '/')
-              }}
-
-        - name: Ensure PowerShell profile directory exists
-          ansible.builtin.file:
-            path: "{{ configure_git_powershell_profile_dir_posix }}"
-            state: directory
-            mode: "0755"
-
-        - name: Configure PowerShell profile to load SSH key
-          ansible.builtin.lineinfile:
-            path: "{{ configure_git_powershell_profile_path_posix }}"
-            line: "ssh-add {{ configure_git_ssh_key_path_win }}"
+        - name: Configure bashrc to use ssh-agent
+          ansible.builtin.blockinfile:
+            path: "{{ ansible_facts.env.HOME }}/.bashrc"
             create: true
             mode: "0644"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK FOR GITHUB SSH AGENT"
+            block: |
+              env=~/.ssh/agent.env
+
+              agent_load_env () { test -f "$env" && . "$env" >| /dev/null ; }
+
+              agent_start () {
+                  (umask 077; ssh-agent >| "$env")
+                  . "$env" >| /dev/null ; }
+
+              agent_load_env
+
+              # agent_run_state: 0=agent running w/ key; 1=agent w/o key; 2=agent not running
+              agent_run_state=$(ssh-add -l >| /dev/null 2>&1; echo $?)
+
+              if [ ! "$SSH_AUTH_SOCK" ] || [ $agent_run_state = 2 ]; then
+                  agent_start
+                  ssh-add {{ configure_git_ssh_key_path }}
+              elif [ "$SSH_AUTH_SOCK" ] && [ $agent_run_state = 1 ]; then
+                  ssh-add {{ configure_git_ssh_key_path }}
+              fi
+
+              unset env
