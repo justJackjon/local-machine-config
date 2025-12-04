@@ -175,3 +175,15 @@
               fi
 
               unset env
+
+- name: Manage git remote origin URL
+  block:
+    - name: Get git remote origin url
+      ansible.builtin.command: git remote get-url origin
+      register: git_remote_url
+      changed_when: false
+      failed_when: false
+
+    - name: Update git remote origin to SSH
+      ansible.builtin.command: git remote set-url origin git@github.com:justjackjon/local-machine-config.git
+      when: "'https' in git_remote_url.stdout"
