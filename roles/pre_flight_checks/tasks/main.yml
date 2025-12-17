@@ -1,44 +1,47 @@
 - name: Set fact if OS family is Debian
+  tags: always
   ansible.builtin.set_fact:
     pre_flight_checks_is_debian_os_family: "{{ ansible_facts.os_family == \"Debian\" }}"
 
 - name: Set fact if OS family is Darwin
+  tags: always
   ansible.builtin.set_fact:
     pre_flight_checks_is_darwin_os_family: "{{ ansible_facts.os_family == \"Darwin\" }}"
 
 - name: Check gh authentication status
+  tags: always
   ansible.builtin.command: gh auth status
   register: pre_flight_checks_gh_auth_status
   changed_when: false
   failed_when: false
-  tags: configure_git
 
 - name: Set fact if gh CLI is not authenticated
+  tags: always
   ansible.builtin.set_fact:
     pre_flight_checks_is_gh_cli_not_authenticated: "{{ pre_flight_checks_gh_auth_status.rc != 0 }}"
-  tags: configure_git
 
 - name: Fail if gh CLI is not authenticated
+  tags: always
   ansible.builtin.fail:
     msg: |
       gh CLI is not authenticated. This process is automated in the 'install.sh' script.
       Please run 'install.sh' or manually run 'gh auth login' before running this playbook.
   when: pre_flight_checks_is_gh_cli_not_authenticated
-  tags: configure_git
 
 - name: Get gh CLI version
+  tags: always
   ansible.builtin.shell: "gh --version | head -n 1 | cut -d ' ' -f 3"
   register: pre_flight_checks_gh_version
   changed_when: false
   failed_when: false
-  tags: configure_git
 
 - name: Set gh CLI version fact
+  tags: always
   ansible.builtin.set_fact:
     pre_flight_checks_gh_version_number: "{{ pre_flight_checks_gh_version.stdout | trim }}"
-  tags: configure_git
 
 - name: Check for required gh auth scopes
+  tags: always
   ansible.builtin.fail:
     msg: |
       The 'gh' command is not authenticated with the required scopes.
@@ -49,9 +52,9 @@
     - pre_flight_checks_gh_version_number is defined
     - pre_flight_checks_gh_version_number is version('2.48.0', '>=')
     - "'admin:public_key' not in pre_flight_checks_gh_auth_status.stdout or 'admin:gpg_key' not in pre_flight_checks_gh_auth_status.stdout"
-  tags: configure_git
 
 - name: Install ssh-askpass for Debian
+  tags: always
   ansible.builtin.package:
     name: ssh-askpass
     state: present
@@ -59,22 +62,23 @@
   become: true
 
 - name: Install openssh for macOS
+  tags: always
   community.general.homebrew:
     name: openssh
     state: present
   when: pre_flight_checks_is_darwin_os_family
 
-- name: Check if playbook is run with administrative privileges (Windows)
+- name: Check for administrative privileges on Windows
+  tags: always
   when: is_windows
   block:
-    - name: Attempt to create a file in a system directory
-      ansible.builtin.file:
-        path: "C:/Windows/Temp/test"
-        state: touch
-      register: admin_check
-      ignore_errors: true
+    - name: Check if the current user is an Administrator
+      ansible.builtin.command:
+        cmd: "powershell.exe -Command \"([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)\""
+      register: admin_check_ps
+      changed_when: false
+      failed_when: false
 
-    - name: Fail if playbook is not run with administrative privileges
-      ansible.builtin.fail:
-        msg: "This playbook must be run with administrative privileges. Please re-run the playbook as an administrator."
-      when: admin_check.failed
+    - name: Set has_admin_privileges fact
+      ansible.builtin.set_fact:
+        has_admin_privileges: "{{ admin_check_ps.stdout | trim == 'True' }}"

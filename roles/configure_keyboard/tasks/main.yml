@@ -3,20 +3,32 @@
 - name: Configure Keyboard
   block:
     - name: Set OS and hardware facts
+      tags: configure_keyboard
       set_fact:
         is_debian_os_on_gb_chromebook: >
-          {{
+          {{ 
             ansible_facts.os_family == 'Debian' and
             ansible_facts.env.LANGUAGE == 'en_GB:en' and
             ansible_facts.system_vendor == 'GOOGLE'
           }}
-        is_xfce_desktop: >
-          {{
-            ansible_facts.env.XDG_CURRENT_DESKTOP is defined and
-            ansible_facts.env.XDG_CURRENT_DESKTOP == 'XFCE'
-          }}
+        apply_xfce_kinto_settings: "{{ is_inside_xfce or (is_windows and configure_keyboard_enable_windows_xfce_mode) }}"
+
+    - name: Set Windows specific facts
+      tags: configure_keyboard
+      when: is_windows
+      block:
+        - name: Get user's home directory path in POSIX format
+          command: cygpath -u "{{ ansible_env.USERPROFILE }}"
+          register: user_home_posix
+          changed_when: false
+
+        - name: Set windows paths facts
+          set_fact:
+            windows_home_posix: "{{ user_home_posix.stdout }}"
+            windows_downloads_path: "{{ user_home_posix.stdout }}/Downloads"
 
     - name: Apply Custom Keyboard Mappings for Debian based systems on Chromebook hardware
+      tags: configure_keyboard
       when: is_debian_os_on_gb_chromebook
       block:
         - name: Create ~/.Xmodmap with custom key mappings
@@ -38,10 +50,11 @@
           shell:
             cmd: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
 
-    - name: Configure General Keyboard Shortcuts 
+    - name: Configure General Keyboard Shortcuts
+      tags: configure_keyboard
       block:
         - name: Set custom Kinto compatible keyboard shortcuts in XFCE
-          when: is_xfce_desktop
+          when: is_inside_xfce
           command:
             cmd: "{{ item }}"
           with_items:
@@ -50,10 +63,11 @@
             - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Super>l" --reset
             - xfconf-query --channel=xfce4-keyboard-shortcuts --property "/commands/custom/<Primary><Alt>q" --create --type string --set "xflock4"
 
-    - name: Configure Workspace Switching Shortcuts 
+    - name: Configure Workspace Switching Shortcuts
+      tags: configure_keyboard
       block:
         - name: Configure XFCE workspace shortcuts
-          when: is_xfce_desktop
+          when: is_inside_xfce
           block:
             - name: Ensure there are 10 workspaces
               command: xfconf-query -c xfwm4 -p /general/workspace_count -s 10
@@ -77,12 +91,11 @@
               # Because the `shell` module runs `sh` by default unless it is symlinked to
               # `/bin/bash`, the `command` module is used instead to spawn a bash shell.
               command: "bash {{ role_path }}/files/{{ configure_keyboard_macos_shortcut_creation_script_path }}"
-
-    - name: Install Kinto.sh 
-      tags: kinto_install
+    - name: Install Kinto
+      tags: configure_keyboard
       when: not is_wsl
       block:
-        - name: Install Kinto.sh on Linux
+        - name: Install Kinto on Linux
           when: ansible_facts.system == 'Linux'
           block:
             - name: Install Kinto dependencies
@@ -107,16 +120,137 @@
 
             - name: Run Kinto install script
               when: kinto_download_result is success
-              shell: "{{ tempdir.path }}/install_kinto.sh"
+              shell:
+                cmd: "{{ tempdir.path }}/install_kinto.sh"
               args:
                 executable: /bin/bash
               register: kinto_install_result
 
+        - name: Install Kinto on Windows
+          when: is_windows
+          block:
+            - name: Create Downloads directory if it does not exist
+              file:
+                path: "{{ windows_downloads_path }}"
+                state: directory
+
+            - name: Download Kinto zip
+              get_url:
+                url: https://github.com/rbreaves/kinto/archive/refs/heads/master.zip
+                dest: "{{ windows_downloads_path }}/kinto.zip"
+
+            - name: Extract Kinto zip
+              unarchive:
+                src: "{{ windows_downloads_path }}/kinto.zip"
+                dest: "{{ windows_downloads_path }}"
+                remote_src: yes
+                creates: "{{ windows_downloads_path }}/kinto-master"
+
+            - name: Re-implement Kinto setup script with native Ansible tasks
+              block:
+                - name: Ensure .kinto directories exist
+                  ansible.builtin.file:
+                    path: "{{ item }}"
+                    state: directory
+                  with_items:
+                    - "{{ windows_home_posix }}/.kinto"
+                    - "{{ windows_home_posix }}/.kinto/assets"
+
+                - name: Copy base kinto.ahk
+                  ansible.builtin.copy:
+                    src: "{{ windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    dest: "{{ windows_home_posix }}/.kinto/kinto.ahk"
+                    remote_src: yes
+
+                - name: Define Windows path for downloads directory
+                  ansible.builtin.command: cygpath -w "{{ windows_downloads_path }}"
+                  register: windows_downloads_path_win
+                  changed_when: false
+
+                - name: Import Ubuntu theme registry file
+                  ansible.builtin.command:
+                    cmd: |
+                      powershell.exe -Command "Start-Process -FilePath regedit.exe -ArgumentList '/s \"{{ windows_downloads_path_win.stdout }}\kinto-master\windows\theme_ubuntu.reg\"' -Wait"
+                  changed_when: true
+
+                - name: Copy assets
+                  ansible.builtin.copy:
+                    src: "{{ windows_downloads_path }}/kinto-master/assets/"
+                    dest: "{{ windows_home_posix }}/.kinto/assets/"
+                    remote_src: yes
+
+                - name: Copy other Kinto Windows scripts
+                  ansible.builtin.copy:
+                    src: "{{ windows_downloads_path }}/kinto-master/windows/{{ item }}"
+                    dest: "{{ windows_home_posix }}/.kinto/{{ item }}"
+                    remote_src: yes
+                  with_items:
+                    - kinto-start.vbs
+                    - usb.vbs
+                    - detectUSB.ahk
+                    - NoShell.vbs
+                    - toggle_kb.bat
+
+                - name: Get mixed-style path for perl.exe
+                  ansible.builtin.command:
+                    cmd: "cygpath -m {{ windows_home_posix }}/scoop/apps/perl/current/perl/bin/perl.exe"
+                  register: perl_exe_mixed_path
+                  changed_when: false
+
+                - name: Update Perl path in toggle_kb.bat for Scoop installation
+                  ansible.builtin.replace:
+                    path: "{{ windows_home_posix }}/.kinto/toggle_kb.bat"
+                    regexp: 'C:\\Strawberry\\perl\\bin\\perl.exe'
+                    replace: "{{ perl_exe_mixed_path.stdout }}"
+                    backup: yes
+
+                - name: Patch kbtype in kinto-start.vbs
+                  ansible.builtin.replace:
+                    path: "{{ windows_home_posix }}/.kinto/kinto-start.vbs"
+                    regexp: '{kbtype}'
+                    replace: 'win'
+
+                - name: Remove runas from kinto-start.vbs to avoid UAC prompt
+                  ansible.builtin.replace:
+                    path: "{{ windows_home_posix }}/.kinto/kinto-start.vbs"
+                    regexp: 'oShell.ShellExecute "C:\\Program Files\\AutoHotkey\\AutoHotkey.exe", strFolder, , "runas", 0'
+                    replace: 'oShell.ShellExecute "C:\\Program Files\\AutoHotkey\\AutoHotkey.exe", strFolder, , , 0'
+
+                - name: Remove runas from NoShell.vbs to avoid UAC prompt
+                  ansible.builtin.replace:
+                    path: "{{ windows_home_posix }}/.kinto/NoShell.vbs"
+                    regexp: 'oShell.ShellExecute prog, RunCmd, , "runas", 0'
+                    replace: 'oShell.ShellExecute prog, RunCmd, , , 0'
+
+                - name: Get Windows style path for .kinto directory
+                  ansible.builtin.command: cygpath -w "{{ windows_home_posix }}/.kinto"
+                  register: kinto_dir_win
+                  changed_when: false
+
+                - name: Get Windows style path for Startup folder
+                  ansible.builtin.command: cygpath -w "{{ ansible_env.APPDATA }}/Microsoft/Windows/Start Menu/Programs/Startup"
+                  register: startup_dir_win
+                  changed_when: false
+
+                - name: Create shortcut in Windows Startup folder
+                  ansible.builtin.command:
+                    cmd: 'cmd.exe /c mklink "{{ startup_dir_win.stdout }}\kinto-start.vbs" "{{ kinto_dir_win.stdout }}\kinto-start.vbs"'
+                  args:
+                    creates: "{{ startup_dir_win.stdout }}\\kinto-start.vbs"
+                  register: kinto_install_result
+
+                - name: Run Kinto for the first time
+                  ansible.builtin.command:
+                    cmd: |
+                      powershell.exe -Command "Start-Process -FilePath 'C:\Program Files\AutoHotkey\AutoHotkey.exe' -ArgumentList '\"{{ kinto_dir_win.stdout }}\kinto.ahk\" win'"
+                  changed_when: true
+
     - name: Clean-up Kinto.sh Install
-      when: not is_wsl
+      tags: configure_keyboard
+      when: not is_wsl and kinto_install_result is changed
       block:
-        - name: Remove files downloaded by Kinto install script
-          when: kinto_install_result is changed
+        - name: Remove files downloaded by Kinto install script on Linux
+          when: ansible_facts.system == 'Linux'
           file:
             path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
             state: absent
@@ -125,12 +259,30 @@
             - kinto.zip
           become: true
 
-    - name: Configure Kinto.sh 
-      tags: kinto_config
+        - name: Remove files downloaded by Kinto install script on Windows
+          when: is_windows
+          file:
+            path: "{{ windows_downloads_path }}/{{ item }}"
+            state: absent
+          loop:
+            - kinto-master
+            - kinto.zip
+
+    - name: Configure Kinto
+      tags: configure_keyboard
       when: not is_wsl
       block:
         - name: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4
-          when: is_xfce_desktop
+          when: apply_xfce_kinto_settings and not is_windows
+          replace:
+            path: "{{ configure_keyboard_kinto_config_path }}"
+            regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
+            replace: '\1\3'
+            backup: true
+          register: xfce_changes
+
+        - name: Uncomment XFCE4 specific lines in Kinto.py when current desktop is XFCE4
+          when: apply_xfce_kinto_settings and not is_windows
           replace:
             path: "{{ configure_keyboard_kinto_config_path }}"
             regexp: '^(\s*)([#\s]+)(.*\s(?!not-)xfce4[\s\w]*)$'
@@ -139,7 +291,7 @@
           register: xfce_changes
 
         - name: Modify shortcuts for en_GB Chromebook keyboard layouts in kinto.py
-          when: is_debian_os_on_gb_chromebook
+          when: is_debian_os_on_gb_chromebook and not is_windows
           block:
             - name: Modify general GUI related shortcuts
               blockinfile:
@@ -158,12 +310,23 @@
               register: terminal_changes
 
         - name: Restart xkeysnail service after making changes to kinto.py
-          when: (xfce_changes.changed or gui_changes.changed or terminal_changes.changed) and not is_wsl
+          when: (xfce_changes.changed or gui_changes.changed or terminal_changes.changed) and not is_wsl and not is_windows
           systemd:
             name: xkeysnail
             state: restarted
           register: kinto_config_result
           become: true
+
+        - name: Restart Kinto on Windows
+          when: (xfce_changes.changed or gui_changes.changed or terminal_changes.changed) and is_windows
+          block:
+            # TODO: Implement a reliable way to find and restart kinto.exe
+            - name: Kill Kinto process
+              command: powershell.exe -Command "Stop-Process -Name kinto -Force -ErrorAction SilentlyContinue"
+              changed_when: false
+            - name: Start Kinto
+              command: powershell.exe -Command "Start-Process kinto.exe"
+              register: kinto_config_result
 
         - name: Restart xkeysnail service for WSL
           when: (xfce_changes.changed or gui_changes.changed or terminal_changes.changed) and is_wsl
@@ -176,13 +339,14 @@
           register: kinto_config_result_wsl
 
     - name: Manage Kinto Backup Files
+      tags: configure_keyboard
       when: not is_wsl
       block:
         - name: Retain latest backup file only
           when: (kinto_config_result is defined and kinto_config_result is changed) or (kinto_config_result_wsl is defined and kinto_config_result_wsl is changed)
           block:
             - name: Get list of backup files
-              when: ansible_facts.system == "Linux"
+              when: ansible_facts.system == "Linux" 
               set_fact:
                 backup_files: "{{ lookup('fileglob', configure_keyboard_kinto_config_path ~ '.*', wantlist=true) }}"
 

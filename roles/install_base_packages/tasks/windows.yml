@@ -65,24 +65,61 @@
 
         - name: Install packages with scoop
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadiacode-nf"
+            cmd: "{{ install_base_packages_scoop_executable_path }} install nvm gh gnupg openssh neovim lazygit alacritty cascadiacode-nf perl"
           register: install_base_packages_scoop_install
           changed_when: install_base_packages_scoop_install.stdout is defined and "successfully" in install_base_packages_scoop_install.stdout
           failed_when: install_base_packages_scoop_install.rc != 0 and "successfully" not in install_base_packages_scoop_install.stdout
 
+    - name: Download and Install AutoHotkey v1.1
+      block:
+        # NOTE: We are not using scoop to install AutoHotkey because the manifest
+        #       points to the official website, which is protected by Cloudflare and
+        #       returns a 403 Forbidden error. Instead, we download the installer
+        #       from the official GitHub releases.
+        - name: Download AutoHotkey v1.1 installer
+          ansible.builtin.get_url:
+            url: https://github.com/AutoHotkey/AutoHotkey/releases/download/v1.1.37.02/AutoHotkey_1.1.37.02_setup.exe
+            dest: /tmp/autohotkey_setup.exe
+            mode: '0755'
+
+        - name: Install AutoHotkey v1.1 silently
+          ansible.builtin.command:
+            cmd: powershell.exe -Command "/tmp/autohotkey_setup.exe /S"
+          args:
+            creates: /c/Program Files/AutoHotkey/AutoHotkey.exe
+          register: install_ahk
+          changed_when: install_ahk.rc == 0
+          ignore_errors: true
+
+        - name: Set fact if AutoHotkey installation failed due to permissions
+          ansible.builtin.set_fact:
+            autohotkey_install_failed_due_to_permissions: >-
+              {{ install_ahk.failed and
+                 ('Permission denied' in install_ahk.stderr or
+                  'access is denied' in install_ahk.stderr or
+                  'failed to start' in install_ahk.stderr or
+                  'denied' in install_ahk.stdout or
+                  'failed' in install_ahk.stdout) }}
+          when: install_ahk.failed
+
+        - name: Adjust has_admin_privileges fact if AutoHotkey installation failed due to permissions
+          ansible.builtin.set_fact:
+            has_admin_privileges: false
+          when: autohotkey_install_failed_due_to_permissions is defined and autohotkey_install_failed_due_to_permissions
+
+    - name: Get user's home directory path in POSIX format
+      ansible.builtin.command:
+        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+      register: install_base_packages_win_home_dir_raw
+      changed_when: false
+
+    - name: Set Windows-specific paths
+      ansible.builtin.set_fact:
+        install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm/pnpm"
+        install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm"
+
     - name: Install pnpm packages
       block:
-        - name: Get user's home directory path in POSIX format
-          ansible.builtin.command:
-            cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
-          register: install_base_packages_win_home_dir_raw
-          changed_when: false
-
-        - name: Set Windows-specific paths
-          ansible.builtin.set_fact:
-            install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm/pnpm"
-            install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm"
-
         - name: Check if pnpm is installed on Windows
           ansible.builtin.command:
             cmd: test -f "{{ install_base_packages_pnpm_executable_path }}"
@@ -114,6 +151,7 @@
           environment:
             PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
             PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
+      when: has_admin_privileges
 
     - name: Install Node.js LTS
       ansible.builtin.command:
