@@ -31,6 +31,7 @@
           - libsqlite3-dev
           - libfontconfig1-dev
           - pkg-config
+          - openssh-client
         state: latest
         update_cache: true
 
