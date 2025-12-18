@@ -1,0 +1,26 @@
+# NOTE: This file ensures consistent line endings across Windows, macOS,
+#       and Linux, preventing `git status` issues from CRLF/LF differences.
+#       `* text=auto` normalizes text file line endings to LF in the repo
+#       and converts to native OS on checkout. Explicitly marking file types
+#       as `text` guarantees correct normalization, vital for cross-OS
+#       development and avoiding spurious modifications.
+* text=auto
+
+# Ansible files
+*.yml text
+*.yaml text
+
+# Scripts
+*.sh text
+*.ps1 text
+
+# Configuration files
+*.cfg text
+*.ini text
+
+# Vimscript
+*.vim text
+
+# Documentation
+*.md text
+*.txt text
