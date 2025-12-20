@@ -40,10 +40,6 @@ esac
 
 info "Detected OS: ${os}"
 
-if [ "$os" == "Windows" ]; then
-  error "This script is not intended for Windows. Please run 'install.ps1' from an elevated PowerShell prompt."
-fi
-
 if [ "$os" == "Linux" ]; then
   info "Running on Linux"
   note "This script is designed for Debian-based distributions (e.g., Ubuntu, Mint) using apt-get."
@@ -74,14 +70,14 @@ if [ "$os" == "Linux" ]; then
   pkill -f "chrome" || true
 
   info "Authenticating gh CLI (user interaction required)..."
-  # Check gh version for conditional flags
+  # NOTE: Check gh version for conditional flags
   GH_VERSION=$(gh --version | head -n 1 | cut -d ' ' -f 3)
   if printf '%s\n' "2.48.0" "$GH_VERSION" | sort -V -C; then
-    # The gh version is 2.48.0 or higher, use --skip-ssh-key...
+    # NOTE: The gh version is 2.48.0 or higher, use --skip-ssh-key...
     gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   else
-    # The gh version is older, --git-protocol and --skip-ssh-key flags not available.
-    # The --clipboard flag is also only available in gh 2.79.0 or higher, see: https://github.com/cli/cli/releases/tag/v2.79.0
+    # NOTE: The gh version is older, --git-protocol and --skip-ssh-key flags not available.
+    #       The --clipboard flag is also only available in gh 2.79.0 or higher, see: https://github.com/cli/cli/releases/tag/v2.79.0
     warning "When prompted to 'Generate a new SSH key to add to your GitHub account?', please answer 'n'. Ansible will handle SSH key generation."
     note "The --skip-ssh-key flag is not available in your gh CLI version (${GH_VERSION}). See: https://github.com/cli/cli/releases/tag/v2.48.0 for release notes."
     gh auth login --web -h github.com -s public_repo,admin:public_key,admin:gpg_key
@@ -104,6 +100,25 @@ elif [ "$os" == "macOS" ]; then
 
   info "Authenticating gh CLI (user interaction required)..."
   gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
+
+elif [ "$os" == "Windows" ]; then
+  if [ -n "$MSYSTEM" ]; then
+    info "Running on Windows (MSYS2 - $MSYSTEM)"
+    note "Assuming dependencies (Ansible, Git, etc.) are installed via 'install.ps1' or manually via pacman."
+  else
+    warning "Running on Windows but MSYS2 environment (MSYSTEM var) not detected. This might be Git Bash or Cygwin."
+    note "Proceeding, but ensure 'ansible-playbook' is in your PATH."
+  fi
+
+  if ! command -v ansible-playbook &>/dev/null; then
+    error "Ansible not found. Please run 'install.ps1' (recommended) or install 'ansible' manually."
+    exit 1
+  fi
+
+  if command -v gh &>/dev/null; then
+    info "Authenticating gh CLI..."
+    gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key || true
+  fi
 else
   info "Unsupported OS: ${os}"
   exit 1
@@ -111,49 +126,50 @@ fi
 
 info "gh CLI authentication complete."
 
-# Clone repository
-REPO_DIR="$HOME/Repos"
-
-info "Cloning repository to ${REPO_DIR}/local-machine-config..."
-mkdir -p "${REPO_DIR}"
-git clone https://github.com/justjackjon/local-machine-config.git "${REPO_DIR}/local-machine-config" 2>/dev/null || {
-  info "Repository already cloned. Pulling latest changes."
-  cd "${REPO_DIR}/local-machine-config"
-  current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-  if [ "$current_branch" == "main" ]; then
-    info "On 'main' branch. Stashing and pulling latest changes..."
-    git stash --all >/dev/null 2>&1 || true
-
-    # After stashing, verify the working directory is clean before pulling.
-    if ! git diff-index --quiet HEAD -- || ! git diff-index --cached --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-      error "Working directory is still dirty after 'git stash --all'. Aborting."
-      git status --short >&2
-
-      exit 1
-    fi
-
-    if ! git_output=$(git pull 2>&1); then
-      error "git pull failed with the following error:"
-      echo "${git_output}" >&2
-
-      exit 1
-    fi
-
-    git stash pop >/dev/null 2>&1 || true
-  else
-    info "On branch '$current_branch'. Skipping 'git pull' to preserve local work."
-  fi
-}
-
-# Execute playbook
-info "Executing Ansible playbook..."
-cd "${REPO_DIR}/local-machine-config"
-
-if [ "$os" == "Linux" ]; then
-  "$HOME/.local/bin/ansible-playbook" -i hosts playbooks/setup_ansible_controller.yml --ask-become-pass
+# Check if we are already in the repository
+if [ -f "./ansible.cfg" ] && [ -f "./run-playbook.sh" ]; then
+  info "Detected execution from within the repository. Skipping clone/pull."
+  ./run-playbook.sh --ask-become-pass
 else
-  ansible-playbook -i hosts playbooks/setup_ansible_controller.yml --ask-become-pass
+  # Clone repository
+  REPO_DIR="$HOME/Repos"
+
+  info "Cloning repository to ${REPO_DIR}/local-machine-config..."
+  mkdir -p "${REPO_DIR}"
+  git clone https://github.com/justjackjon/local-machine-config.git "${REPO_DIR}/local-machine-config" 2>/dev/null || {
+    info "Repository already cloned. Pulling latest changes."
+    cd "${REPO_DIR}/local-machine-config"
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    if [ "$current_branch" == "main" ]; then
+      info "On 'main' branch. Stashing and pulling latest changes..."
+      git stash --all >/dev/null 2>&1 || true
+
+      # After stashing, verify the working directory is clean before pulling.
+      if ! git diff-index --quiet HEAD -- || ! git diff-index --cached --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+        error "Working directory is still dirty after 'git stash --all'. Aborting."
+        git status --short >&2
+        exit 1
+      fi
+
+      if ! git_output=$(git pull 2>&1); then
+        error "git pull failed with the following error:"
+        echo "${git_output}" >&2
+        exit 1
+      fi
+
+      git stash pop >/dev/null 2>&1 || true
+    else
+      info "On branch '$current_branch'. Skipping 'git pull' to preserve local work."
+    fi
+  }
+
+  # Execute playbook
+  info "Executing Ansible playbook..."
+  cd "${REPO_DIR}/local-machine-config"
+  ./run-playbook.sh --ask-become-pass
 fi
+
+
 
 info "Setup complete!"
