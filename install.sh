@@ -129,6 +129,7 @@ info "gh CLI authentication complete."
 # Check if we are already in the repository
 if [ -f "./ansible.cfg" ] && [ -f "./run-playbook.sh" ]; then
   info "Detected execution from within the repository. Skipping clone/pull."
+  chmod +x run-playbook.sh
   ./run-playbook.sh --ask-become-pass
 else
   # Clone repository
@@ -167,6 +168,7 @@ else
   # Execute playbook
   info "Executing Ansible playbook..."
   cd "${REPO_DIR}/local-machine-config"
+  chmod +x run-playbook.sh
   ./run-playbook.sh --ask-become-pass
 fi
 
