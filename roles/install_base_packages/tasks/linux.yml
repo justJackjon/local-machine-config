@@ -41,17 +41,17 @@
         - name: Check if rustup is installed
           ansible.builtin.stat:
             path: "/root/.cargo/bin/rustup"
-          register: rustup_stat_root
+          register: install_base_packages_rustup_stat_root
 
         - name: Download rustup installer
-          when: not rustup_stat_root.stat.exists
+          when: not install_base_packages_rustup_stat_root.stat.exists
           ansible.builtin.get_url:
             url: https://sh.rustup.rs
             dest: /tmp/rustup-init.sh
             mode: "0755"
 
         - name: Run rustup installer for root user
-          when: not rustup_stat_root.stat.exists
+          when: not install_base_packages_rustup_stat_root.stat.exists
           ansible.builtin.command: /tmp/rustup-init.sh -y
           changed_when: true
 
@@ -82,7 +82,10 @@
 
         - name: Add GitHub CLI apt repository
           ansible.builtin.apt_repository:
-            repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'i386' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+            repo: >
+              deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'i386' }}
+              signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg]
+              https://cli.github.com/packages stable main
             state: present
             filename: github-cli
 
@@ -121,7 +124,7 @@
 
             - name: Download and unarchive lazygit
               ansible.builtin.unarchive:
-                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz" # noqa: line-length
+                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz"
                 dest: /tmp
                 remote_src: true
 
@@ -170,6 +173,27 @@
           args:
             creates: "{{ ansible_env.HOME }}/.fzf/bin/fzf"
           changed_when: false
+
+    - name: Install Starship
+      block:
+        - name: Check if starship is installed
+          ansible.builtin.command: which starship
+          register: install_base_packages_starship_check
+          failed_when: false
+          changed_when: false
+
+        - name: Download Starship install script
+          when: install_base_packages_starship_check.rc != 0
+          ansible.builtin.get_url:
+            url: https://starship.rs/install.sh
+            dest: /tmp/install_starship.sh
+            mode: "0755"
+
+        - name: Run Starship install script
+          when: install_base_packages_starship_check.rc != 0
+          become: true
+          ansible.builtin.command: /tmp/install_starship.sh -y
+          changed_when: true
 
     - name: Install nvm, node and pnpm
       block:

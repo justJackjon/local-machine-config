@@ -72,6 +72,7 @@
         mode: "0644"
 
     - name: Get user's home directory path in POSIX format
+      when: is_windows
       ansible.builtin.command:
         cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
       register: configure_shell_win_home_dir
@@ -79,7 +80,7 @@
 
     - name: Configure Starship for use with bash
       ansible.builtin.lineinfile:
-        path: "{{ configure_shell_win_home_dir.stdout if is_windows else ansible_facts.env.HOME }}/.bashrc"
+        path: "{{ (configure_shell_win_home_dir.stdout | default('')) if is_windows else ansible_facts.env.HOME }}/.bashrc"
         line: 'eval "$(starship init bash)"'
         create: true
         mode: "0644"

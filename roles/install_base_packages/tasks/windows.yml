@@ -88,25 +88,27 @@
             cmd: powershell.exe -Command "/tmp/autohotkey_setup.exe /S"
           args:
             creates: /c/Program Files/AutoHotkey/AutoHotkey.exe
-          register: install_ahk
-          changed_when: install_ahk.rc == 0
+          register: install_base_packages_install_ahk
+          changed_when: install_base_packages_install_ahk.rc == 0
           ignore_errors: true
 
         - name: Set fact if AutoHotkey installation failed due to permissions
           ansible.builtin.set_fact:
-            autohotkey_install_failed_due_to_permissions: >-
-              {{ install_ahk.failed and
-                 ('Permission denied' in install_ahk.stderr or
-                  'access is denied' in install_ahk.stderr or
-                  'failed to start' in install_ahk.stderr or
-                  'denied' in install_ahk.stdout or
-                  'failed' in install_ahk.stdout) }}
-          when: install_ahk.failed
+            install_base_packages_autohotkey_install_failed_due_to_permissions: >-
+              {{ install_base_packages_install_ahk.failed and
+                 ('Permission denied' in install_base_packages_install_ahk.stderr or
+                  'access is denied' in install_base_packages_install_ahk.stderr or
+                  'failed to start' in install_base_packages_install_ahk.stderr or
+                  'denied' in install_base_packages_install_ahk.stdout or
+                  'failed' in install_base_packages_install_ahk.stdout) }}
+          when: install_base_packages_install_ahk.failed
 
         - name: Adjust has_admin_privileges fact if AutoHotkey installation failed due to permissions
           ansible.builtin.set_fact:
-            has_admin_privileges: false
-          when: autohotkey_install_failed_due_to_permissions is defined and autohotkey_install_failed_due_to_permissions
+            install_base_packages_has_admin_privileges: false
+          when:
+            - install_base_packages_autohotkey_install_failed_due_to_permissions is defined
+            - install_base_packages_autohotkey_install_failed_due_to_permissions
 
     - name: Get user's home directory path in POSIX format
       ansible.builtin.command:
@@ -120,6 +122,7 @@
         install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm"
 
     - name: Install pnpm packages
+      when: has_admin_privileges
       block:
         - name: Check if pnpm is installed on Windows
           ansible.builtin.command:
@@ -152,7 +155,6 @@
           environment:
             PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
             PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
-      when: has_admin_privileges
 
     - name: Install Node.js LTS
       ansible.builtin.command:

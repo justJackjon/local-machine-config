@@ -14,4 +14,4 @@ _python_argcomplete()
         unset COMPREPLY
     fi
 }
-complete -o nospace -o default -F _python_argcomplete
+complete -o nospace -o default -D -F _python_argcomplete

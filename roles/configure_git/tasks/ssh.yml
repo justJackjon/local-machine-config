@@ -47,8 +47,13 @@
   when: not configure_git_is_ssh_key_present_locally
   block:
     - name: Create SSH key on Windows
-      ansible.builtin.command:
-        cmd: 'ssh-keygen -t ed25519 -C "{{ configure_git_user_email }}" -N "{{ configure_git_ssh_passphrase_prompt.user_input | default("") }}" -f "{{ configure_git_ssh_key_path }}"'
+      ansible.builtin.shell: >
+        ssh-keygen -t ed25519
+        -C "{{ configure_git_user_email }}"
+        -N "{{ configure_git_ssh_passphrase_prompt.user_input | default("") }}"
+        -f "{{ configure_git_ssh_key_path }}"
+      args:
+        creates: "{{ configure_git_ssh_key_path }}"
       when: is_windows
 
     - name: Create SSH key on non-Windows systems
@@ -178,12 +183,14 @@
 
 - name: Manage git remote origin URL
   block:
-    - name: Get git remote origin url
+    - name: Get git remote origin url # noqa: command-instead-of-module
       ansible.builtin.command: git remote get-url origin
-      register: git_remote_url
+      register: configure_git_remote_url
       changed_when: false
       failed_when: false
 
-    - name: Update git remote origin to SSH
+    - name: Update git remote origin to SSH # noqa: command-instead-of-module
       ansible.builtin.command: git remote set-url origin git@github.com:justjackjon/local-machine-config.git
-      when: "'https' in git_remote_url.stdout"
+      when: "'https' in configure_git_remote_url.stdout"
+      register: configure_git_set_url_result
+      changed_when: configure_git_set_url_result.rc == 0
