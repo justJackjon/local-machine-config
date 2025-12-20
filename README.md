@@ -33,6 +33,24 @@ To start the setup on Linux or macOS, run the following command in your terminal
 > [!WARNING]
 > Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh)
 
+## Manual Execution
+
+After cloning the repository, the standard way to run the playbook is by using the `run-playbook.sh` wrapper script. This script handles environment-specific issues, providing a consistent experience across all platforms.
+
+```bash
+./run-playbook.sh
+```
+
+You can also pass extra arguments to the `ansible-playbook` command, such as `--syntax-check` or `--list-tasks`:
+
+```bash
+./run-playbook.sh --syntax-check
+```
+
+> [!NOTE]
+> **Why is this script needed?**
+> When running inside WSL, Ansible may ignore the local `ansible.cfg` file due to the "world-writable" permissions of mounted Windows drives. This causes Ansible to fail when it cannot find the roles defined in `roles_path`. The `run-playbook.sh` script automatically detects this WSL environment and forces Ansible to use the correct configuration file, ensuring the playbook runs correctly everywhere.
+
 ## Post-Installation
 
 After the main playbook has finished, you will need to start a new shell session (or run `source ~/.bashrc`) for all changes to take effect. This is especially important for interacting with services like GitHub, as the `ssh-agent` will only be started in new shell sessions.
@@ -43,7 +61,7 @@ After the main playbook has finished, you will need to start a new shell session
   > [!NOTE]
   > For Linux, this script is designed for Debian-based distributions (e.g., Ubuntu, Mint) using `apt-get`.
 - **Base Package Installation:** Installs fundamental development tools and utilities.
-- **Shell Configuration:** Sets up default shell and Ansible tab completion.
+- **Shell Configuration:** Sets up default shell, Starship prompt (Linux), and Ansible tab completion.
 - **Keyboard Customization:** Configures custom keyboard mappings and workspace switching shortcuts.
 - **Browser Installation:** Installs a web browser (Chrome or Firefox).
 - **Neovim & LazyVim Setup:** Automates the installation and configuration of Neovim with the LazyVim distribution, including a Nerd Font.
@@ -109,6 +127,7 @@ The playbooks in this repository will install and configure the following softwa
 - **MSYS2** (Windows)
 - **Python 3 & pip**
 - **Bash & Bash Completion**
+- **Starship** (Linux only)
 - **argcomplete** (for Ansible tab completion)
 
 ## TODO:
