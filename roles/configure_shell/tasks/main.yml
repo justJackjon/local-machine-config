@@ -74,7 +74,7 @@
     - name: Get user's home directory path in POSIX format
       when: is_windows
       ansible.builtin.command:
-        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+        cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
       register: configure_shell_win_home_dir
       changed_when: false
 

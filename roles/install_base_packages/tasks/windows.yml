@@ -43,7 +43,7 @@
         #       so we need to use the full path to the scoop executable.
         - name: Get scoop executable path
           ansible.builtin.command:
-            cmd: cygpath -u "{{ ansible_env.USERPROFILE }}/scoop/shims/scoop"
+            cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}/scoop/shims/scoop"
           register: install_base_packages_scoop_exe_path_raw
           changed_when: false
 
@@ -112,7 +112,7 @@
 
     - name: Get user's home directory path in POSIX format
       ansible.builtin.command:
-        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+        cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
       register: install_base_packages_win_home_dir_raw
       changed_when: false
 
