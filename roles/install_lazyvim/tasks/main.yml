@@ -139,7 +139,7 @@
     - name: Get user's home directory path in POSIX format
       when: is_windows
       ansible.builtin.command:
-        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+        cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
       register: install_lazyvim_win_home_dir
       changed_when: false
 
@@ -150,7 +150,7 @@
       changed_when: false
       environment:
         PNPM_HOME: "{{ install_lazyvim_win_home_dir.stdout | default('') }}/AppData/Local/pnpm"
-        PATH: "{{ install_lazyvim_win_home_dir.stdout | default('') }}/AppData/Local/pnpm:{{ ansible_env.PATH }}"
+        PATH: "{{ install_lazyvim_win_home_dir.stdout | default('') }}/AppData/Local/pnpm:{{ ansible_facts['env']['PATH'] }}"
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
       when: is_debian_family or is_mac

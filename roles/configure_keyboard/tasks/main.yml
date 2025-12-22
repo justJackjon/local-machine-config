@@ -18,7 +18,7 @@
       when: is_windows
       block:
         - name: Get user's home directory path in POSIX format
-          ansible.builtin.command: cygpath -u "{{ ansible_env.USERPROFILE }}"
+          ansible.builtin.command: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
           register: configure_keyboard_user_home_posix
           changed_when: false
 
@@ -363,7 +363,7 @@
                   changed_when: false
 
                 - name: Get Windows style path for Startup folder
-                  ansible.builtin.command: cygpath -w "{{ ansible_env.APPDATA }}/Microsoft/Windows/Start Menu/Programs/Startup"
+                  ansible.builtin.command: cygpath -w "{{ ansible_facts['env']['APPDATA'] }}/Microsoft/Windows/Start Menu/Programs/Startup"
                   register: configure_keyboard_startup_dir_win
                   changed_when: false
 

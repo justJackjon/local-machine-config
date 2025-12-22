@@ -17,7 +17,7 @@
   block:
     - name: Get user's home directory path in POSIX format
       ansible.builtin.command:
-        cmd: cygpath -u "{{ ansible_env.USERPROFILE }}"
+        cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
       register: configure_msys2_win_home_dir_raw
       changed_when: false
 
