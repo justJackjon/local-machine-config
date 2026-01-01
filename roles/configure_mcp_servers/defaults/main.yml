@@ -1,7 +1,7 @@
-mcp_github_extension_repo: "https://github.com/github/github-mcp-server"
-mcp_dot_env_path: "{{ ansible_facts['env']['HOME'] }}/.gemini/.env"
+configure_mcp_servers_mcp_github_extension_repo: "https://github.com/github/github-mcp-server"
+configure_mcp_servers_mcp_dot_env_path: "{{ ansible_facts['env']['HOME'] }}/.gemini/.env"
 
-mcp_servers:
+configure_mcp_servers_list:
   - name: semgrep
     command: semgrep
     args: ["mcp"]
