@@ -1,0 +1,10 @@
+mcp_github_extension_repo: "https://github.com/github/github-mcp-server"
+mcp_dot_env_path: "{{ ansible_facts['env']['HOME'] }}/.gemini/.env"
+
+mcp_servers:
+  - name: semgrep
+    command: semgrep
+    args: ["mcp"]
+    description: "Semgrep Security Scanning"
+    trust: true
+    enabled: true
