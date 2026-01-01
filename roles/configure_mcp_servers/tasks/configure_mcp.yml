@@ -7,19 +7,20 @@
 - name: Check if settings.json exists
   ansible.builtin.stat:
     path: "{{ ansible_facts['env']['HOME'] }}/.gemini/settings.json"
-  register: gemini_settings_file
+  register: configure_mcp_servers_gemini_settings_file
 
 - name: Initialize settings.json if it does not exist
   ansible.builtin.copy:
     content: "{}"
     dest: "{{ ansible_facts['env']['HOME'] }}/.gemini/settings.json"
     mode: "0644"
-  when: not gemini_settings_file.stat.exists
+  when: not configure_mcp_servers_gemini_settings_file.stat.exists
 
 - name: Configure MCP servers in Gemini settings
   vars:
     settings_path: "{{ ansible_facts['env']['HOME'] }}/.gemini/settings.json"
   ansible.builtin.shell: >
+    set -o pipefail &&
     jq '.mcpServers["{{ item.name }}"] = {
       "command": "{{ item.command }}",
       "args": {{ item.args | to_json }},
@@ -27,6 +28,6 @@
       "description": "{{ item.description }}"
     } | if "{{ item.enabled }}" == "false" then del(.mcpServers["{{ item.name }}"]) else . end'
     "{{ settings_path }}" > "{{ settings_path }}.tmp" && mv "{{ settings_path }}.tmp" "{{ settings_path }}"
-  loop: "{{ mcp_servers }}"
+  loop: "{{ configure_mcp_servers_list }}"
   when: item.enabled | default(true)
   changed_when: true

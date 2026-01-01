@@ -1,31 +1,39 @@
 - name: Check for GitHub MCP Personal Access Token
   ansible.builtin.shell: |
-    grep -q "GITHUB_MCP_PAT" "{{ mcp_dot_env_path }}"
-  register: github_pat_check
+    grep -q "GITHUB_MCP_PAT" "{{ configure_mcp_servers_mcp_dot_env_path }}"
+  register: configure_mcp_servers_github_pat_check
   failed_when: false
   changed_when: false
   ignore_errors: true
 
 - name: Check if GitHub extension is already installed
   ansible.builtin.shell: "bash -lc 'gemini extensions list'"
-  register: extension_list
+  args:
+    executable: /bin/bash
+  register: configure_mcp_servers_extension_list
   changed_when: false
+  # noqa: command-instead-of-shell
 
 - name: Install GitHub MCP Extension
-  ansible.builtin.shell: "bash -lc 'gemini extensions install {{ mcp_github_extension_repo }} --auto-update'"
-  register: install_result
-  changed_when: "'Installing extension' in install_result.stdout"
-  when: 
-    - github_pat_check.rc == 0
-    - "'github' not in extension_list.stdout"
+  ansible.builtin.shell: "bash -lc 'gemini extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update'"
+  args:
+    executable: /bin/bash
+  register: configure_mcp_servers_install_result
+  changed_when: "'Installing extension' in configure_mcp_servers_install_result.stdout"
+  when:
+    - configure_mcp_servers_github_pat_check.rc == 0
+    - "'github' not in configure_mcp_servers_extension_list.stdout"
+  # noqa: command-instead-of-shell
 
 - name: Warn if GitHub PAT is missing
   ansible.builtin.debug:
-    msg: "Skipping GitHub MCP extension installation. Please add GITHUB_MCP_PAT to {{ mcp_dot_env_path }}."
-  when: github_pat_check.rc != 0
+    msg: "Skipping GitHub MCP extension installation. Please add GITHUB_MCP_PAT to {{ configure_mcp_servers_mcp_dot_env_path }}."
+  when: configure_mcp_servers_github_pat_check.rc != 0
 
 - name: Register GitHub MCP status for post-flight report
   ansible.builtin.set_fact:
-    github_mcp_pat_status: "{{ 'Present' if github_pat_check.rc == 0 else 'Missing' }}"
-    github_mcp_install_status: "{{ 'Installed/Configured' if (github_pat_check.rc == 0) else 'Skipped (Missing PAT)' }}"
-    github_mcp_action_needed: "{{ 'None' if github_pat_check.rc == 0 else 'Add GITHUB_MCP_PAT to ' ~ mcp_dot_env_path }}"
+    configure_mcp_servers_github_mcp_pat_status: "{{ 'Present' if configure_mcp_servers_github_pat_check.rc == 0 else 'Missing' }}"
+    configure_mcp_servers_github_mcp_install_status: >-
+      {{ 'Installed/Configured' if (configure_mcp_servers_github_pat_check.rc == 0) else 'Skipped (Missing PAT)' }}
+    configure_mcp_servers_github_mcp_action_needed: >-
+      {{ 'None' if configure_mcp_servers_github_pat_check.rc == 0 else 'Add GITHUB_MCP_PAT to ' ~ configure_mcp_servers_mcp_dot_env_path }}
