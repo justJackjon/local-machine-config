@@ -1,0 +1,31 @@
+- name: Check for GitHub MCP Personal Access Token
+  ansible.builtin.shell: |
+    grep -q "GITHUB_MCP_PAT" "{{ mcp_dot_env_path }}"
+  register: github_pat_check
+  failed_when: false
+  changed_when: false
+  ignore_errors: true
+
+- name: Check if GitHub extension is already installed
+  ansible.builtin.shell: "bash -lc 'gemini extensions list'"
+  register: extension_list
+  changed_when: false
+
+- name: Install GitHub MCP Extension
+  ansible.builtin.shell: "bash -lc 'gemini extensions install {{ mcp_github_extension_repo }} --auto-update'"
+  register: install_result
+  changed_when: "'Installing extension' in install_result.stdout"
+  when: 
+    - github_pat_check.rc == 0
+    - "'github' not in extension_list.stdout"
+
+- name: Warn if GitHub PAT is missing
+  ansible.builtin.debug:
+    msg: "Skipping GitHub MCP extension installation. Please add GITHUB_MCP_PAT to {{ mcp_dot_env_path }}."
+  when: github_pat_check.rc != 0
+
+- name: Register GitHub MCP status for post-flight report
+  ansible.builtin.set_fact:
+    github_mcp_pat_status: "{{ 'Present' if github_pat_check.rc == 0 else 'Missing' }}"
+    github_mcp_install_status: "{{ 'Installed/Configured' if (github_pat_check.rc == 0) else 'Skipped (Missing PAT)' }}"
+    github_mcp_action_needed: "{{ 'None' if github_pat_check.rc == 0 else 'Add GITHUB_MCP_PAT to ' ~ mcp_dot_env_path }}"

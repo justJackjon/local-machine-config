@@ -43,17 +43,22 @@
     - role: install_wsl_gui
       when: is_wsl | default(false)
 
-    - configure_shell
+    - role: configure_shell
+      tags: [configure_shell, configure_mcp_servers]
 
     - role: configure_keyboard
       tags: configure_keyboard
 
     - install_browser
     - install_lazyvim
-    - stow_dotfiles
+    - role: stow_dotfiles
+      tags: [stow_dotfiles, configure_mcp_servers]
 
     - role: configure_git
       tags: configure_git
+
+    - role: configure_mcp_servers
+      tags: configure_mcp_servers
 
   post_tasks:
     - name: Display final instructions
@@ -72,6 +77,23 @@
           - "The following tasks were skipped. Please run the 'install.ps1' script as an Administrator to complete the setup."
           - "- Installing global pnpm packages (tree-sitter-cli, neovim)"
           - " {% if autohotkey_install_failed_due_to_permissions | default(false) %}- Installing AutoHotkey v1.1{% endif %}"
+
+    - name: Display MCP Server Configuration Report
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "   MCP SERVER CONFIGURATION REPORT"
+          - "=========================================="
+          - "GitHub MCP Server:"
+          - "  PAT Status:      {{ github_mcp_pat_status | default('Not Checked') }}"
+          - "  MCP Status:      {{ github_mcp_install_status | default('Skipped') }}"
+          - "  Action Needed:   {{ github_mcp_action_needed | default('None') }}"
+          - ""
+          - "Semgrep MCP Server:"
+          - "  Status:          Installed & Configured (Community)"
+          - "  Action Needed:   Run 'semgrep login' (Optional) for more rules."
+          - "=========================================="
+      tags: configure_mcp_servers
 
     - name: Add final instructions for GitHub
       ansible.builtin.debug:

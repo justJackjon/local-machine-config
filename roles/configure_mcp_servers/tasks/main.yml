@@ -1,0 +1,17 @@
+- name: Install MCP tools (macOS)
+  ansible.builtin.include_tasks: macos.yml
+  when: is_mac
+
+- name: Install MCP tools (Linux)
+  ansible.builtin.include_tasks: linux.yml
+  when: is_debian_family
+
+- name: Install MCP tools (Windows)
+  ansible.builtin.include_tasks: windows.yml
+  when: is_windows
+
+- name: Configure MCP servers (JSON)
+  ansible.builtin.include_tasks: configure_mcp.yml
+
+- name: Configure Gemini Extensions
+  ansible.builtin.include_tasks: configure_extensions.yml

@@ -1,0 +1,5 @@
+- name: Install Semgrep (Windows)
+  ansible.builtin.command: pipx install semgrep
+  args:
+    creates: "{{ ansible_facts['env']['UserProfile'] }}\\.local\\bin\\semgrep.exe"
+  changed_when: false
