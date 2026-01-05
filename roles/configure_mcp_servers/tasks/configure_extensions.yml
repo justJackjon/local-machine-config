@@ -1,6 +1,6 @@
 - name: Set Gemini CLI base command fact
   ansible.builtin.set_fact:
-    configure_mcp_servers_gemini_base: "CI=true pnpm dlx @google/gemini-cli"
+    configure_mcp_servers_gemini_base: "pnpm dlx @google/gemini-cli"
 
 - name: Check for GitHub MCP Personal Access Token
   ansible.builtin.shell: |
@@ -11,25 +11,29 @@
   ignore_errors: true
 
 - name: Check if GitHub extension is already installed
-  ansible.builtin.command: >-
+  ansible.builtin.shell: >-
     {% if is_windows -%}
     {{ configure_mcp_servers_gemini_base }} extensions list{%- else -%}
     bash -lc '{{ configure_mcp_servers_gemini_base }} extensions list'{%- endif %}
+  environment:
+    CI: "true"
   register: configure_mcp_servers_extension_list
   changed_when: false
-  # noqa yaml[line-length]
+  # noqa command-instead-of-shell yaml[line-length]
 
 - name: Install GitHub MCP Extension
-  ansible.builtin.command: >-
+  ansible.builtin.shell: >-
     {% if is_windows -%}
     {{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update{%- else -%}
     bash -lc '{{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update'{%- endif %}
+  environment:
+    CI: "true"
   register: configure_mcp_servers_install_result
   changed_when: "'Installing extension' in configure_mcp_servers_install_result.stdout"
   when:
     - configure_mcp_servers_github_pat_check.rc == 0
     - "'github' not in configure_mcp_servers_extension_list.stdout"
-  # noqa yaml[line-length]
+  # noqa command-instead-of-shell yaml[line-length]
 
 - name: Warn if GitHub PAT is missing
   ansible.builtin.debug:
