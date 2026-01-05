@@ -16,6 +16,9 @@ function Write-ErrorMsg {
   Write-Host "`e[0;31mERROR: $Message`e[0m"
 
   if (-not $NoExit) {
+    Write-Host ""
+    Read-Host "Press Enter to exit..."
+    Stop-Transcript -ErrorAction SilentlyContinue
     exit 1
   }
 }
@@ -41,7 +44,11 @@ if ($PSVersionTable.OS -notlike "*Windows*") {
   Write-ErrorMsg "This script is intended to be run on Windows. Please use install.sh for Linux/macOS."
 }
 
+# Start transcript logging to a temp file
+$logFile = Join-Path -Path $env:TEMP -ChildPath "local-machine-config-install.log"
+Start-Transcript -Path $logFile -Append -ErrorAction SilentlyContinue
 Write-Info "Running on Windows"
+Write-Note "Transcript logging started. Logs will be saved to: $logFile"
 
 # Define repository directory
 $REPO_DIR = "$env:USERPROFILE\Repos"
@@ -182,3 +189,8 @@ Set-Location $LOCAL_REPO_PATH
 
 # Execute the main installation function
 Install-LocalMachineConfig
+
+# Final pause and cleanup
+Write-Host ""
+Read-Host "Press Enter to exit..."
+Stop-Transcript -ErrorAction SilentlyContinue

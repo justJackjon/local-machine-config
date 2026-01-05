@@ -19,6 +19,9 @@ To start the setup on Windows, run the following command from an **elevated Powe
 Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1'))
 ```
 
+> [!NOTE]
+> The script will pause at the end (or upon failure) to allow you to review the output. Full logs are also saved to `$env:TEMP\local-machine-config-install.log`.
+
 > [!WARNING]
 > Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1)
 
