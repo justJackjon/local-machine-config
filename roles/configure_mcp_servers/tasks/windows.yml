@@ -1,5 +1,14 @@
 - name: Install Semgrep (Windows)
-  ansible.builtin.command: pipx install semgrep
-  args:
-    creates: "{{ ansible_facts['env']['UserProfile'] }}\\.local\\bin\\semgrep.exe"
+  ansible.builtin.command:
+    cmd: /mingw64/bin/pipx.exe install semgrep
+  register: semgrep_install
+  changed_when: "'installed package' in semgrep_install.stdout"
+  failed_when:
+    - semgrep_install.rc != 0
+    - "'already installed' not in semgrep_install.stdout"
+    - "'already installed' not in semgrep_install.stderr"
+
+- name: Ensure pipx binary directory is in PATH
+  ansible.builtin.command:
+    cmd: /mingw64/bin/pipx.exe ensurepath
   changed_when: false
