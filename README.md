@@ -74,7 +74,7 @@ This repository is structured into several Ansible roles, each responsible for a
 
 - **`common/`**: Contains common tasks used across playbooks, primarily for setting up Ansible facts related to the operating system and architecture.
   - `set_os_facts.yml`: Determines the operating system family (e.g., Debian, macOS, Windows) and detects if running within a WSL environment, setting the `is_wsl` fact.
-  - `set_python_interpreter.yml`: Configures the Python interpreter for Ansible.
+  - `set_python_interpreter.yml`: Configures the Python interpreter for Ansible. On Windows, it handles the complex logic of selecting the MSYS2 interpreter for Ansible execution (to support POSIX requirements like the `grp` module) while optionally setting up a MinGW64-based virtual environment for development tools.
   - `set_sys_architecture_facts.yml`: Identifies the system's architecture (e.g., amd64, arm64).
 
 - **`configure_keyboard/`**:

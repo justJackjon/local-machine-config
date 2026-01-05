@@ -22,22 +22,60 @@
   when: "'msys' in os_result.stdout | lower or 'mingw' in os_result.stdout | lower"
   tags: always
   block:
-    - name: Set initial python interpreter for MSYS2 on Windows
+    - name: Force Ansible to use MSYS2 Python
       ansible.builtin.set_fact:
-        ansible_python_interpreter: "/usr/bin/python3"
+        ansible_python_interpreter: /usr/bin/python3
 
-    - name: Ensure virtual environment exists and has required packages
-      ansible.builtin.pip:
-        name:
-          - pip # NOTE: We need to install pip for python in the venv.
-          - pipx
-        state: latest
-        virtualenv: "{{ unix_home_path }}/.venvs/local-machine-config"
-        virtualenv_command: "{{ ansible_python_interpreter }} -m venv --system-site-packages"
+    - name: Check for MinGW64 Python
+      ansible.builtin.raw: test -f /mingw64/bin/python.exe
+      register: mingw_python_check
+      changed_when: false
+      failed_when: false
+
+    - name: Get Windows path for MinGW64 Python
+      ansible.builtin.command: cygpath -u /mingw64/bin/python.exe
+      register: mingw_python_win_path
+      changed_when: false
+      when: mingw_python_check.rc == 0
+
+    - name: Get user's home directory in Windows format
+      ansible.builtin.command: cygpath -u "{{ unix_home_path }}"
+      register: win_home_path_result
+      changed_when: false
+
+    - name: Set facts for MinGW Python usage
+      ansible.builtin.set_fact:
+        use_mingw_python: "{{ mingw_python_check.rc == 0 }}"
+        base_python_interpreter: "{{ mingw_python_win_path.stdout | trim if mingw_python_check.rc == 0 else '/usr/bin/python3' }}"
+        venv_path: "{{ unix_home_path }}/.venvs/local-machine-config"
+
+    - name: Create virtual environment
+      ansible.builtin.command:
+        cmd: "{{ base_python_interpreter }} -m venv --system-site-packages {{ venv_path }}"
+        creates: "{{ venv_path }}/pyvenv.cfg"
+
+    - name: Install required packages (pip, pipx) in venv (Unix)
+      ansible.builtin.command:
+        cmd: "{{ venv_path }}/bin/python -m pip install pip pipx"
+      changed_when: false
+      when: not use_mingw_python
+
+    - name: Bootstrap pip in venv (Windows)
+      ansible.builtin.command:
+        cmd: "{{ venv_path }}/bin/python -m ensurepip"
+      changed_when: false
+      when: use_mingw_python
+
+    - name: Install required packages (pip, pipx) in venv (Windows)
+      ansible.builtin.command:
+        cmd: "{{ venv_path }}/bin/python -m pip install pip pipx"
+      changed_when: false
+      when: use_mingw_python
 
     - name: Set ansible_python_interpreter to use the new venv
       ansible.builtin.set_fact:
-        ansible_python_interpreter: "{{ unix_home_path }}/.venvs/local-machine-config/bin/python"
+        ansible_python_interpreter: "{{ venv_path }}/bin/python"
+      when: not use_mingw_python
 
 - name: Set and manage python interpreter for Unix systems
   when: "'Linux' in os_result.stdout or 'Darwin' in os_result.stdout"

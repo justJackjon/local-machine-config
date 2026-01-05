@@ -35,7 +35,7 @@
       when: is_windows
 
     - role: install_base_packages
-      tags: [install_base_packages, configure_git, configure_keyboard]
+      tags: [install_base_packages, configure_git, configure_keyboard, configure_mcp_servers]
 
     - role: configure_system
       when: ansible_facts.os_family == 'Debian'
