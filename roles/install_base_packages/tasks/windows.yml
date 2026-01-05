@@ -120,21 +120,23 @@
     - name: Check if pipx shared environment exists
       ansible.builtin.stat:
         path: "{{ install_base_packages_win_home_dir_raw.stdout }}/.local/pipx/shared/pyvenv.cfg"
-      register: pipx_shared_venv_cfg
+      register: install_base_packages_pipx_shared_venv_cfg
 
     - name: Check if pipx shared environment is MinGW-based
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: grep -q "mingw64" "{{ install_base_packages_win_home_dir_raw.stdout }}/.local/pipx/shared/pyvenv.cfg"
-      register: pipx_shared_is_mingw
+      register: install_base_packages_pipx_shared_is_mingw
       changed_when: false
       failed_when: false
-      when: pipx_shared_venv_cfg.stat.exists
+      when: install_base_packages_pipx_shared_venv_cfg.stat.exists
 
     - name: Remove incompatible (non-MinGW) pipx shared environment
       ansible.builtin.file:
         path: "{{ install_base_packages_win_home_dir_raw.stdout }}/.local/pipx/shared"
         state: absent
-      when: pipx_shared_venv_cfg.stat.exists and pipx_shared_is_mingw.rc != 0
+      when:
+        - install_base_packages_pipx_shared_venv_cfg.stat.exists
+        - install_base_packages_pipx_shared_is_mingw.rc != 0
 
     - name: Set Windows-specific paths
       ansible.builtin.set_fact:
