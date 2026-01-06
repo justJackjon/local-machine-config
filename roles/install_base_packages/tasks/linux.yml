@@ -61,7 +61,7 @@
         name: alacritty
         state: present
       environment:
-        PATH: "/root/.cargo/bin:{{ ansible_env.PATH }}"
+        PATH: "/root/.cargo/bin:{{ ansible_facts.env.PATH }}"
         CARGO_INSTALL_ROOT: "/usr/local"
 
     - name: Install gh for Debian based systems
@@ -83,7 +83,7 @@
         - name: Add GitHub CLI apt repository
           ansible.builtin.apt_repository:
             repo: >
-              deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'i386' }}
+              deb [arch={{ 'amd64' if ansible_facts.architecture == 'x86_64' else 'arm64' if ansible_facts.architecture == 'aarch64' else 'i386' }}
               signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg]
               https://cli.github.com/packages stable main
             state: present
@@ -100,8 +100,8 @@
       block:
         - name: Install lazygit from apt on Debian >= 13 or Ubuntu >= 25.10
           when: >
-            (ansible_distribution == 'Debian' and ansible_distribution_version | float >= 13) or
-            (ansible_distribution == 'Ubuntu' and ansible_distribution_version | float >= 25.10)
+            (ansible_facts.distribution == 'Debian' and ansible_facts.distribution_version | float >= 13) or
+            (ansible_facts.distribution == 'Ubuntu' and ansible_facts.distribution_version | float >= 25.10)
           ansible.builtin.apt:
             name: lazygit
             state: present
@@ -109,8 +109,8 @@
 
         - name: Install lazygit from source on older Debian/Ubuntu
           when: >
-            (ansible_distribution == 'Debian' and ansible_distribution_version | float < 13) or
-            (ansible_distribution == 'Ubuntu' and ansible_distribution_version | float < 25.10)
+            (ansible_facts.distribution == 'Debian' and ansible_facts.distribution_version | float < 13) or
+            (ansible_facts.distribution == 'Ubuntu' and ansible_facts.distribution_version | float < 25.10)
           block:
             - name: Get latest lazygit version
               ansible.builtin.uri:
@@ -162,16 +162,16 @@
         - name: Clone fzf repository
           ansible.builtin.git:
             repo: "https://github.com/junegunn/fzf.git"
-            dest: "{{ ansible_env.HOME }}/.fzf"
+            dest: "{{ ansible_facts.env.HOME }}/.fzf"
             version: "{{ install_base_packages_fzf_version }}"
             depth: 1
             force: true
           changed_when: false # noqa: latest[git]
 
         - name: Run fzf install script
-          ansible.builtin.command: "{{ ansible_env.HOME }}/.fzf/install --all"
+          ansible.builtin.command: "{{ ansible_facts.env.HOME }}/.fzf/install --all"
           args:
-            creates: "{{ ansible_env.HOME }}/.fzf/bin/fzf"
+            creates: "{{ ansible_facts.env.HOME }}/.fzf/bin/fzf"
           changed_when: false
 
     - name: Install Starship
@@ -207,18 +207,18 @@
         - name: Run nvm install script
           ansible.builtin.command: /tmp/install_nvm.sh
           args:
-            creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+            creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
         - name: Install Node.js LTS
           ansible.builtin.shell: >
-            set -o pipefail && source {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install --lts
+            set -o pipefail && source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh && nvm install --lts
           args:
             executable: /bin/bash
-            creates: "{{ ansible_env.HOME }}/.nvm/versions/node"
+            creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
 
         - name: Check if pnpm is installed
           ansible.builtin.stat:
-            path: "{{ ansible_env.HOME }}/.local/share/pnpm/pnpm"
+            path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
           register: install_base_packages_pnpm_stat_debian
 
         - name: Download pnpm install script
@@ -236,10 +236,10 @@
         - name: Update pnpm
           when: install_base_packages_pnpm_stat_debian.stat.exists
           ansible.builtin.shell:
-            cmd: "{{ ansible_env.HOME }}/.local/share/pnpm/pnpm self-update"
+            cmd: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm self-update"
           args:
             executable: /bin/bash
-            chdir: "{{ ansible_env.HOME }}"
+            chdir: "{{ ansible_facts.env.HOME }}"
           changed_when: false
 
     - name: Install pnpm packages

@@ -3,14 +3,14 @@
     - name: Set OS specific facts
       ansible.builtin.set_fact:
         install_spacevim_minttyrc_file: >-
-          {{ '/c/Users/' + ansible_user_id + '/.minttyrc'
+          {{ '/c/Users/' + ansible_facts.user_id + '/.minttyrc'
           if is_windows
           else '~/.minttyrc' }}
 
     - name: Set general facts
       ansible.builtin.set_fact:
         install_spacevim_spacevim_config_dir: >-
-          {{ '/c/Users/' + ansible_user_id + '/.SpaceVim.d'
+          {{ '/c/Users/' + ansible_facts.user_id + '/.SpaceVim.d'
           if is_windows
           else '~/.SpaceVim.d' }}
     - name: Ensure required dependencies are installed
@@ -108,9 +108,9 @@
 
         - name: Create symbolic link for nvim configuration
           when: is_windows
-          ansible.builtin.command: ln -s {{ ansible_env.HOME }}/.SpaceVim {{ ansible_env.HOME }}/AppData/Local/nvim
+          ansible.builtin.command: ln -s {{ ansible_facts.env.HOME }}/.SpaceVim {{ ansible_facts.env.HOME }}/AppData/Local/nvim
           args:
-            creates: "{{ ansible_env.HOME }}/AppData/Local/nvim"
+            creates: "{{ ansible_facts.env.HOME }}/AppData/Local/nvim"
 
     - name: Install Nerd Font
       block:
@@ -146,13 +146,13 @@
           block:
             - name: Ensure XFCE Terminal configuration directory exists
               ansible.builtin.file:
-                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal"
+                path: "{{ ansible_facts.env.HOME }}/.config/xfce4/terminal"
                 state: directory
                 mode: '0755'
 
             - name: Configure XFCE Terminal to use Nerd Font
               ansible.builtin.lineinfile:
-                path: "{{ ansible_env.HOME }}/.config/xfce4/terminal/terminalrc"
+                path: "{{ ansible_facts.env.HOME }}/.config/xfce4/terminal/terminalrc"
                 regexp: '^FontName='
                 line: 'FontName=CaskaydiaCove Nerd Font 10'
                 create: true

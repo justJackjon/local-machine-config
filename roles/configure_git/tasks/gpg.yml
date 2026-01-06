@@ -59,7 +59,7 @@
 - name: Add GPG key to GitHub
   ansible.builtin.shell: |
     set -o pipefail
-    echo "{{ configure_git_gpg_public_key.stdout }}" | gh gpg-key add --title "{{ ansible_hostname }} GPG Key (ansible-managed)" -
+    echo "{{ configure_git_gpg_public_key.stdout }}" | gh gpg-key add --title "{{ ansible_facts.hostname }} GPG Key (ansible-managed)" -
   args:
     executable: /bin/bash
   register: configure_git_add_gpg_key_result

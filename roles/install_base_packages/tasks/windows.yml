@@ -243,5 +243,5 @@
           changed_when: false
           environment:
             PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
-            PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
+            PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_facts.env.PATH }}"
 
