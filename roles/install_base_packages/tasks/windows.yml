@@ -71,11 +71,15 @@
             - install_base_packages_scoop_install.rc != 0
             - "'already installed' not in install_base_packages_scoop_install.stdout"
 
+    - name: Set scoop root backslash fact
+      ansible.builtin.set_fact:
+        install_base_packages_scoop_root_win: "{{ install_base_packages_scoop_root | replace('/', '\\') }}"
+
     - name: Prepend NVM symlink to User PATH
       ansible.builtin.command:
         cmd: >
           powershell.exe -Command "
-          $NvmSymlink = '{{ install_base_packages_scoop_root | replace('/', '\') }}\persist\nvm\nodejs';
+          $NvmSymlink = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs';
           $CurrentPath = [Environment]::GetEnvironmentVariable('Path', 'User');
           if ($CurrentPath -notlike \"*$NvmSymlink*\") {
             [Environment]::SetEnvironmentVariable('Path', \"$NvmSymlink;$CurrentPath\", 'User');
