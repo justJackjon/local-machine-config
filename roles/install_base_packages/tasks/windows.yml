@@ -70,14 +70,24 @@
             - install_base_packages_scoop_install.rc != 0
             - "'already installed' not in install_base_packages_scoop_install.stdout"
 
+    - name: Configure NVM root
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe root {{ install_base_packages_scoop_root }}/persist/nvm/nodejs"
+      changed_when: false
+
+    - name: Configure NVM symlink
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe symlink {{ install_base_packages_scoop_root }}/persist/nvm/nodejs/symlink"
+      changed_when: false
+
     - name: Install Node.js LTS via NVM
       ansible.builtin.command:
         cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe install lts"
-      register: install_base_packages_nvm_lts
-      changed_when: "'is already installed' not in install_base_packages_nvm_lts.stdout"
+      register: install_base_packages_nvm_install
+      changed_when: "'is already installed' not in install_base_packages_nvm_install.stdout"
       failed_when:
-        - install_base_packages_nvm_lts.rc != 0
-        - "'already installed' not in install_base_packages_nvm_lts.stdout"
+        - install_base_packages_nvm_install.rc != 0
+        - "'already installed' not in install_base_packages_nvm_install.stdout"
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
