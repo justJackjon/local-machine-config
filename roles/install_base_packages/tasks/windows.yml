@@ -75,7 +75,7 @@
 
         - name: Install packages with scoop
           ansible.builtin.command:
-            cmd: powershell.exe -Command "scoop install {{ item }}"
+            cmd: powershell.exe -Command "& '{{ install_base_packages_scoop_executable_path }}' install {{ item }}"
           loop:
             - nvm
             - gh
@@ -95,7 +95,7 @@
         #       'scoop reset' will fix the junctions and shims.
         - name: Reset scoop packages to ensure shims are created
           ansible.builtin.command:
-            cmd: powershell.exe -Command "scoop reset {{ item }}"
+            cmd: powershell.exe -Command "& '{{ install_base_packages_scoop_executable_path }}' reset {{ item }}"
           loop:
             - nvm
             - gh
