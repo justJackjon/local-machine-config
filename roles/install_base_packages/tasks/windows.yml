@@ -206,7 +206,7 @@
         #       pnpm executable on the first run (as the PATH is not updated).
         - name: Install pnpm packages
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path | dirname }}/pnpm.cmd add -g {{ item }}"
+            cmd: "{{ install_base_packages_scoop_executable_path | dirname }}/pnpm.exe add -g {{ item }}"
           with_items:
             - tree-sitter-cli
             - neovim
