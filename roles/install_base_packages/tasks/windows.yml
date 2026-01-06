@@ -64,6 +64,7 @@
             - alacritty
             - cascadiacode-nf
             - perl
+            - pnpm
           register: install_base_packages_scoop_install
           changed_when: "'successfully' in install_base_packages_scoop_install.stdout"
           failed_when:
@@ -166,42 +167,14 @@
         - install_base_packages_pipx_shared_venv_cfg.stat.exists
         - install_base_packages_pipx_shared_is_mingw.rc != 0
 
-    - name: Set Windows-specific paths
-      ansible.builtin.set_fact:
-        install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm/pnpm.exe"
-        install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout }}/AppData/Local/pnpm"
-
     - name: Install pnpm packages
-      when: has_admin_privileges
       block:
-        - name: Check if pnpm is installed on Windows
-          ansible.builtin.command:
-            cmd: test -f "{{ install_base_packages_pnpm_executable_path }}"
-          register: install_base_packages_pnpm_check
-          changed_when: false
-          failed_when: false
-
-        - name: Install pnpm on Windows
-          when: install_base_packages_pnpm_check.rc != 0
-          ansible.builtin.command:
-            cmd: powershell.exe -Command "iwr https://get.pnpm.io/install.ps1 -useb | iex"
-          changed_when: false
-
-        - name: Update pnpm on Windows
-          when: install_base_packages_pnpm_check.rc == 0
-          ansible.builtin.command:
-            cmd: "{{ install_base_packages_pnpm_executable_path }} self-update"
-          changed_when: false
-
         # NOTE: We use the shell module here because the pnpm module fails to find the
         #       pnpm executable on the first run (as the PATH is not updated).
         - name: Install pnpm packages
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
+            cmd: "{{ install_base_packages_scoop_executable_path | dirname }}/pnpm.cmd add -g {{ item }}"
           with_items:
             - tree-sitter-cli
             - neovim
           changed_when: false
-          environment:
-            PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
-            PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
