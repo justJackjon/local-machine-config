@@ -49,6 +49,26 @@
         base_python_interpreter: "{{ mingw_python_win_path.stdout | trim if mingw_python_check.rc == 0 else '/usr/bin/python3' }}"
         venv_path: "{{ unix_home_path }}/.venvs/local-machine-config"
 
+    - name: Check if existing venv matches current interpreter
+      ansible.builtin.shell: |
+        if [ -f "{{ venv_path }}/pyvenv.cfg" ]; then
+          if grep -q "{{ base_python_interpreter }}" "{{ venv_path }}/pyvenv.cfg"; then
+            echo "match"
+          else
+            echo "mismatch"
+          fi
+        else
+          echo "missing"
+        fi
+      register: venv_interpreter_check
+      changed_when: false
+
+    - name: Remove mismatched venv
+      ansible.builtin.file:
+        path: "{{ venv_path }}"
+        state: absent
+      when: venv_interpreter_check.stdout == "mismatch"
+
     - name: Create virtual environment
       ansible.builtin.command:
         cmd: "{{ base_python_interpreter }} -m venv --system-site-packages {{ venv_path }}"
