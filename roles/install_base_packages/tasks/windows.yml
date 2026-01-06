@@ -74,27 +74,6 @@
             - install_base_packages_scoop_install.rc != 0
             - "'already installed' not in install_base_packages_scoop_install.stdout"
 
-        # NOTE: If a package was already "installed" but is broken (e.g. missing shims),
-        #       'scoop reset' will fix the junctions and shims.
-        - name: Reset scoop packages to ensure shims are created
-          ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path }} reset {{ item }}"
-          loop:
-            - nvm
-            - nodejs-lts
-            - gh
-            - gnupg
-            - neovim
-            - lazygit
-            - alacritty
-            - cascadiacode-nf
-            - perl
-          changed_when: false
-
-        - name: Log Scoop reset completion
-          ansible.builtin.debug:
-            msg: "Completed Scoop reset for all core packages."
-
     - name: Download and Install AutoHotkey v1.1
       block:
         # NOTE: We are not using scoop to install AutoHotkey because the manifest
