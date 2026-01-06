@@ -72,10 +72,9 @@
             - "'already installed' not in install_base_packages_scoop_install.stdout"
 
     - name: Remove conflicting system Node.js installation
-      ansible.builtin.win_file:
-        path: "C:\\Program Files\\nodejs"
-        state: absent
-      ignore_errors: true
+      ansible.builtin.command:
+        cmd: powershell.exe -Command "Remove-Item -Path 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue"
+      changed_when: false
 
     - name: Configure NVM root
       ansible.builtin.command:
