@@ -10,6 +10,19 @@
   ansible.builtin.include_tasks: windows.yml
   when: is_windows
 
+- name: Set pnpm executable path (Windows)
+  when: is_windows
+  block:
+    - name: Get user's home directory path in POSIX format
+      ansible.builtin.command:
+        cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
+      register: configure_mcp_win_home_dir
+      changed_when: false
+
+    - name: Set pnpm executable fact
+      ansible.builtin.set_fact:
+        configure_mcp_pnpm_executable: "{{ configure_mcp_win_home_dir.stdout }}/scoop/shims/pnpm.exe"
+
 - name: Configure MCP servers (JSON)
   ansible.builtin.include_tasks: configure_mcp.yml
 

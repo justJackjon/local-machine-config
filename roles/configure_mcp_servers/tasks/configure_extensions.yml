@@ -1,6 +1,6 @@
 - name: Set Gemini CLI base command fact
   ansible.builtin.set_fact:
-    configure_mcp_servers_gemini_base: "pnpm dlx @google/gemini-cli"
+    configure_mcp_servers_gemini_base: "{{ configure_mcp_pnpm_executable | default('pnpm') }} dlx @google/gemini-cli"
 
 - name: Check for GitHub MCP Personal Access Token
   ansible.builtin.shell: |
