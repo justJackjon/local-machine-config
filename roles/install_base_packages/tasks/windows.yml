@@ -205,6 +205,16 @@
         install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/AppData/Local/pnpm/pnpm.exe"
         install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/AppData/Local/pnpm"
 
+    - name: Get pnpm home path in Windows format
+      ansible.builtin.command:
+        cmd: cygpath -w "{{ install_base_packages_pnpm_home_path }}"
+      register: install_base_packages_pnpm_home_win_raw
+      changed_when: false
+
+    - name: Set pnpm home Windows path fact
+      ansible.builtin.set_fact:
+        install_base_packages_pnpm_home_win: "{{ install_base_packages_pnpm_home_win_raw.stdout | trim }}"
+
     - name: Install pnpm packages
       block:
         - name: Ensure pnpm home directory exists
@@ -216,7 +226,7 @@
           ansible.builtin.command:
             cmd: >
               powershell.exe -Command "
-              [Environment]::SetEnvironmentVariable('PNPM_HOME', '{{ install_base_packages_pnpm_home_path | replace('/', '\') }}', 'User');
+              [Environment]::SetEnvironmentVariable('PNPM_HOME', '{{ install_base_packages_pnpm_home_win }}', 'User');
               $CurrentPath = [Environment]::GetEnvironmentVariable('Path', 'User');
               if ($CurrentPath -notlike '*%PNPM_HOME%*') {
                 [Environment]::SetEnvironmentVariable('Path', '%PNPM_HOME%;' + $CurrentPath, 'User');
