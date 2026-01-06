@@ -154,7 +154,7 @@
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
       ansible.builtin.command:
-        cmd: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm/pnpm add -g neovim"
+        cmd: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm/pnpm.exe add -g neovim"
       changed_when: false
       environment:
         PNPM_HOME: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm"
