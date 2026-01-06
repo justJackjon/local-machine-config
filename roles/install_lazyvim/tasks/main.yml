@@ -156,6 +156,9 @@
       ansible.builtin.command:
         cmd: "{{ install_lazyvim_win_home_dir }}/scoop/shims/pnpm.exe add -g neovim"
       changed_when: false
+      environment:
+        PNPM_HOME: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm"
+        PATH: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm:{{ ansible_facts['env']['PATH'] }}"
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
       when: is_debian_family or is_mac
