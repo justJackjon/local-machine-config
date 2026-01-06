@@ -180,5 +180,7 @@
 
     - name: Install Node.js LTS
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_win_home_dir_raw.stdout }}/scoop/apps/nvm/current/nvm.exe install lts"
+        cmd: "{{ install_base_packages_scoop_shims_path }}/nvm.exe install lts"
       changed_when: false
+      environment:
+        PATH: "{{ install_base_packages_scoop_shims_path }}:{{ ansible_env.PATH }}"
