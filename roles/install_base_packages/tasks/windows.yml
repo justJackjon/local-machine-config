@@ -55,6 +55,12 @@
             install_base_packages_scoop_executable_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | trim }}"
             install_base_packages_scoop_shims_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | trim | dirname }}"
 
+        - name: Get scoop executable path in Windows format
+          ansible.builtin.command:
+            cmd: cygpath -w "{{ install_base_packages_scoop_executable_path }}"
+          register: install_base_packages_scoop_exe_path_win
+          changed_when: false
+
         - name: Add scoop 'extras' bucket
           ansible.builtin.command:
             cmd: "{{ install_base_packages_scoop_executable_path }} bucket add extras"
@@ -75,7 +81,7 @@
 
         - name: Install packages with scoop
           ansible.builtin.command:
-            cmd: powershell.exe -Command "& '{{ install_base_packages_scoop_executable_path }}' install {{ item }}"
+            cmd: powershell.exe -Command "& '{{ install_base_packages_scoop_exe_path_win.stdout | trim }}' install {{ item }}"
           loop:
             - nvm
             - gh
@@ -95,7 +101,7 @@
         #       'scoop reset' will fix the junctions and shims.
         - name: Reset scoop packages to ensure shims are created
           ansible.builtin.command:
-            cmd: powershell.exe -Command "& '{{ install_base_packages_scoop_executable_path }}' reset {{ item }}"
+            cmd: powershell.exe -Command "& '{{ install_base_packages_scoop_exe_path_win.stdout | trim }}' reset {{ item }}"
           loop:
             - nvm
             - gh
