@@ -17,8 +17,8 @@
         path: "{{ item }}"
       loop:
         - "{{ stow_dotfiles_win_home_dir.stdout }}/scoop/shims/git.exe"
-        - "/c/Program Files/Git/cmd/git.exe"
-        - "/c/Program Files/Git/bin/git.exe"
+        - "/c/PROGRA~1/Git/cmd/git.exe"
+        - "/c/PROGRA~1/Git/bin/git.exe"
       register: stow_dotfiles_git_check
 
     - name: Set git executable path fact
