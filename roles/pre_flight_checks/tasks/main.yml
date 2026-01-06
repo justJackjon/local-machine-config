@@ -79,7 +79,7 @@
     - name: Check if the current user is an Administrator # noqa: var-naming[no-role-prefix]
       ansible.builtin.command:
         cmd: >
-          powershell.exe -Command "([bool]((Get-PrincipalPolicy).UserFlags -band 1))"
+          powershell.exe -Command "([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"
       register: admin_check_ps
       changed_when: false
       failed_when: false
