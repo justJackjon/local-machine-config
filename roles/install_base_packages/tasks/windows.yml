@@ -52,25 +52,44 @@
         #       is not updated for the current running shell session on the first run.
         - name: Set scoop_executable_path fact
           ansible.builtin.set_fact:
-            install_base_packages_scoop_executable_path: "{{ install_base_packages_scoop_exe_path_raw.stdout }}"
-            install_base_packages_scoop_shims_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | dirname }}"
+            install_base_packages_scoop_executable_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | trim }}"
+            install_base_packages_scoop_shims_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | trim | dirname }}"
 
         - name: Add scoop 'extras' bucket
           ansible.builtin.command:
             cmd: "{{ install_base_packages_scoop_executable_path }} bucket add extras"
-          changed_when: false
+          register: install_base_packages_bucket_extras
+          changed_when: "'successfully' in install_base_packages_bucket_extras.stdout"
+          failed_when:
+            - install_base_packages_bucket_extras.rc != 0
+            - "'already' not in install_base_packages_bucket_extras.stdout"
 
         - name: Add scoop 'nerd-fonts' bucket
           ansible.builtin.command:
             cmd: "{{ install_base_packages_scoop_executable_path }} bucket add nerd-fonts"
-          changed_when: false
+          register: install_base_packages_bucket_fonts
+          changed_when: "'successfully' in install_base_packages_bucket_fonts.stdout"
+          failed_when:
+            - install_base_packages_bucket_fonts.rc != 0
+            - "'already' not in install_base_packages_bucket_fonts.stdout"
 
         - name: Install packages with scoop
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path }} install nvm gh gnupg neovim lazygit alacritty cascadiacode-nf perl"
+            cmd: "{{ install_base_packages_scoop_executable_path }} install {{ item }}"
+          loop:
+            - nvm
+            - gh
+            - gnupg
+            - neovim
+            - lazygit
+            - alacritty
+            - cascadiacode-nf
+            - perl
           register: install_base_packages_scoop_install
-          changed_when: install_base_packages_scoop_install.stdout is defined and "successfully" in install_base_packages_scoop_install.stdout
-          failed_when: install_base_packages_scoop_install.rc != 0 and "successfully" not in install_base_packages_scoop_install.stdout
+          changed_when: "'successfully' in install_base_packages_scoop_install.stdout"
+          failed_when:
+            - install_base_packages_scoop_install.rc != 0
+            - "'already installed' not in install_base_packages_scoop_install.stdout"
 
     - name: Download and Install AutoHotkey v1.1
       block:
@@ -178,9 +197,24 @@
             PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
             PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
 
+    - name: Verify nvm.exe shim exists
+      ansible.builtin.stat:
+        path: "{{ install_base_packages_scoop_shims_path }}/nvm.exe"
+      register: install_base_packages_nvm_shim_stat
+
     - name: Install Node.js LTS
+      when: install_base_packages_nvm_shim_stat.stat.exists
       ansible.builtin.command:
         cmd: "{{ install_base_packages_scoop_shims_path }}/nvm.exe install lts"
-      changed_when: false
+      register: install_base_packages_nvm_lts
+      changed_when: "'is already installed' not in install_base_packages_nvm_lts.stdout"
+      failed_when:
+        - install_base_packages_nvm_lts.rc != 0
+        - "'already installed' not in install_base_packages_nvm_lts.stdout"
       environment:
         PATH: "{{ install_base_packages_scoop_shims_path }}:{{ ansible_env.PATH }}"
+
+    - name: Fail if nvm shim is missing
+      ansible.builtin.fail:
+        msg: "nvm.exe not found at {{ install_base_packages_scoop_shims_path }}/nvm.exe. Scoop installation might have failed or shim was not created."
+      when: not install_base_packages_nvm_shim_stat.stat.exists
