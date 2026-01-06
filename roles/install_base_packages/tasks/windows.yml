@@ -40,20 +40,17 @@
 
     - name: Install Scoop packages
       block:
-        # NOTE: On the first playbook run, the MSYS2 shell will not have inherited the Windows PATH,
-        #       so we need to use the full path to the scoop executable.
-        - name: Get scoop executable path
+        - name: Get user's home directory in POSIX format
           ansible.builtin.command:
-            cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}/scoop/shims/scoop"
-          register: install_base_packages_scoop_exe_path_raw
+            cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
+          register: install_base_packages_win_home_posix_raw
           changed_when: false
 
-        # NOTE: We use the full path to executables installed by scoop because the PATH
-        #       is not updated for the current running shell session on the first run.
-        - name: Set scoop_executable_path fact
+        - name: Set scoop root and executable facts
           ansible.builtin.set_fact:
-            install_base_packages_scoop_executable_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | trim }}"
-            install_base_packages_scoop_shims_path: "{{ install_base_packages_scoop_exe_path_raw.stdout | trim | dirname }}"
+            install_base_packages_win_home_posix: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}"
+            install_base_packages_scoop_root: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop"
+            install_base_packages_scoop_executable_path: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop/shims/scoop"
 
         - name: Install packages with scoop
           ansible.builtin.command:
@@ -75,7 +72,7 @@
 
     - name: Install Node.js LTS via NVM
       ansible.builtin.command:
-        cmd: powershell.exe -Command "nvm install lts"
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe install lts"
       register: install_base_packages_nvm_lts
       changed_when: "'is already installed' not in install_base_packages_nvm_lts.stdout"
       failed_when:
@@ -84,7 +81,7 @@
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
-        cmd: powershell.exe -Command "nvm use lts"
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe use lts"
       changed_when: false
 
     - name: Download and Install AutoHotkey v1.1
