@@ -71,9 +71,15 @@
             - install_base_packages_scoop_install.rc != 0
             - "'already installed' not in install_base_packages_scoop_install.stdout"
 
+    - name: Get scoop root in Windows format
+      ansible.builtin.command:
+        cmd: cygpath -w "{{ install_base_packages_scoop_root }}"
+      register: install_base_packages_scoop_root_win_raw
+      changed_when: false
+
     - name: Set scoop root backslash fact
       ansible.builtin.set_fact:
-        install_base_packages_scoop_root_win: "{{ install_base_packages_scoop_root | replace('/', '\\') }}"
+        install_base_packages_scoop_root_win: "{{ install_base_packages_scoop_root_win_raw.stdout | trim }}"
 
     - name: Prepend NVM symlink to User PATH
       ansible.builtin.command:
