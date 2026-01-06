@@ -200,6 +200,11 @@
         - install_base_packages_pipx_shared_venv_cfg.stat.exists
         - install_base_packages_pipx_shared_is_mingw.rc != 0
 
+    - name: Set Windows-specific paths
+      ansible.builtin.set_fact:
+        install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/AppData/Local/pnpm/pnpm.exe"
+        install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/AppData/Local/pnpm"
+
     - name: Install pnpm packages
       block:
         - name: Ensure pnpm home directory exists
