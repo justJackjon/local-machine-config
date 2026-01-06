@@ -93,11 +93,12 @@ function Install-LocalMachineConfig {
 
     $msys2Shell = Join-Path -Path $msys2Path -ChildPath "usr\bin\bash.exe"
 
-    # MSYS2 Initialization "Warm-up"
+    # NOTE: Perform an MSYS2 initialization "warm-up" to trigger post-install scripts.
     Write-Info "Performing MSYS2 initialization (this may take a moment)..."
     & $msys2Shell -lc "echo 'MSYS2 shell initialized'"
     
-    # Sometimes MSYS2 needs a second kick to finish creating home directories
+    # NOTE: Sometimes MSYS2 requires a brief delay or multiple shell invocations 
+    #       to finish populating the user's home directory.
     Start-Sleep -Seconds 2
     & $msys2Shell -lc "echo 'Environment check: ' && whoami && pwd"
 
@@ -167,7 +168,7 @@ function Install-LocalMachineConfig {
     Write-Info "Executing Ansible playbook..."
     $msys2LocalRepoPath = (& $msys2Shell -lc "cygpath -u '$LOCAL_REPO_PATH'" | Out-String).Trim()
     
-    # We explicitly set the PATH to prioritize MSYS2 tools and avoid Windows cross-contamination
+    # NOTE: Explicitly set the PATH to prioritize MSYS2 tools and prevent collision with Windows-native executables.
     & $msys2Shell -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH && cd `"$msys2LocalRepoPath`" && ./run-playbook.sh"
 
     if ($LASTEXITCODE -ne 0) {
@@ -192,7 +193,7 @@ if (-not (Test-Path -Path $LOCAL_REPO_PATH)) {
 } else {
   Write-Info "Repository already cloned. Pulling latest changes."
   Push-Location $LOCAL_REPO_PATH
-  # Handle cases where git might not be in the Windows PATH yet
+  # NOTE: Handle scenarios where git may not yet be available in the PowerShell PATH by catching the exception.
   try {
     git stash --include-untracked | Out-Null
     git pull | Out-Null
