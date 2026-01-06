@@ -107,6 +107,10 @@
             - perl
           changed_when: false
 
+        - name: Log Scoop reset completion
+          ansible.builtin.debug:
+            msg: "Completed Scoop reset for all core packages."
+
     - name: Download and Install AutoHotkey v1.1
       block:
         # NOTE: We are not using scoop to install AutoHotkey because the manifest
@@ -213,13 +217,17 @@
             PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
             PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_env.PATH }}"
 
-    - name: Verify nvm.exe shim exists
+    - name: Set nvm executable path fact
+      ansible.builtin.set_fact:
+        install_base_packages_nvm_executable_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/scoop/apps/nvm/current/nvm.exe"
+
+    - name: Verify nvm.exe exists
       ansible.builtin.stat:
-        path: "{{ install_base_packages_scoop_shims_path }}/nvm.exe"
-      register: install_base_packages_nvm_shim_stat
+        path: "{{ install_base_packages_nvm_executable_path }}"
+      register: install_base_packages_nvm_stat
 
     - name: Attempt to force reinstall broken nvm
-      when: not install_base_packages_nvm_shim_stat.stat.exists
+      when: not install_base_packages_nvm_stat.stat.exists
       block:
         - name: Uninstall broken nvm package
           ansible.builtin.command:
@@ -230,28 +238,29 @@
           ansible.builtin.command:
             cmd: powershell.exe -Command "scoop install nvm"
 
-        - name: Re-verify nvm.exe shim existence
+        - name: Re-verify nvm.exe existence
           ansible.builtin.stat:
-            path: "{{ install_base_packages_scoop_shims_path }}/nvm.exe"
-          register: install_base_packages_nvm_shim_stat_retry
+            path: "{{ install_base_packages_nvm_executable_path }}"
+          register: install_base_packages_nvm_stat_retry
 
-    - name: Set final nvm shim stat fact
+    - name: Set final nvm exists fact
       ansible.builtin.set_fact:
-        install_base_packages_nvm_exists: "{{ install_base_packages_nvm_shim_stat_retry.stat.exists if install_base_packages_nvm_shim_stat_retry.stat is defined else install_base_packages_nvm_shim_stat.stat.exists }}"
+        install_base_packages_nvm_exists: "{{ install_base_packages_nvm_stat_retry.stat.exists if install_base_packages_nvm_stat_retry.stat is defined else install_base_packages_nvm_stat.stat.exists }}"
 
     - name: Install Node.js LTS
       when: install_base_packages_nvm_exists
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_shims_path }}/nvm.exe install lts"
+        cmd: "{{ install_base_packages_nvm_executable_path }} install lts"
       register: install_base_packages_nvm_lts
       changed_when: "'is already installed' not in install_base_packages_nvm_lts.stdout"
       failed_when:
         - install_base_packages_nvm_lts.rc != 0
         - "'already installed' not in install_base_packages_nvm_lts.stdout"
       environment:
-        PATH: "{{ install_base_packages_scoop_shims_path }}:{{ ansible_env.PATH }}"
+        # NOTE: We include the nvm directory in the PATH so it can find its own internal tools (like elevate.cmd)
+        PATH: "{{ install_base_packages_nvm_executable_path | dirname }}:{{ ansible_env.PATH }}"
 
-    - name: Fail if nvm shim is missing
+    - name: Fail if nvm is missing
       ansible.builtin.fail:
-        msg: "nvm.exe not found at {{ install_base_packages_scoop_shims_path }}/nvm.exe even after attempted repair. Please check your Scoop installation."
+        msg: "nvm.exe not found at {{ install_base_packages_nvm_executable_path }} even after attempted repair."
       when: not install_base_packages_nvm_exists
