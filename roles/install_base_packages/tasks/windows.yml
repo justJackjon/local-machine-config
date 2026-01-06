@@ -70,14 +70,20 @@
             - install_base_packages_scoop_install.rc != 0
             - "'already installed' not in install_base_packages_scoop_install.stdout"
 
+    - name: Remove conflicting system Node.js installation
+      ansible.builtin.win_file:
+        path: "C:\\Program Files\\nodejs"
+        state: absent
+      ignore_errors: true
+
     - name: Configure NVM root
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe root {{ install_base_packages_scoop_root }}/persist/nvm/nodejs"
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe root {{ install_base_packages_scoop_root }}/persist/nvm/versions"
       changed_when: false
 
     - name: Configure NVM symlink
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe symlink {{ install_base_packages_scoop_root }}/persist/nvm/nodejs/symlink"
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe symlink {{ install_base_packages_scoop_root }}/persist/nvm/nodejs"
       changed_when: false
 
     - name: Install Node.js LTS via NVM
