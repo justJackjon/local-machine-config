@@ -2,10 +2,10 @@
 # This is for users running an XFCE desktop environment inside WSL2.
 configure_keyboard_enable_windows_xfce_mode: true
 
-configure_keyboard_linux_kinto_config_path: "/home/{{ ansible_user_id }}/.config/kinto/kinto.py"
+configure_keyboard_linux_kinto_config_path: "/home/{{ ansible_facts.user_id }}/.config/kinto/kinto.py"
 # NOTE: The following path is an assumption based on common application behavior on Windows.
 #       The actual path will be determined by Kinto's setup.py and Python's installation location.
-configure_keyboard_windows_kinto_config_path: "{{ ansible_env.APPDATA }}\\kinto\\kinto.py"
+configure_keyboard_windows_kinto_config_path: "{{ ansible_facts.env.APPDATA }}\\kinto\\kinto.py"
 
 configure_keyboard_kinto_config_path: "{{ configure_keyboard_linux_kinto_config_path if not is_windows else configure_keyboard_windows_kinto_config_path }}"
 

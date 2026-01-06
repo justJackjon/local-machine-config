@@ -19,7 +19,7 @@
     path: /etc/security/limits.conf
     block: |
       # Increased for development environment
-      {{ ansible_user_id }} soft nofile {{ configure_system_max_open_files }}
-      {{ ansible_user_id }} hard nofile {{ configure_system_max_open_files }}
+      {{ ansible_facts.user_id }} soft nofile {{ configure_system_max_open_files }}
+      {{ ansible_facts.user_id }} hard nofile {{ configure_system_max_open_files }}
     marker: "# {mark} ANSIBLE MANAGED BLOCK for nofile limit"
     mode: '0644'

@@ -41,13 +41,13 @@
               keycode 51 = backslash bar
               keycode 94 = grave asciitilde
               keycode 108 = Mode_switch Mode_switch Mode_switch Mode_switch
-            dest: "/home/{{ ansible_user_id }}/.Xmodmap"
+            dest: "/home/{{ ansible_facts.user_id }}/.Xmodmap"
             mode: "0644"
           register: configure_keyboard_xmodmap_copy_result
 
         - name: Apply custom key mappings with xmodmap # noqa: no-handler
           when: configure_keyboard_xmodmap_copy_result.changed
-          ansible.builtin.command: xmodmap /home/{{ ansible_user_id }}/.Xmodmap
+          ansible.builtin.command: xmodmap /home/{{ ansible_facts.user_id }}/.Xmodmap
           changed_when: true
 
     - name: Configure General Keyboard Shortcuts
@@ -395,7 +395,7 @@
         - name: Remove files downloaded by Kinto install script on Linux
           when: ansible_facts.system == 'Linux'
           ansible.builtin.file:
-            path: "/home/{{ ansible_user_id }}/Downloads/{{ item }}"
+            path: "/home/{{ ansible_facts.user_id }}/Downloads/{{ item }}"
             state: absent
           loop:
             - kinto-master
