@@ -1,3 +1,26 @@
+- name: Get user's home directory path in POSIX format
+  when: is_windows
+  ansible.builtin.command:
+    cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
+  register: configure_git_win_home_dir
+  changed_when: false
+
+- name: Set git executable path (Windows)
+  when: is_windows
+  block:
+    - name: Check for Git in standard locations
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ configure_git_win_home_dir.stdout }}/scoop/shims/git.exe"
+        - "/c/PROGRA~1/Git/cmd/git.exe"
+        - "/c/PROGRA~1/Git/bin/git.exe"
+      register: configure_git_check
+
+    - name: Set git directory path fact
+      ansible.builtin.set_fact:
+        configure_git_bin_dir: "{{ (configure_git_check.results | selectattr('stat.exists') | map(attribute='item') | first | dirname) | default('/usr/bin') }}"
+
 - name: Configure Git
   ansible.builtin.include_tasks: ssh.yml
 
