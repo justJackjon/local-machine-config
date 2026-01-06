@@ -9,6 +9,22 @@
   ansible.builtin.set_fact:
     stow_dotfiles_repo_path: "{{ stow_dotfiles_win_home_dir.stdout | default('') if is_windows else ansible_facts.env.HOME }}/.dotfiles"
 
+- name: Set git executable path (Windows)
+  when: is_windows
+  block:
+    - name: Check for Git in standard locations
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ stow_dotfiles_win_home_dir.stdout }}/scoop/shims/git.exe"
+        - "C:/Program Files/Git/cmd/git.exe"
+        - "C:/Program Files/Git/bin/git.exe"
+      register: stow_dotfiles_git_check
+
+    - name: Set git executable path fact
+      ansible.builtin.set_fact:
+        stow_dotfiles_git_executable: "{{ (stow_dotfiles_git_check.results | selectattr('stat.exists') | map(attribute='item') | first) | default('git') }}"
+
 - name: Ensure .dotfiles directory exists
   ansible.builtin.file:
     path: "{{ stow_dotfiles_repo_path }}"
@@ -18,7 +34,7 @@
 - name: Check for local changes in .dotfiles repository # noqa: command-instead-of-module
   # NOTE: The ansible.builtin.git module does not support `git status --porcelain`,
   #       so we use `ansible.builtin.command` here.
-  ansible.builtin.command: git status --porcelain
+  ansible.builtin.command: "{{ stow_dotfiles_git_executable | default('git') }} status --porcelain"
   args:
     chdir: "{{ stow_dotfiles_repo_path }}"
   register: stow_dotfiles_git_status
@@ -33,7 +49,7 @@
   when: stow_dotfiles_is_dotfiles_repo_dirty
   block:
     - name: Get list of unmerged files # noqa: command-instead-of-module
-      ansible.builtin.command: git diff --name-only --diff-filter=U
+      ansible.builtin.command: "{{ stow_dotfiles_git_executable | default('git') }} diff --name-only --diff-filter=U"
       args:
         chdir: "{{ stow_dotfiles_repo_path }}"
       register: stow_dotfiles_unmerged_files
@@ -41,7 +57,7 @@
       failed_when: false
 
     - name: Reset unmerged files to resolve conflicts # noqa: command-instead-of-module
-      ansible.builtin.command: "git checkout HEAD -- {{ item }}"
+      ansible.builtin.command: "{{ stow_dotfiles_git_executable | default('git') }} checkout HEAD -- {{ item }}"
       args:
         chdir: "{{ stow_dotfiles_repo_path }}"
       with_items: "{{ stow_dotfiles_unmerged_files.stdout_lines }}"
@@ -51,7 +67,7 @@
     - name: Stash local changes # noqa: command-instead-of-module
       # NOTE: The ansible.builtin.git module does not support `git stash`,
       #       so we use `ansible.builtin.command` here.
-      ansible.builtin.command: git stash
+      ansible.builtin.command: "{{ stow_dotfiles_git_executable | default('git') }} stash"
       args:
         chdir: "{{ stow_dotfiles_repo_path }}"
       register: stow_dotfiles_git_stash
@@ -66,15 +82,11 @@
       }}
 
 - name: Clone or update .dotfiles repository
-  ansible.builtin.shell:
-    cmd: |
-      if [ -d .git ]; then
-        git pull
-      else
-        git clone "{{ stow_dotfiles_repo_url }}" .
-      fi
-    chdir: "{{ stow_dotfiles_repo_path }}"
-  changed_when: false
+  ansible.builtin.git:
+    repo: "{{ stow_dotfiles_repo_url }}"
+    dest: "{{ stow_dotfiles_repo_path }}"
+    version: main
+    executable: "{{ stow_dotfiles_git_executable | default(omit) }}"
 
 - name: Stow dotfiles with --adopt and restore git changes
   ansible.builtin.shell:
@@ -87,7 +99,7 @@
       #       in the .dotfiles repository, ensuring that the repository remains clean and
       #       reflects only the intended dotfiles from the origin.
       stow */ --adopt
-      git restore .
+      "{{ stow_dotfiles_git_executable | default('git') }}" restore .
   args:
     chdir: "{{ stow_dotfiles_repo_path }}"
   changed_when: true
@@ -95,7 +107,7 @@
 - name: Unstash local changes # noqa: command-instead-of-module
   # NOTE: The ansible.builtin.git module does not support `git stash pop`,
   #       so we use `ansible.builtin.command` here.
-  ansible.builtin.command: git stash pop
+  ansible.builtin.command: "{{ stow_dotfiles_git_executable | default('git') }} stash pop"
   args:
     chdir: "{{ stow_dotfiles_repo_path }}"
   when: stow_dotfiles_is_git_stash_successful
