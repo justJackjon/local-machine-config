@@ -1,0 +1,37 @@
+- name: Check if {{ scoop_package.name }} executable exists
+  ansible.builtin.stat:
+    path: "{{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"
+  register: scoop_package_check
+
+- name: Install {{ scoop_package.name }} via Scoop
+  when: not scoop_package_check.stat.exists
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} install {{ scoop_package.name }}"
+  register: scoop_package_install_result
+  changed_when: "'successfully' in scoop_package_install_result.stdout"
+  failed_when:
+    - scoop_package_install_result.rc != 0
+    - "'already installed' not in scoop_package_install_result.stdout"
+
+- name: Reset {{ scoop_package.name }} to fix shims
+  when:
+    - not scoop_package_check.stat.exists
+    # NOTE: nvm-windows is excluded from scoop reset because it does not use standard 
+    #       Scoop shims; it manages its own path and symlinks directly.
+    - scoop_package.name != 'nvm'
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} reset {{ scoop_package.name }}"
+  changed_when: false
+
+- name: Verify {{ scoop_package.name }} installation
+  when: not scoop_package_check.stat.exists
+  ansible.builtin.stat:
+    path: "{{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"
+  register: scoop_package_verify
+
+- name: Fail if {{ scoop_package.name }} is still missing
+  when:
+    - not scoop_package_check.stat.exists
+    - not scoop_package_verify.stat.exists
+  ansible.builtin.fail:
+    msg: "Failed to install {{ scoop_package.name }}. Executable not found at {{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"

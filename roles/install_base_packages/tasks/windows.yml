@@ -52,48 +52,33 @@
             install_base_packages_scoop_root: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop"
             install_base_packages_scoop_executable_path: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop/shims/scoop"
 
-        - name: Install packages with scoop
-          ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path }} install {{ item }}"
-          loop:
-            - nvm
-            - gh
-            - gnupg
-            - neovim
-            - lazygit
-            - alacritty
-            - cascadiacode-nf
-            - perl
-            - pnpm
-          register: install_base_packages_scoop_install
-          changed_when: "'successfully' in install_base_packages_scoop_install.stdout"
-          failed_when:
-            - install_base_packages_scoop_install.rc != 0
-            - "'already installed' not in install_base_packages_scoop_install.stdout"
-
-        - name: Reset scoop packages to ensure shims are created
-          ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path }} reset {{ item }}"
-          loop:
-            - gh
-            - gnupg
-            - neovim
-            - lazygit
-            - alacritty
-            - cascadiacode-nf
-            - perl
-            - pnpm
-          changed_when: false
-
-    - name: Get scoop root in Windows format
-      ansible.builtin.command:
-        cmd: cygpath -w "{{ install_base_packages_scoop_root }}"
-      register: install_base_packages_scoop_root_win_raw
-      changed_when: false
-
-    - name: Set scoop root backslash fact
+    - name: Define Scoop packages list
       ansible.builtin.set_fact:
-        install_base_packages_scoop_root_win: "{{ install_base_packages_scoop_root_win_raw.stdout | trim }}"
+        install_base_packages_scoop_list:
+          - name: nvm
+            check: "apps/nvm/current/nvm.exe"
+          - name: gh
+            check: "shims/gh.exe"
+          - name: gnupg
+            check: "shims/gpg.exe"
+          - name: neovim
+            check: "shims/nvim.exe"
+          - name: lazygit
+            check: "shims/lazygit.exe"
+          - name: alacritty
+            check: "shims/alacritty.exe"
+          - name: cascadiacode-nf
+            check: "apps/cascadiacode-nf/current"
+          - name: perl
+            check: "shims/perl.exe"
+          - name: pnpm
+            check: "shims/pnpm.exe"
+
+    - name: Process Scoop packages
+      ansible.builtin.include_tasks: ../../../common/tasks/install_scoop_package.yml
+      loop: "{{ install_base_packages_scoop_list }}"
+      loop_control:
+        loop_var: scoop_package
 
     - name: Prepend NVM symlink to User PATH
       ansible.builtin.command:
