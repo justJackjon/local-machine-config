@@ -50,7 +50,7 @@
           ansible.builtin.set_fact:
             install_base_packages_win_home_posix: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}"
             install_base_packages_scoop_root: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop"
-            install_base_packages_scoop_executable_path: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop/shims/scoop"
+            install_base_packages_scoop_executable_path: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop/shims/scoop.cmd"
 
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
