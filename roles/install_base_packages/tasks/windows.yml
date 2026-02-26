@@ -80,7 +80,7 @@
           - name: perl
             check: "apps/perl/current/perl/bin/perl.exe"
           - name: pnpm
-            check: "shims/pnpm.exe"
+            check: "../AppData/Local/pnpm/pnpm"
 
     - name: Process Scoop packages
       ansible.builtin.include_tasks: ../../../common/tasks/install_scoop_package.yml
@@ -229,7 +229,7 @@
         #       pnpm executable on the first run (as the PATH is not updated).
         - name: Install pnpm packages
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_executable_path | dirname }}/pnpm.exe add -g {{ item }}"
+            cmd: "{{ install_base_packages_pnpm_home_path }}/pnpm add -g {{ item }}"
           with_items:
             - tree-sitter-cli
             - neovim
