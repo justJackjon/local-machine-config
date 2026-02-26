@@ -13,6 +13,8 @@
           - mingw-w64-x86_64-python-pip
           - mingw-w64-x86_64-python-pipx
           - mingw-w64-x86_64-python-setuptools
+          - mingw-w64-x86_64-python-argcomplete
+          - mingw-w64-x86_64-python-packaging
           - mingw-w64-x86_64-toolchain
           - mingw-w64-x86_64-rust
           - mingw-w64-x86_64-maturin
