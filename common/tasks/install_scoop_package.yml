@@ -16,7 +16,7 @@
 - name: Reset {{ scoop_package.name }} to fix shims
   when:
     - not scoop_package_check.stat.exists
-    # NOTE: nvm-windows is excluded from scoop reset because it does not use standard 
+    # NOTE: nvm-windows is excluded from scoop reset because it does not use standard
     #       Scoop shims; it manages its own path and symlinks directly.
     - scoop_package.name != 'nvm'
   ansible.builtin.command:

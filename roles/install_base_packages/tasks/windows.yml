@@ -52,6 +52,11 @@
             install_base_packages_scoop_root: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop"
             install_base_packages_scoop_executable_path: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop/shims/scoop.cmd"
 
+    - name: Remove conflicting system Node.js installation
+      ansible.builtin.command:
+        cmd: powershell.exe -Command "Remove-Item -Path 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue"
+      changed_when: false
+
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
         install_base_packages_scoop_list:
@@ -60,7 +65,7 @@
           - name: gh
             check: "shims/gh.exe"
           - name: gnupg
-            check: "shims/gpg.exe"
+            check: "apps/gnupg/current/bin/gpg.exe"
           - name: neovim
             check: "shims/nvim.exe"
           - name: lazygit
