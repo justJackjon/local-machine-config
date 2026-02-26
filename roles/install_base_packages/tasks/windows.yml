@@ -26,17 +26,13 @@
           - mingw-w64-x86_64-lua-luarocks
           - mingw-w64-x86_64-imagemagick
           - mingw-w64-x86_64-sqlite3
+          - mingw-w64-x86_64-tldr
           - bash-completion
           - stow
           - tree
           - openssh
         state: latest
         update_cache: true
-
-    - name: Install tldr (python client) on Windows
-      ansible.builtin.pip:
-        name: tldr
-        state: present
 
     - name: Install Scoop packages
       block:
