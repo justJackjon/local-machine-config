@@ -21,7 +21,7 @@
 
     - name: Set pnpm executable fact
       ansible.builtin.set_fact:
-        configure_mcp_pnpm_executable: "{{ configure_mcp_win_home_dir.stdout }}/scoop/shims/pnpm.exe"
+        configure_mcp_pnpm_executable: "{{ configure_mcp_win_home_dir.stdout }}/AppData/Local/pnpm/pnpm"
         configure_mcp_nodejs_path: "{{ configure_mcp_win_home_dir.stdout }}/scoop/persist/nvm/nodejs/nodejs"
 
 - name: Configure MCP servers (JSON)
