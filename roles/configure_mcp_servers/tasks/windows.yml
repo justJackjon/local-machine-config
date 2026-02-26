@@ -1,6 +1,6 @@
 - name: Install Semgrep (Windows)
   ansible.builtin.command:
-    cmd: "{{ venv_path }}/bin/pipx install semgrep"
+    cmd: /mingw64/bin/pipx.exe install semgrep
   register: configure_mcp_servers_semgrep_install
   changed_when: "'installed package' in configure_mcp_servers_semgrep_install.stdout"
   failed_when:
@@ -10,5 +10,5 @@
 
 - name: Ensure pipx binary directory is in PATH
   ansible.builtin.command:
-    cmd: "{{ venv_path }}/bin/pipx ensurepath"
+    cmd: /mingw64/bin/pipx.exe ensurepath
   changed_when: false
