@@ -78,7 +78,7 @@
           - name: cascadiacode-nf
             check: "apps/cascadiacode-nf/current"
           - name: perl
-            check: "shims/perl.exe"
+            check: "apps/perl/current/perl/bin/perl.exe"
           - name: pnpm
             check: "shims/pnpm.exe"
 
