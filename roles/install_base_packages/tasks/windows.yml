@@ -33,6 +33,7 @@
           - openssh
         state: latest
         update_cache: true
+        extra_args: --overwrite "*"
 
     - name: Install Scoop packages
       block:
