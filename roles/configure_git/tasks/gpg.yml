@@ -1,3 +1,13 @@
+- name: Clear stale GPG locks
+  ansible.builtin.shell: |
+    gpgconf --kill all || true
+    rm -f ~/.gnupg/public-keys.d/*.lock || true
+    rm -f ~/.gnupg/public-keys.d/.#* || true
+    rm -f ~/.gnupg/.#* || true
+  args:
+    executable: /bin/bash
+  changed_when: false
+
 - name: Check for existing GPG secret key
   ansible.builtin.shell: |
     set -o pipefail
