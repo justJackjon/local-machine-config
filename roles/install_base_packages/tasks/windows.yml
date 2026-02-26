@@ -52,7 +52,13 @@
     - name: Remove conflicting system Node.js installation
       ansible.builtin.command:
         cmd: powershell.exe -Command "Remove-Item -Path 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue"
+      register: install_base_packages_remove_node_result
+      failed_when: false
       changed_when: false
+
+    - name: Set fact if Node.js removal failed
+      ansible.builtin.set_fact:
+        install_base_packages_node_removal_failed: "{{ install_base_packages_remove_node_result.rc != 0 }}"
 
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
