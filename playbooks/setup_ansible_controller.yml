@@ -78,6 +78,16 @@
           - "- Installing global pnpm packages (tree-sitter-cli, neovim)"
           - " {% if autohotkey_install_failed_due_to_permissions | default(false) %}- Installing AutoHotkey v1.1{% endif %}"
 
+    - name: Display warning for manual Node.js cleanup on Windows
+      ansible.builtin.debug:
+        msg:
+          - "WARNING: A conflicting system Node.js installation was found at 'C:\\Program Files\\nodejs' but could not be removed automatically."
+          - "This may cause conflicts with the NVM-managed Node.js installation."
+          - "Please manually remove this directory if you experience issues with Node.js versions."
+      when:
+        - is_windows
+        - install_base_packages_node_removal_failed | default(false)
+
     - name: Display MCP Server Configuration Report
       ansible.builtin.debug:
         msg:
