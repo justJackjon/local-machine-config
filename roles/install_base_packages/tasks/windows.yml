@@ -65,27 +65,44 @@
       ansible.builtin.set_fact:
         install_base_packages_node_removal_failed: "{{ install_base_packages_remove_node_result.rc != 0 }}"
 
+    - name: Ensure required Scoop buckets are added
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} bucket add {{ item }}"
+      loop:
+        - main
+        - extras
+      register: scoop_bucket_add
+      failed_when:
+        - scoop_bucket_add.rc != 0
+        - "'already added' not in scoop_bucket_add.stdout"
+      changed_when: "'Successfully added' in scoop_bucket_add.stdout"
+
+    - name: Update Scoop and buckets
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} update"
+      changed_when: false
+      ignore_errors: true
+
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
         install_base_packages_scoop_list:
           - name: nvm
-            check: "apps/nvm/current/nvm.exe"
+            executable_name: nvm
           - name: gh
-            check: "shims/gh.exe"
+            executable_name: gh
           - name: gnupg
-            check: "apps/gnupg/current/bin/gpg.exe"
+            executable_name: gpg
           - name: neovim
-            check: "shims/nvim.exe"
+            executable_name: nvim
           - name: lazygit
-            check: "shims/lazygit.exe"
+            executable_name: lazygit
           - name: alacritty
-            check: "shims/alacritty.exe"
+            executable_name: alacritty
           - name: cascadiacode-nf
-            check: "apps/cascadiacode-nf/current"
           - name: perl
-            check: "apps/perl/current/perl/bin/perl.exe"
+            executable_name: perl
           - name: pnpm
-            check: "../AppData/Local/pnpm/pnpm"
+            executable_name: pnpm
 
     - name: Process Scoop packages
       ansible.builtin.include_tasks: ../../../common/tasks/install_scoop_package.yml
