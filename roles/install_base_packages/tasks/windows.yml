@@ -64,11 +64,16 @@
           register: install_base_packages_win_temp_native_raw
           changed_when: false
 
+        - name: Get Windows-native SYSTEMROOT
+          ansible.builtin.shell: cygpath -w "$SYSTEMROOT"
+          register: install_base_packages_win_systemroot_raw
+          changed_when: false
+
         - name: Set Windows-native environment facts
           ansible.builtin.set_fact:
             install_base_packages_win_path_native: "{{ install_base_packages_win_path_native_raw.stdout | trim }}"
             install_base_packages_win_temp_native: "{{ install_base_packages_win_temp_native_raw.stdout | trim }}"
-            install_base_packages_win_systemroot: "{{ ansible_facts['env']['SystemRoot'] if ':\\' in ansible_facts['env']['SystemRoot'] | default('') else 'C:\\Windows' }}"
+            install_base_packages_win_systemroot: "{{ install_base_packages_win_systemroot_raw.stdout | trim }}"
 
     - name: Remove conflicting system Node.js installation
       ansible.builtin.command:
