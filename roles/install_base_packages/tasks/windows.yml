@@ -215,48 +215,23 @@
         - install_base_packages_pipx_shared_venv_cfg.stat.exists
         - install_base_packages_pipx_shared_is_mingw.rc != 0
 
-    - name: Set Windows-specific paths
-      ansible.builtin.set_fact:
-        install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/AppData/Local/pnpm"
-
-    - name: Get pnpm home path in Windows format
+    - name: Get pnpm executable path from Scoop
       ansible.builtin.command:
-        cmd: cygpath -w "{{ install_base_packages_pnpm_home_path }}"
-      register: install_base_packages_pnpm_home_win_raw
+        cmd: "{{ install_base_packages_scoop_executable_path }} which pnpm"
+      register: pnpm_executable_path_raw
       changed_when: false
 
-    - name: Set pnpm home Windows path fact
+    - name: Set pnpm executable path fact
       ansible.builtin.set_fact:
-        install_base_packages_pnpm_home_win: "{{ install_base_packages_pnpm_home_win_raw.stdout | trim }}"
+        install_base_packages_pnpm_executable_path: "{{ pnpm_executable_path_raw.stdout | trim }}"
 
     - name: Install pnpm packages
-      block:
-        - name: Ensure pnpm home directory exists
-          ansible.builtin.file:
-            path: "{{ install_base_packages_pnpm_home_path }}"
-            state: directory
-
-        - name: Persist PNPM_HOME environment variable and PATH
-          ansible.builtin.command:
-            cmd: >
-              powershell.exe -Command "
-              [Environment]::SetEnvironmentVariable('PNPM_HOME', '{{ install_base_packages_pnpm_home_win }}', 'User');
-              $CurrentPath = [Environment]::GetEnvironmentVariable('Path', 'User');
-              if ($CurrentPath -notlike '*%PNPM_HOME%*') {
-                [Environment]::SetEnvironmentVariable('Path', '%PNPM_HOME%;' + $CurrentPath, 'User');
-              }"
-          changed_when: false
-
-        # NOTE: We use the shell module here because the pnpm module fails to find the
-        #       pnpm executable on the first run (as the PATH is not updated).
-        - name: Install pnpm packages
-          ansible.builtin.command:
-            cmd: "{{ install_base_packages_pnpm_home_path }}/pnpm add -g {{ item }}"
-          with_items:
-            - tree-sitter-cli
-            - neovim
-          changed_when: false
-          environment:
-            PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
-            PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_facts.env.PATH }}"
+      # NOTE: We use the absolute path to the pnpm executable obtained from `scoop which`
+      #       to ensure we are using the correct, Scoop-managed binary.
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
+      with_items:
+        - tree-sitter-cli
+        - neovim
+      changed_when: false
 
