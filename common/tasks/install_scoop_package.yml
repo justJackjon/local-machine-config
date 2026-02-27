@@ -7,6 +7,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
 
 - name: Determine if {{ scoop_package.name }} is actually healthy
   ansible.builtin.set_fact:
@@ -23,6 +26,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
   when:
     - install_scoop_package_is_registered
     - not install_scoop_package_is_failed
@@ -47,6 +53,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
 
 - name: Re-verify {{ scoop_package.name }} after soft repair
   ansible.builtin.command:
@@ -57,6 +66,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
   when:
     - scoop_package.executable_name is defined
     - install_scoop_package_reset_result is defined and not install_scoop_package_reset_result.skipped
@@ -85,6 +97,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
 
 - name: Install {{ scoop_package.name }} via Scoop
   when: install_scoop_package_needs_install
@@ -98,6 +113,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
 
 - name: Final verification for {{ scoop_package.name }}
   ansible.builtin.command:
@@ -109,6 +127,9 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+    PATH: "{{ ansible_facts['env']['PATH'] }}"
   # NOTE: We must check stdout for common failure keywords because scoop can return a zero
   #       exit code even when it prints a failure warning to stdout.
   failed_when: >-
