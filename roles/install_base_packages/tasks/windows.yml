@@ -54,27 +54,6 @@
             install_base_packages_scoop_root_win: "{{ ansible_facts['env']['USERPROFILE'] }}\\scoop"
             install_base_packages_scoop_executable_path: "{{ install_base_packages_win_home_posix_raw.stdout | trim }}/scoop/shims/scoop.cmd"
 
-        - name: Get Windows-native PATH
-          ansible.builtin.shell: cygpath -wp "$PATH"
-          register: install_base_packages_win_path_native_raw
-          changed_when: false
-
-        - name: Get Windows-native TEMP directory
-          ansible.builtin.shell: cygpath -w "$TEMP"
-          register: install_base_packages_win_temp_native_raw
-          changed_when: false
-
-        - name: Get Windows-native SYSTEMROOT
-          ansible.builtin.shell: cygpath -w "$SYSTEMROOT"
-          register: install_base_packages_win_systemroot_raw
-          changed_when: false
-
-        - name: Set Windows-native environment facts
-          ansible.builtin.set_fact:
-            install_base_packages_win_path_native: "{{ install_base_packages_win_path_native_raw.stdout | trim }}"
-            install_base_packages_win_temp_native: "{{ install_base_packages_win_temp_native_raw.stdout | trim }}"
-            install_base_packages_win_systemroot: "{{ install_base_packages_win_systemroot_raw.stdout | trim }}"
-
     - name: Remove conflicting system Node.js installation
       ansible.builtin.command:
         cmd: powershell.exe -Command "Remove-Item -Path 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue"
@@ -244,12 +223,6 @@
       environment:
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
         USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-        SystemRoot: "{{ install_base_packages_win_systemroot }}"
-        SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
-        WinDir: "{{ install_base_packages_win_systemroot }}"
-        TEMP: "{{ install_base_packages_win_temp_native }}"
-        TMP: "{{ install_base_packages_win_temp_native }}"
-        PATH: "{{ install_base_packages_win_path_native }}"
       failed_when: >-
         pnpm_executable_path_raw.rc != 0 or
         'WARN' in pnpm_executable_path_raw.stdout or
