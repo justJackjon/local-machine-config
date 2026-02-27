@@ -7,12 +7,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
 
 - name: Determine if {{ scoop_package.name }} is actually healthy
   ansible.builtin.set_fact:
@@ -29,12 +29,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
   when:
     - install_scoop_package_is_registered
     - not install_scoop_package_is_failed
@@ -59,12 +59,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
 
 - name: Re-verify {{ scoop_package.name }} after soft repair
   ansible.builtin.command:
@@ -75,12 +75,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
   when:
     - scoop_package.executable_name is defined
     - install_scoop_package_reset_result is defined and not install_scoop_package_reset_result.skipped
@@ -109,12 +109,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
 
 - name: Install {{ scoop_package.name }} via Scoop
   when: install_scoop_package_needs_install
@@ -128,12 +128,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
 
 - name: Final verification for {{ scoop_package.name }}
   ansible.builtin.command:
@@ -145,12 +145,12 @@
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-    SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
-    SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
-    WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
-    TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
-    TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
-    PATH: "{{ ansible_facts['env']['PATH'] }}"
+    SystemRoot: "{{ install_base_packages_win_systemroot }}"
+    SystemDrive: "{{ install_base_packages_win_systemroot[:2] }}"
+    WinDir: "{{ install_base_packages_win_systemroot }}"
+    TEMP: "{{ install_base_packages_win_temp_native }}"
+    TMP: "{{ install_base_packages_win_temp_native }}"
+    PATH: "{{ install_base_packages_win_path_native }}"
   # NOTE: We must check stdout for common failure keywords because scoop can return a zero
   #       exit code even when it prints a failure warning to stdout.
   failed_when: >-
