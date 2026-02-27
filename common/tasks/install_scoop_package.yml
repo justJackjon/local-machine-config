@@ -3,6 +3,14 @@
     path: "{{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"
   register: scoop_package_check
 
+- name: Purge broken {{ scoop_package.name }} installation
+  when: not scoop_package_check.stat.exists
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} uninstall {{ scoop_package.name }}"
+  register: scoop_package_purge_result
+  failed_when: false
+  changed_when: "'uninstalled' in scoop_package_purge_result.stdout"
+
 - name: Install {{ scoop_package.name }} via Scoop
   when: not scoop_package_check.stat.exists
   ansible.builtin.command:
