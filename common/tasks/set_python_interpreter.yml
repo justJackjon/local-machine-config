@@ -82,7 +82,7 @@
 
     - name: Bootstrap pip in venv (Windows)
       ansible.builtin.command:
-        cmd: "{{ venv_path }}/bin/python -m ensurepip"
+        cmd: "{{ venv_path }}/bin/python -m ensurepip --upgrade --default-pip"
       changed_when: false
       when: use_mingw_python
 
