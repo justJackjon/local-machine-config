@@ -220,6 +220,10 @@
         cmd: "{{ install_base_packages_scoop_executable_path }} which pnpm"
       register: pnpm_executable_path_raw
       changed_when: false
+      failed_when:
+        - pnpm_executable_path_raw.rc != 0
+        - "'WARN' in pnpm_executable_path_raw.stdout"
+        - "'not found' in pnpm_executable_path_raw.stdout"
 
     - name: Set pnpm executable path fact
       ansible.builtin.set_fact:

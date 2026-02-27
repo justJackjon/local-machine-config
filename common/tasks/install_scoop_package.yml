@@ -81,5 +81,10 @@
       {{ 'which ' ~ scoop_package.executable_name if scoop_package.executable_name is defined else 'prefix ' ~ scoop_package.name }}
   register: install_scoop_package_final_verify
   changed_when: false
-  # NOTE: Capture the error message to help the user if verification still fails
-  failed_when: install_scoop_package_final_verify.rc != 0
+  # NOTE: We must check stdout for common failure keywords because scoop can return a zero
+  #       exit code even when it prints a failure warning to stdout.
+  failed_when:
+    - install_scoop_package_final_verify.rc != 0
+    - "'WARN' in install_scoop_package_final_verify.stdout"
+    - "'not found' in install_scoop_package_final_verify.stdout"
+    - "'Could not find' in install_scoop_package_final_verify.stdout"
