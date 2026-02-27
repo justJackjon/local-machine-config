@@ -224,7 +224,10 @@
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
         USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
         SystemRoot: "{{ ansible_facts['env']['SystemRoot'] | default('C:\\Windows') }}"
+        SystemDrive: "{{ ansible_facts['env']['SystemDrive'] | default('C:') }}"
         WinDir: "{{ ansible_facts['env']['WinDir'] | default('C:\\Windows') }}"
+        TEMP: "{{ ansible_facts['env']['TEMP'] | default('C:\\Windows\\Temp') }}"
+        TMP: "{{ ansible_facts['env']['TMP'] | default('C:\\Windows\\Temp') }}"
         PATH: "{{ ansible_facts['env']['PATH'] }}"
       failed_when: >-
         pnpm_executable_path_raw.rc != 0 or
