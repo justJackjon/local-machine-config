@@ -1,85 +1,85 @@
 - name: Check exact Scoop installation status for {{ scoop_package.name }}
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} list {{ scoop_package.name }}"
-  register: scoop_package_status_raw
+  register: install_scoop_package_status_raw
   changed_when: false
   failed_when: false
 
 - name: Determine if {{ scoop_package.name }} is actually healthy
   ansible.builtin.set_fact:
     # NOTE: An app is 'installed' only if it appears in the list AND is NOT marked as 'Install failed'
-    scoop_package_is_registered: "{{ scoop_package.name in scoop_package_status_raw.stdout }}"
-    scoop_package_is_failed: "{{ 'Install failed' in scoop_package_status_raw.stdout }}"
+    install_scoop_package_is_registered: "{{ scoop_package.name in install_scoop_package_status_raw.stdout }}"
+    install_scoop_package_is_failed: "{{ 'Install failed' in install_scoop_package_status_raw.stdout }}"
 
 - name: Check if {{ scoop_package.name }} shim/binary is working
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} which {{ scoop_package.executable_name }}"
-  register: scoop_package_which_check
+  register: install_scoop_package_which_check
   changed_when: false
   failed_when: false
   when:
-    - scoop_package_is_registered
-    - not scoop_package_is_failed
+    - install_scoop_package_is_registered
+    - not install_scoop_package_is_failed
     - scoop_package.executable_name is defined
 
 - name: Attempt soft repair of {{ scoop_package.name }} via 'scoop reset'
   when:
-    - scoop_package_is_registered
-    - not scoop_package_is_failed
+    - install_scoop_package_is_registered
+    - not install_scoop_package_is_failed
     - scoop_package.executable_name is defined
-    - scoop_package_which_check.rc != 0
+    - install_scoop_package_which_check.rc != 0
     # NOTE: nvm-windows is excluded from scoop reset because it does not use standard
     #       Scoop shims; it manages its own path and symlinks directly.
     - scoop_package.name != 'nvm'
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} reset {{ scoop_package.name }}"
   changed_when: true
-  register: scoop_package_reset_result
+  register: install_scoop_package_reset_result
 
 - name: Re-verify {{ scoop_package.name }} after soft repair
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} which {{ scoop_package.executable_name }}"
-  register: scoop_package_which_reverify
+  register: install_scoop_package_which_reverify
   changed_when: false
   failed_when: false
   when:
     - scoop_package.executable_name is defined
-    - scoop_package_reset_result is defined and not scoop_package_reset_result.skipped
+    - install_scoop_package_reset_result is defined and not install_scoop_package_reset_result.skipped
 
 - name: Determine if {{ scoop_package.name }} requires full installation
   ansible.builtin.set_fact:
-    scoop_package_needs_install: >-
+    install_scoop_package_needs_install: >-
       {{
-        (not scoop_package_is_registered) or
-        (scoop_package_is_failed) or
+        (not install_scoop_package_is_registered) or
+        (install_scoop_package_is_failed) or
         (scoop_package.executable_name is defined and
-          (scoop_package_which_check.rc != 0 and (scoop_package_which_reverify.rc | default(1)) != 0))
+          (install_scoop_package_which_check.rc != 0 and (install_scoop_package_which_reverify.rc | default(1)) != 0))
       }}
 
 - name: Purge broken {{ scoop_package.name }} before re-install
   when:
-    - scoop_package_needs_install
-    - scoop_package_is_registered or scoop_package_is_failed
+    - install_scoop_package_needs_install
+    - install_scoop_package_is_registered or install_scoop_package_is_failed
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} uninstall {{ scoop_package.name }}"
   changed_when: true
 
 - name: Install {{ scoop_package.name }} via Scoop
-  when: scoop_package_needs_install
+  when: install_scoop_package_needs_install
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} install {{ scoop_package.name }}"
-  register: scoop_package_install_result
-  changed_when: "'successfully' in scoop_package_install_result.stdout"
+  register: install_scoop_package_install_result
+  changed_when: "'successfully' in install_scoop_package_install_result.stdout"
   failed_when:
-    - scoop_package_install_result.rc != 0
-    - "'already installed' not in scoop_package_install_result.stdout"
+    - install_scoop_package_install_result.rc != 0
+    - "'already installed' not in install_scoop_package_install_result.stdout"
 
 - name: Final verification for {{ scoop_package.name }}
   ansible.builtin.command:
     cmd: >-
       {{ install_base_packages_scoop_executable_path }}
       {{ 'which ' ~ scoop_package.executable_name if scoop_package.executable_name is defined else 'prefix ' ~ scoop_package.name }}
-  register: scoop_package_final_verify
+  register: install_scoop_package_final_verify
   changed_when: false
   # NOTE: Capture the error message to help the user if verification still fails
-  failed_when: scoop_package_final_verify.rc != 0
+  failed_when: install_scoop_package_final_verify.rc != 0
