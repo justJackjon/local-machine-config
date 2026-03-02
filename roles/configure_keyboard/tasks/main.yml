@@ -71,8 +71,10 @@
           ansible.builtin.command:
             argv:
               - xfconf-query
-              - --channel=xfce4-keyboard-shortcuts
-              - --property="/xfwm4/custom/<Primary>Tab"
+              - --channel
+              - xfce4-keyboard-shortcuts
+              - --property
+              - "/xfwm4/custom/<Primary>Tab"
               - --create
               - --type
               - string
@@ -98,8 +100,10 @@
           ansible.builtin.command:
             argv:
               - xfconf-query
-              - --channel=xfce4-keyboard-shortcuts
-              - --property="/xfwm4/custom/<Primary><Shift>Tab"
+              - --channel
+              - xfce4-keyboard-shortcuts
+              - --property
+              - "/xfwm4/custom/<Primary><Shift>Tab"
               - --create
               - --type
               - string
@@ -125,8 +129,10 @@
           ansible.builtin.command:
             argv:
               - xfconf-query
-              - --channel=xfce4-keyboard-shortcuts
-              - --property="/commands/custom/<Super>l"
+              - --channel
+              - xfce4-keyboard-shortcuts
+              - --property
+              - "/commands/custom/<Super>l"
               - --reset
           changed_when: true # Assume change if property existed and was reset
 
@@ -148,8 +154,10 @@
           ansible.builtin.command:
             argv:
               - xfconf-query
-              - --channel=xfce4-keyboard-shortcuts
-              - --property="/commands/custom/<Primary><Alt>q"
+              - --channel
+              - xfce4-keyboard-shortcuts
+              - --property
+              - "/commands/custom/<Primary><Alt>q"
               - --create
               - --type
               - string
