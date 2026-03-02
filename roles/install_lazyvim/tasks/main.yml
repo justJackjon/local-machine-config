@@ -180,6 +180,8 @@
       environment:
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
         USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
+        PATH: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm:{{ ansible_facts.env.PATH }}"
 
     - name: Define Neovim config paths to backup (Debian/MacOS)
       when: is_debian_family or is_mac
