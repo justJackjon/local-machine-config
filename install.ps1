@@ -65,11 +65,12 @@ function Install-Dependencies {
       }
 
       # NOTE: Install Scoop using the most compatible method available (Invoke-RestMethod with WebClient fallback).
+      # NOTE: Use Out-Host to ensure output goes to console and is not captured by function return.
       if (Get-Command Invoke-RestMethod -ErrorAction SilentlyContinue) {
-        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression | Out-Host
       } else {
         $webClient = New-Object System.Net.WebClient
-        Invoke-Expression $webClient.DownloadString('https://get.scoop.sh')
+        Invoke-Expression $webClient.DownloadString('https://get.scoop.sh') | Out-Host
       }
 
       $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
@@ -89,7 +90,7 @@ function Install-Dependencies {
 
     if (-not $msys2Installed) {
       Write-Info "Installing MSYS2 via Scoop..."
-      scoop install msys2
+      scoop install msys2 | Out-Host
     } else {
       Write-Host "MSYS2 is already installed."
     }
@@ -104,16 +105,16 @@ function Install-Dependencies {
 
     # NOTE: Perform an MSYS2 initialization "warm-up" to trigger post-install scripts.
     Write-Info "Performing MSYS2 initialization (this may take a moment)..."
-    & $msys2Shell -lc "echo 'MSYS2 shell initialized'"
+    & $msys2Shell -lc "echo 'MSYS2 shell initialized'" | Out-Host
     
     # NOTE: Sometimes MSYS2 requires a brief delay or multiple shell invocations 
     #       to finish populating the user's home directory.
     Start-Sleep -Seconds 2
-    & $msys2Shell -lc "echo 'Environment check: ' && whoami && pwd"
+    & $msys2Shell -lc "echo 'Environment check: ' && whoami && pwd" | Out-Host
 
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
       Write-Info "Installing Git for Windows via Scoop..."
-      scoop install git
+      scoop install git | Out-Host
       if ($env:PATH -notlike "*\scoop\shims*") {
         $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
       }
@@ -126,20 +127,20 @@ function Install-Dependencies {
 
     if (-not $ansibleCheck) {
       Write-Info "Installing Ansible in MSYS2..."
-      & $msys2Shell -lc "pacman -Syu --noconfirm"
-      & $msys2Shell -lc "pacman -S --noconfirm base-devel ansible"
+      & $msys2Shell -lc "pacman -Syu --noconfirm" | Out-Host
+      & $msys2Shell -lc "pacman -S --noconfirm base-devel ansible" | Out-Host
     } else {
       Write-Host "Ansible is already installed in MSYS2."
     }
 
     Write-Info "Installing Ansible collections..."
-    & $msys2Shell -lc "ansible-galaxy collection install community.general ansible.windows community.crypto community.windows"
+    & $msys2Shell -lc "ansible-galaxy collection install community.general ansible.windows community.crypto community.windows" | Out-Host
 
     $ghCheck = & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && which gh 2>/dev/null"
 
     if (-not $ghCheck) {
       Write-Info "Installing GitHub CLI in MSYS2..."
-      & $msys2Shell -lc "pacman -S --noconfirm mingw-w64-x86_64-github-cli"
+      & $msys2Shell -lc "pacman -S --noconfirm mingw-w64-x86_64-github-cli" | Out-Host
 
       if ($LASTEXITCODE -ne 0) {
         Write-ErrorMsg "Failed to install GitHub CLI."
@@ -147,7 +148,7 @@ function Install-Dependencies {
     }
 
     Write-Info "Authenticating gh CLI (user interaction required)..."
-    & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key"
+    & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key" | Out-Host
 
     if ($LASTEXITCODE -eq 0) {
       Write-Info "gh CLI authentication complete."
