@@ -10,9 +10,10 @@
 
 - name: Determine if {{ scoop_package.name }} is actually healthy
   ansible.builtin.set_fact:
-    # NOTE: An app is 'installed' only if it appears in the list AND is NOT marked as 'Install failed'
-    install_scoop_package_is_registered: "{{ scoop_package.name in install_scoop_package_status_raw.stdout }}"
-    install_scoop_package_is_failed: "{{ 'Install failed' in install_scoop_package_status_raw.stdout }}"
+    # NOTE: We use regex to ensure the app name appears at the start of a line in the list table,
+    #       preventing false positives from the 'Installed apps matching...' header.
+    install_scoop_package_is_registered: "{{ install_scoop_package_status_raw.stdout is search('(?m)^' ~ scoop_package.name ~ '\\s+') }}"
+    install_scoop_package_is_failed: "{{ install_scoop_package_status_raw.stdout is search('(?m)^' ~ scoop_package.name ~ '\\s+.*Install failed') }}"
 
 - name: Check if {{ scoop_package.name }} shim/binary is working
   ansible.builtin.command:
@@ -59,7 +60,7 @@
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
   when:
     - scoop_package.executable_name is defined
-    - install_scoop_package_reset_result is defined and not install_scoop_package_reset_result.skipped
+    - install_scoop_package_reset_result is defined and install_scoop_package_reset_result is not skipped
 
 - name: Determine if {{ scoop_package.name }} requires full installation
   ansible.builtin.set_fact:
