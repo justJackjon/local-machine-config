@@ -67,7 +67,7 @@ if [ "$os" == "Linux" ]; then
   "$HOME/.local/bin/ansible-galaxy" collection install community.general ansible.windows community.crypto community.windows
 
   info "Killing any running Chrome processes to ensure a clean browser session for authentication..."
-  pkill -f "chrome" || true
+  pkill -f "[c]hrome" || true
 
   info "Authenticating gh CLI (user interaction required)..."
   # NOTE: Check gh version for conditional flags
