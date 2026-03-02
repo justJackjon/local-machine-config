@@ -12,8 +12,20 @@
 
 - name: Set pnpm executable path (Linux)
   when: is_debian_family
-  ansible.builtin.set_fact:
-    configure_mcp_pnpm_executable: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+  block:
+    - name: Set pnpm executable path fact (Linux)
+      ansible.builtin.set_fact:
+        configure_mcp_pnpm_executable: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+
+    - name: Find NVM Node bin directory (Linux)
+      ansible.builtin.shell: |
+        find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" | head -n 1
+      register: configure_mcp_nvm_node_bin_raw
+      changed_when: false
+
+    - name: Set NVM Node bin fact (Linux)
+      ansible.builtin.set_fact:
+        configure_mcp_nvm_node_bin: "{{ configure_mcp_nvm_node_bin_raw.stdout | trim }}"
 
 - name: Set pnpm executable path (Windows)
   when: is_windows
