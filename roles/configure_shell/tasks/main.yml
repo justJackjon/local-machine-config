@@ -85,11 +85,18 @@
         create: true
         mode: "0644"
 
+    - name: Clean up old hardcoded argcomplete hook for Windows (MSYS2)
+      when: is_windows
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_facts.env.HOME }}/.bashrc"
+        line: "source /mingw64/lib/python3.12/site-packages/argcomplete/bash_completion.d/_python-argcomplete"
+        state: absent
+
     - name: Manually create global argcomplete hook for Windows (MSYS2)
       when: is_windows
       ansible.builtin.lineinfile:
-        path: "{{ configure_shell_win_home_dir.stdout if is_windows else ansible_facts.env.HOME }}/.bashrc"
-        line: "source /mingw64/lib/python3.12/site-packages/argcomplete/bash_completion.d/_python-argcomplete"
+        path: "{{ ansible_facts.env.HOME }}/.bashrc"
+        line: "source /mingw64/lib/python{{ ansible_facts.python.version.major }}.{{ ansible_facts.python.version.minor }}/site-packages/argcomplete/bash_completion.d/_python-argcomplete"
         create: true
         mode: "0644"
 
