@@ -17,6 +17,7 @@
     bash -lc '{{ configure_mcp_servers_gemini_base }} extensions list'{%- endif %}
   environment:
     CI: "true"
+    GEMINI_API_KEY: "dummy"
     PATH: "{{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if is_windows and configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}"
   register: configure_mcp_servers_extension_list
   changed_when: false
@@ -29,6 +30,7 @@
     bash -lc '{{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update'{%- endif %}
   environment:
     CI: "true"
+    GEMINI_API_KEY: "dummy"
     PATH: "{{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if is_windows and configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}"
   register: configure_mcp_servers_install_result
   changed_when: "'Installing extension' in configure_mcp_servers_install_result.stdout"
