@@ -4,7 +4,7 @@
 # Function to print messages
 function Write-Info {
   param([string]$Message)
-  Write-Host "`e[0;35mINFO: $Message`e[0m"
+  Write-Host "INFO: $Message" -ForegroundColor Magenta
 }
 
 # Function to print error messages
@@ -13,7 +13,7 @@ function Write-ErrorMsg {
     [string]$Message,
     [switch]$NoExit
   )
-  Write-Host "`e[0;31mERROR: $Message`e[0m"
+  Write-Host "ERROR: $Message" -ForegroundColor Red
 
   if (-not $NoExit) {
     Write-Host ""
@@ -26,21 +26,21 @@ function Write-ErrorMsg {
 # Function to print warning messages
 function Write-WarningMsg {
   param([string]$Message)
-  Write-Host "`e[0;33m
+  Write-Host "
 -------------------------------------------------------------------------------------------------------------------------------------------------
   WARNING: $Message
 -------------------------------------------------------------------------------------------------------------------------------------------------
-`e[0m"
+" -ForegroundColor Yellow
 }
 
 # Function to print note messages
 function Write-Note {
   param([string]$Message)
-  Write-Host "`e[0;36mNOTE: $Message`e[0m"
+  Write-Host "NOTE: $Message" -ForegroundColor Cyan
 }
 
 # Check if running on Windows
-if ($PSVersionTable.OS -notlike "*Windows*") {
+if ($PSVersionTable.OS -and ($PSVersionTable.OS -notlike "*Windows*")) {
   Write-ErrorMsg "This script is intended to be run on Windows. Please use install.sh for Linux/macOS."
 }
 
@@ -54,13 +54,15 @@ Write-Note "Transcript logging started. Logs will be saved to: $logFile"
 $REPO_DIR = "$env:USERPROFILE\Repos"
 $LOCAL_REPO_PATH = "$REPO_DIR\local-machine-config"
 
-function Install-LocalMachineConfig {
+function Install-Dependencies {
   try {
     # Check if Scoop is installed
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
       Write-Info "Installing Scoop..."
       Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
       Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+      # Add Scoop shims to current session PATH
+      $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
     } else {
       Write-Host "Scoop is already installed."
     }
@@ -107,6 +109,10 @@ function Install-LocalMachineConfig {
       # Install Git for Windows
       Write-Info "Installing Git for Windows via Scoop..."
       scoop install git
+      # Ensure Scoop shims are in current session PATH
+      if ($env:PATH -notlike "*\scoop\shims*") {
+        $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
+      }
     } else {
       Write-Host "Git for Windows is already installed."
     }
@@ -163,21 +169,7 @@ function Install-LocalMachineConfig {
     }
 
     Write-Info "Scoop, MSYS2, Git for Windows, and Ansible are installed."
-
-    # Execute playbook
-    Write-Info "Executing Ansible playbook..."
-    $msys2LocalRepoPath = (& $msys2Shell -lc "cygpath -u '$LOCAL_REPO_PATH'" | Out-String).Trim()
-    
-    # NOTE: Set MSYS2_PATH_TYPE to inherit to ensure Windows-native environment variables 
-    #       (like SystemRoot, TEMP, etc.) are preserved for Scoop and PowerShell.
-    $env:MSYS2_PATH_TYPE = "inherit"
-    & $msys2Shell -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH && cd `"$msys2LocalRepoPath`" && ./run-playbook.sh"
-
-    if ($LASTEXITCODE -ne 0) {
-      Write-ErrorMsg "Ansible playbook execution failed with exit code $LASTEXITCODE."
-    }
-
-    Write-Info "`nSetup complete! Please review the output above for any errors.`n"
+    return $msys2Shell
   } catch {
     Write-ErrorMsg "$($_.Exception.ToString())" -NoExit
     Write-Host ""
@@ -185,9 +177,30 @@ function Install-LocalMachineConfig {
     Write-ErrorMsg "Please ensure you are running this script from an elevated PowerShell prompt." -NoExit
     Write-ErrorMsg "If the error persists, please check the error message above for more details."
   }
-} # End of function Install-LocalMachineConfig
+}
 
-# Clone repository
+function Execute-Playbook {
+  param([string]$msys2Shell)
+  # Execute playbook
+  Write-Info "Executing Ansible playbook..."
+  $msys2LocalRepoPath = (& $msys2Shell -lc "cygpath -u '$LOCAL_REPO_PATH'" | Out-String).Trim()
+  
+  # NOTE: Set MSYS2_PATH_TYPE to inherit to ensure Windows-native environment variables 
+  #       (like SystemRoot, TEMP, etc.) are preserved for Scoop and PowerShell.
+  $env:MSYS2_PATH_TYPE = "inherit"
+  & $msys2Shell -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH && cd `"$msys2LocalRepoPath`" && ./run-playbook.sh"
+
+  if ($LASTEXITCODE -ne 0) {
+    Write-ErrorMsg "Ansible playbook execution failed with exit code $LASTEXITCODE."
+  }
+
+  Write-Info "`nSetup complete! Please review the output above for any errors.`n"
+}
+
+# 1. Install dependencies (Scoop, MSYS2, Git, Ansible)
+$msys2Shell = Install-Dependencies
+
+# 2. Clone repository
 if (-not (Test-Path -Path $LOCAL_REPO_PATH)) {
   Write-Info "Cloning repository to $LOCAL_REPO_PATH..."
   New-Item -ItemType Directory -Force -Path $REPO_DIR | Out-Null
@@ -206,11 +219,12 @@ if (-not (Test-Path -Path $LOCAL_REPO_PATH)) {
   Pop-Location
 }
 
-# Change directory to the cloned repository
+# 3. Change directory to the cloned repository
 Set-Location $LOCAL_REPO_PATH
 
-# Execute the main installation function
-Install-LocalMachineConfig
+# 4. Execute the Ansible playbook
+Execute-Playbook -msys2Shell $msys2Shell
+
 
 # Final pause
 Write-Host ""
