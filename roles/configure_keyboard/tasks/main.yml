@@ -63,10 +63,11 @@
               - --property
               - "/xfwm4/custom/<Primary>Tab"
           register: configure_keyboard_current_cycle_windows_key
+          failed_when: false
           changed_when: false
 
         - name: Set cycle_windows_key if different
-          when: is_inside_xfce and configure_keyboard_current_cycle_windows_key.stdout != "cycle_windows_key"
+          when: is_inside_xfce and (configure_keyboard_current_cycle_windows_key.rc != 0 or configure_keyboard_current_cycle_windows_key.stdout != "cycle_windows_key")
           ansible.builtin.command:
             argv:
               - xfconf-query
@@ -89,10 +90,11 @@
               - --property
               - "/xfwm4/custom/<Primary><Shift>Tab"
           register: configure_keyboard_current_cycle_reverse_windows_key
+          failed_when: false
           changed_when: false
 
         - name: Set cycle_reverse_windows_key if different
-          when: is_inside_xfce and configure_keyboard_current_cycle_reverse_windows_key.stdout != "cycle_reverse_windows_key"
+          when: is_inside_xfce and (configure_keyboard_current_cycle_reverse_windows_key.rc != 0 or configure_keyboard_current_cycle_reverse_windows_key.stdout != "cycle_reverse_windows_key")
           ansible.builtin.command:
             argv:
               - xfconf-query
@@ -138,10 +140,11 @@
               - --property
               - "/commands/custom/<Primary><Alt>q"
           register: configure_keyboard_current_xfce_lock_key
+          failed_when: false
           changed_when: false
 
         - name: Set xflock4_key if different
-          when: is_inside_xfce and configure_keyboard_current_xfce_lock_key.stdout != "xflock4"
+          when: is_inside_xfce and (configure_keyboard_current_xfce_lock_key.rc != 0 or configure_keyboard_current_xfce_lock_key.stdout != "xflock4")
           ansible.builtin.command:
             argv:
               - xfconf-query
@@ -169,6 +172,7 @@
                   - -p
                   - /general/workspace_count
               register: configure_keyboard_current_workspace_count
+              failed_when: false
               changed_when: false
 
             - name: Set workspace count to 10 if different
@@ -181,7 +185,7 @@
                   - /general/workspace_count
                   - -s
                   - "10"
-              when: configure_keyboard_current_workspace_count.stdout != "10"
+              when: configure_keyboard_current_workspace_count.rc != 0 or configure_keyboard_current_workspace_count.stdout != "10"
               changed_when: true
 
             - name: Execute XFCE4 workspace switching shortcut deletion script # noqa: line-length
