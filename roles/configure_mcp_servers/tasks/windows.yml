@@ -2,13 +2,17 @@
   ansible.builtin.command:
     cmd: /mingw64/bin/pipx.exe install semgrep
   register: configure_mcp_servers_semgrep_install
+  # NOTE: Semgrep currently fails to build on Python 3.14 (MinGW) due to ruamel.yaml.clib
+  #       incompatibility with the removal of ast.Str. We make this non-fatal.
+  failed_when: false
   changed_when: "'installed package' in configure_mcp_servers_semgrep_install.stdout"
-  failed_when:
-    - configure_mcp_servers_semgrep_install.rc != 0
-    - "'already installed' not in configure_mcp_servers_semgrep_install.stdout"
-    - "'already installed' not in configure_mcp_servers_semgrep_install.stderr"
+
+- name: Register Semgrep installation status
+  ansible.builtin.set_fact:
+    configure_mcp_servers_semgrep_installed: "{{ configure_mcp_servers_semgrep_install.rc == 0 or 'already installed' in configure_mcp_servers_semgrep_install.stdout or 'already installed' in configure_mcp_servers_semgrep_install.stderr }}"
 
 - name: Ensure pipx binary directory is in PATH
   ansible.builtin.command:
     cmd: /mingw64/bin/pipx.exe ensurepath
   changed_when: false
+  when: configure_mcp_servers_semgrep_installed
