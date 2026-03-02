@@ -18,9 +18,11 @@
   environment:
     CI: "true"
     GEMINI_API_KEY: "dummy"
+    PNPM_HOME: >-
+      {% if is_windows -%}{{ ansible_facts['env']['USERPROFILE'] }}\AppData\Local\pnpm{%- endif %}
     PATH: >-
       {% if is_windows -%}
-      {{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
+      {{ configure_mcp_win_home_dir.stdout ~ '/AppData/Local/pnpm;' ~ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
       {%- else -%}
       {{ configure_mcp_nvm_node_bin ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nvm_node_bin is defined else ansible_facts.env.PATH }}
       {%- endif %}
@@ -36,9 +38,11 @@
   environment:
     CI: "true"
     GEMINI_API_KEY: "dummy"
+    PNPM_HOME: >-
+      {% if is_windows -%}{{ ansible_facts['env']['USERPROFILE'] }}\AppData\Local\pnpm{%- endif %}
     PATH: >-
       {% if is_windows -%}
-      {{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
+      {{ configure_mcp_win_home_dir.stdout ~ '/AppData/Local/pnpm;' ~ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
       {%- else -%}
       {{ configure_mcp_nvm_node_bin ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nvm_node_bin is defined else ansible_facts.env.PATH }}
       {%- endif %}
