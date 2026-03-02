@@ -19,9 +19,24 @@
       register: configure_mcp_win_home_dir
       changed_when: false
 
-    - name: Set pnpm executable fact
+    - name: Get pnpm executable path from Scoop (Windows)
+      ansible.builtin.command:
+        cmd: "{{ configure_mcp_win_home_dir.stdout }}/scoop/shims/scoop.cmd which pnpm"
+      register: configure_mcp_pnpm_path_raw
+      changed_when: false
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+      failed_when: >-
+        configure_mcp_pnpm_path_raw.rc != 0 or
+        'WARN' in configure_mcp_pnpm_path_raw.stdout or
+        'not found' in configure_mcp_pnpm_path_raw.stdout
+
+    - name: Set pnpm and node facts
       ansible.builtin.set_fact:
-        configure_mcp_pnpm_executable: "{{ configure_mcp_win_home_dir.stdout }}/AppData/Local/pnpm/pnpm"
+        # NOTE: We convert the Windows-style path (with tildes and backslashes) into a POSIX-style
+        #       path that the MSYS2-based Ansible executor can understand and execute.
+        configure_mcp_pnpm_executable: "{{ configure_mcp_pnpm_path_raw.stdout | trim | replace('~', configure_mcp_win_home_dir.stdout) | regex_replace('\\\\', '/') }}"
         configure_mcp_nodejs_path: "{{ configure_mcp_win_home_dir.stdout }}/scoop/persist/nvm/nodejs/nodejs"
 
 - name: Configure MCP servers (JSON)
