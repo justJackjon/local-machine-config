@@ -65,27 +65,45 @@
       ansible.builtin.set_fact:
         install_base_packages_node_removal_failed: "{{ install_base_packages_remove_node_result.rc != 0 }}"
 
+    - name: Ensure required Scoop buckets are added
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} bucket add {{ item }}"
+      loop:
+        - main
+        - extras
+        - nerd-fonts
+      register: scoop_bucket_add
+      failed_when:
+        - scoop_bucket_add.rc != 0
+        - "'already added' not in scoop_bucket_add.stdout"
+      changed_when: "'Successfully added' in scoop_bucket_add.stdout"
+
+    - name: Update Scoop and buckets
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} update"
+      changed_when: false
+      ignore_errors: true
+
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
         install_base_packages_scoop_list:
           - name: nvm
-            check: "apps/nvm/current/nvm.exe"
+            executable_name: nvm
           - name: gh
-            check: "shims/gh.exe"
+            executable_name: gh
           - name: gnupg
-            check: "apps/gnupg/current/bin/gpg.exe"
+            executable_name: gpg
           - name: neovim
-            check: "shims/nvim.exe"
+            executable_name: nvim
           - name: lazygit
-            check: "shims/lazygit.exe"
+            executable_name: lazygit
           - name: alacritty
-            check: "shims/alacritty.exe"
+            executable_name: alacritty
           - name: cascadiacode-nf
-            check: "apps/cascadiacode-nf/current"
           - name: perl
-            check: "apps/perl/current/perl/bin/perl.exe"
+            executable_name: perl
           - name: pnpm
-            check: "../AppData/Local/pnpm/pnpm"
+            executable_name: pnpm
 
     - name: Process Scoop packages
       ansible.builtin.include_tasks: ../../../common/tasks/install_scoop_package.yml
@@ -198,48 +216,33 @@
         - install_base_packages_pipx_shared_venv_cfg.stat.exists
         - install_base_packages_pipx_shared_is_mingw.rc != 0
 
-    - name: Set Windows-specific paths
-      ansible.builtin.set_fact:
-        install_base_packages_pnpm_home_path: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/AppData/Local/pnpm"
-
-    - name: Get pnpm home path in Windows format
+    - name: Get pnpm executable path from Scoop
       ansible.builtin.command:
-        cmd: cygpath -w "{{ install_base_packages_pnpm_home_path }}"
-      register: install_base_packages_pnpm_home_win_raw
+        cmd: "{{ install_base_packages_scoop_executable_path }} which pnpm"
+      register: pnpm_executable_path_raw
       changed_when: false
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+      failed_when: >-
+        pnpm_executable_path_raw.rc != 0 or
+        'WARN' in pnpm_executable_path_raw.stdout or
+        'not found' in pnpm_executable_path_raw.stdout
 
-    - name: Set pnpm home Windows path fact
+    - name: Set pnpm executable path fact
       ansible.builtin.set_fact:
-        install_base_packages_pnpm_home_win: "{{ install_base_packages_pnpm_home_win_raw.stdout | trim }}"
+        # NOTE: We convert the Windows-style path (with tildes and backslashes) into a POSIX-style
+        #       path that the MSYS2-based Ansible executor can understand and execute.
+        #       We use regex_replace with '\\\\' which YAML turns into '\\' and Jinja2/Regex turns into a single literal '\'.
+        install_base_packages_pnpm_executable_path: "{{ pnpm_executable_path_raw.stdout | trim | replace('~', install_base_packages_win_home_posix) | regex_replace('\\\\', '/') }}"
 
     - name: Install pnpm packages
-      block:
-        - name: Ensure pnpm home directory exists
-          ansible.builtin.file:
-            path: "{{ install_base_packages_pnpm_home_path }}"
-            state: directory
-
-        - name: Persist PNPM_HOME environment variable and PATH
-          ansible.builtin.command:
-            cmd: >
-              powershell.exe -Command "
-              [Environment]::SetEnvironmentVariable('PNPM_HOME', '{{ install_base_packages_pnpm_home_win }}', 'User');
-              $CurrentPath = [Environment]::GetEnvironmentVariable('Path', 'User');
-              if ($CurrentPath -notlike '*%PNPM_HOME%*') {
-                [Environment]::SetEnvironmentVariable('Path', '%PNPM_HOME%;' + $CurrentPath, 'User');
-              }"
-          changed_when: false
-
-        # NOTE: We use the shell module here because the pnpm module fails to find the
-        #       pnpm executable on the first run (as the PATH is not updated).
-        - name: Install pnpm packages
-          ansible.builtin.command:
-            cmd: "{{ install_base_packages_pnpm_home_path }}/pnpm add -g {{ item }}"
-          with_items:
-            - tree-sitter-cli
-            - neovim
-          changed_when: false
-          environment:
-            PNPM_HOME: "{{ install_base_packages_pnpm_home_path }}"
-            PATH: "{{ install_base_packages_pnpm_home_path }}:{{ ansible_facts.env.PATH }}"
+      # NOTE: We use the absolute path to the pnpm executable obtained from `scoop which`
+      #       to ensure we are using the correct, Scoop-managed binary.
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
+      with_items:
+        - tree-sitter-cli
+        - neovim
+      changed_when: false
 

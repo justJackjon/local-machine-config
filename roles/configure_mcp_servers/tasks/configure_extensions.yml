@@ -13,11 +13,17 @@
 - name: Check if GitHub extension is already installed
   ansible.builtin.shell: >-
     {% if is_windows -%}
-    {{ configure_mcp_servers_gemini_base }} extensions list{%- else -%}
-    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions list'{%- endif %}
+    {{ configure_mcp_servers_gemini_base }} extensions list 2>&1{%- else -%}
+    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions list' 2>&1{%- endif %}
   environment:
     CI: "true"
-    PATH: "{{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if is_windows and configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}"
+    GEMINI_API_KEY: "dummy"
+    PATH: >-
+      {% if is_windows -%}
+      {{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
+      {%- else -%}
+      {{ configure_mcp_nvm_node_bin ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nvm_node_bin is defined else ansible_facts.env.PATH }}
+      {%- endif %}
   register: configure_mcp_servers_extension_list
   changed_when: false
   # noqa command-instead-of-shell yaml[line-length]
@@ -25,11 +31,17 @@
 - name: Install GitHub MCP Extension
   ansible.builtin.shell: >-
     {% if is_windows -%}
-    {{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update{%- else -%}
-    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update'{%- endif %}
+    {{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update 2>&1{%- else -%}
+    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update' 2>&1{%- endif %}
   environment:
     CI: "true"
-    PATH: "{{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if is_windows and configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}"
+    GEMINI_API_KEY: "dummy"
+    PATH: >-
+      {% if is_windows -%}
+      {{ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
+      {%- else -%}
+      {{ configure_mcp_nvm_node_bin ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nvm_node_bin is defined else ansible_facts.env.PATH }}
+      {%- endif %}
   register: configure_mcp_servers_install_result
   changed_when: "'Installing extension' in configure_mcp_servers_install_result.stdout"
   when:

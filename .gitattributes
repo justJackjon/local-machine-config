@@ -7,12 +7,15 @@
 * text=auto
 
 # Ansible files
-*.yml text
-*.yaml text
+*.yml text eol=lf
+*.yaml text eol=lf
+ansible.cfg text eol=lf
+hosts text eol=lf
+.ansible-lint text eol=lf
 
 # Scripts
-*.sh text
-*.ps1 text
+*.sh text eol=lf
+*.ps1 text eol=crlf
 
 # Configuration files
 *.cfg text

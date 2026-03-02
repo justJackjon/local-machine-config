@@ -1,37 +1,122 @@
-- name: Check if {{ scoop_package.name }} executable exists
-  ansible.builtin.stat:
-    path: "{{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"
-  register: scoop_package_check
-
-- name: Install {{ scoop_package.name }} via Scoop
-  when: not scoop_package_check.stat.exists
+- name: Check exact Scoop installation status for {{ scoop_package.name }}
   ansible.builtin.command:
-    cmd: "{{ install_base_packages_scoop_executable_path }} install {{ scoop_package.name }}"
-  register: scoop_package_install_result
-  changed_when: "'successfully' in scoop_package_install_result.stdout"
-  failed_when:
-    - scoop_package_install_result.rc != 0
-    - "'already installed' not in scoop_package_install_result.stdout"
+    cmd: "{{ install_base_packages_scoop_executable_path }} list {{ scoop_package.name }}"
+  register: install_scoop_package_status_raw
+  changed_when: false
+  failed_when: false
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
 
-- name: Reset {{ scoop_package.name }} to fix shims
+- name: Determine if {{ scoop_package.name }} is actually healthy
+  ansible.builtin.set_fact:
+    # NOTE: We use regex to ensure the app name appears at the start of a line in the list table,
+    #       preventing false positives from the 'Installed apps matching...' header.
+    install_scoop_package_is_registered: "{{ install_scoop_package_status_raw.stdout is search('(?m)^' ~ scoop_package.name ~ '\\s+') }}"
+    install_scoop_package_is_failed: "{{ install_scoop_package_status_raw.stdout is search('(?m)^' ~ scoop_package.name ~ '\\s+.*Install failed') }}"
+
+- name: Check if {{ scoop_package.name }} shim/binary is working
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} which {{ scoop_package.executable_name }}"
+  register: install_scoop_package_which_check
+  changed_when: false
+  failed_when: false
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
   when:
-    - not scoop_package_check.stat.exists
+    - install_scoop_package_is_registered
+    - not install_scoop_package_is_failed
+    - scoop_package.executable_name is defined
+
+- name: Attempt soft repair of {{ scoop_package.name }} via 'scoop reset'
+  when:
+    - install_scoop_package_is_registered
+    - not install_scoop_package_is_failed
+    - scoop_package.executable_name is defined
+    - >-
+      install_scoop_package_which_check.rc != 0 or
+      'WARN' in install_scoop_package_which_check.stdout or
+      'not found' in install_scoop_package_which_check.stdout
     # NOTE: nvm-windows is excluded from scoop reset because it does not use standard
     #       Scoop shims; it manages its own path and symlinks directly.
     - scoop_package.name != 'nvm'
   ansible.builtin.command:
     cmd: "{{ install_base_packages_scoop_executable_path }} reset {{ scoop_package.name }}"
+  changed_when: true
+  register: install_scoop_package_reset_result
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+- name: Re-verify {{ scoop_package.name }} after soft repair
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} which {{ scoop_package.executable_name }}"
+  register: install_scoop_package_which_reverify
   changed_when: false
-
-- name: Verify {{ scoop_package.name }} installation
-  when: not scoop_package_check.stat.exists
-  ansible.builtin.stat:
-    path: "{{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"
-  register: scoop_package_verify
-
-- name: Fail if {{ scoop_package.name }} is still missing
+  failed_when: false
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
   when:
-    - not scoop_package_check.stat.exists
-    - not scoop_package_verify.stat.exists
-  ansible.builtin.fail:
-    msg: "Failed to install {{ scoop_package.name }}. Executable not found at {{ install_base_packages_scoop_root }}/{{ scoop_package.check }}"
+    - scoop_package.executable_name is defined
+    - install_scoop_package_reset_result is defined and install_scoop_package_reset_result is not skipped
+
+- name: Determine if {{ scoop_package.name }} requires full installation
+  ansible.builtin.set_fact:
+    install_scoop_package_needs_install: >-
+      {{
+        (not install_scoop_package_is_registered) or
+        (install_scoop_package_is_failed) or
+        (scoop_package.executable_name is defined and
+          (
+            (install_scoop_package_which_check.rc != 0 or 'WARN' in install_scoop_package_which_check.stdout or 'not found' in install_scoop_package_which_check.stdout) and
+            ((install_scoop_package_which_reverify.rc | default(1)) != 0 or 'WARN' in (install_scoop_package_which_reverify.stdout | default('WARN')))
+          )
+        )
+      }}
+
+- name: Purge broken {{ scoop_package.name }} before re-install
+  when:
+    - install_scoop_package_needs_install
+    - install_scoop_package_is_registered or install_scoop_package_is_failed
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} uninstall {{ scoop_package.name }}"
+  changed_when: true
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+- name: Install {{ scoop_package.name }} via Scoop
+  when: install_scoop_package_needs_install
+  ansible.builtin.command:
+    cmd: "{{ install_base_packages_scoop_executable_path }} install {{ scoop_package.name }}"
+  register: install_scoop_package_install_result
+  changed_when: "'successfully' in install_scoop_package_install_result.stdout"
+  # NOTE: We must check stdout for manifest failure because scoop can return a zero
+  #       exit code even when it fails to find the app.
+  failed_when:
+    - install_scoop_package_install_result.rc != 0
+    - "'already installed' not in install_scoop_package_install_result.stdout"
+    - "'Couldn\\'t find manifest' in install_scoop_package_install_result.stdout"
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+- name: Final verification for {{ scoop_package.name }}
+  ansible.builtin.command:
+    cmd: >-
+      {{ install_base_packages_scoop_executable_path }}
+      {{ 'which ' ~ scoop_package.executable_name if scoop_package.executable_name is defined else 'prefix ' ~ scoop_package.name }}
+  register: install_scoop_package_final_verify
+  changed_when: false
+  environment:
+    HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+    USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+  # NOTE: We must check stdout for common failure keywords because scoop can return a zero
+  #       exit code even when it prints a failure warning to stdout.
+  failed_when: >-
+    install_scoop_package_final_verify.rc != 0 or
+    'WARN' in install_scoop_package_final_verify.stdout or
+    'not found' in install_scoop_package_final_verify.stdout or
+    'Could not find' in install_scoop_package_final_verify.stdout

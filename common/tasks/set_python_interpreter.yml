@@ -49,6 +49,13 @@
         base_python_interpreter: "{{ mingw_python_win_path.stdout | trim if mingw_python_check.rc == 0 else '/usr/bin/python3' }}"
         venv_path: "{{ unix_home_path }}/.venvs/local-machine-config"
 
+    - name: Ensure system-level pip and setuptools are healthy (MSYS2/MinGW)
+      ansible.builtin.command:
+        cmd: pacman -S --noconfirm --needed mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-setuptools
+      when: use_mingw_python
+      changed_when: false
+      ignore_errors: true
+
     - name: Check if existing venv matches current interpreter
       ansible.builtin.shell: |
         if [ -f "{{ venv_path }}/pyvenv.cfg" ]; then
@@ -82,7 +89,7 @@
 
     - name: Bootstrap pip in venv (Windows)
       ansible.builtin.command:
-        cmd: "{{ venv_path }}/bin/python -m ensurepip"
+        cmd: "{{ venv_path }}/bin/python -m ensurepip --upgrade --default-pip"
       changed_when: false
       when: use_mingw_python
 

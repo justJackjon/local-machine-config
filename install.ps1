@@ -168,7 +168,9 @@ function Install-LocalMachineConfig {
     Write-Info "Executing Ansible playbook..."
     $msys2LocalRepoPath = (& $msys2Shell -lc "cygpath -u '$LOCAL_REPO_PATH'" | Out-String).Trim()
     
-    # NOTE: Explicitly set the PATH to prioritize MSYS2 tools and prevent collision with Windows-native executables.
+    # NOTE: Set MSYS2_PATH_TYPE to inherit to ensure Windows-native environment variables 
+    #       (like SystemRoot, TEMP, etc.) are preserved for Scoop and PowerShell.
+    $env:MSYS2_PATH_TYPE = "inherit"
     & $msys2Shell -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH && cd `"$msys2LocalRepoPath`" && ./run-playbook.sh"
 
     if ($LASTEXITCODE -ne 0) {

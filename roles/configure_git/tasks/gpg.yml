@@ -18,9 +18,41 @@
   changed_when: false
   failed_when: false
 
+- name: Ensure .gnupg directory exists
+  ansible.builtin.file:
+    path: ~/.gnupg
+    state: directory
+    mode: "0700"
+
+- name: Prompt for GPG key passphrase
+  ansible.builtin.pause:
+    prompt: "Enter GPG key passphrase"
+    echo: false
+  register: configure_git_gpg_passphrase_prompt
+  no_log: true
+  when: configure_git_gpg_secret_key_check.stdout == ""
+
+- name: Confirm GPG key passphrase
+  ansible.builtin.pause:
+    prompt: "Confirm GPG key passphrase"
+    echo: false
+  register: configure_git_gpg_passphrase_confirm
+  no_log: true
+  when: configure_git_gpg_secret_key_check.stdout == ""
+
+- name: Set fact if GPG key passphrases match
+  ansible.builtin.set_fact:
+    configure_git_is_gpg_passphrases_match: "{{ configure_git_gpg_passphrase_prompt.user_input == configure_git_gpg_passphrase_confirm.user_input }}"
+  when: configure_git_gpg_secret_key_check.stdout == "" and configure_git_gpg_passphrase_prompt is defined
+
+- name: Fail if GPG key passphrases don't match
+  ansible.builtin.fail:
+    msg: "GPG key passphrases don't match!"
+  when: configure_git_gpg_secret_key_check.stdout == "" and not configure_git_is_gpg_passphrases_match
+
 - name: Create GPG key
   ansible.builtin.shell: |
-    gpg --batch --full-generate-key <<EOF
+    gpg --batch --pinentry-mode loopback --passphrase "{{ configure_git_gpg_passphrase_prompt.user_input }}" --full-generate-key <<EOF
     Key-Type: RSA
     Key-Length: 4096
     Subkey-Type: RSA
@@ -29,11 +61,17 @@
     Name-Email: {{ configure_git_user_email }}
     Name-Comment: ansible-managed
     Expire-Date: 0
+    %commit
     EOF
   args:
     executable: /bin/bash
+  register: configure_git_gpg_create_result
   when: configure_git_gpg_secret_key_check.stdout == ""
-  changed_when: true
+  changed_when: configure_git_gpg_create_result.rc == 0
+  no_log: true
+  failed_when:
+    - configure_git_gpg_create_result.rc != 0
+    - "'already exists' not in configure_git_gpg_create_result.stderr"
 
 - name: Get GPG key fingerprint
   ansible.builtin.shell: |
