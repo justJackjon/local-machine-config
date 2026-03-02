@@ -186,26 +186,25 @@
           when: install_base_packages_starship_check.rc != 0
           ansible.builtin.get_url:
             url: https://starship.rs/install.sh
-            dest: /tmp/install_starship.sh
+            dest: "/tmp/install_starship_{{ ansible_user_id }}.sh"
             mode: "0755"
 
         - name: Run Starship install script
           when: install_base_packages_starship_check.rc != 0
           become: true
-          ansible.builtin.command: /tmp/install_starship.sh -y
+          ansible.builtin.command: "/tmp/install_starship_{{ ansible_user_id }}.sh -y"
           changed_when: true
 
     - name: Install nvm, node and pnpm
       block:
         - name: Download nvm install script
           ansible.builtin.get_url:
-            url: |
-              https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
-            dest: /tmp/install_nvm.sh
+            url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+            dest: "/tmp/install_nvm_{{ ansible_user_id }}.sh"
             mode: "0755"
 
         - name: Run nvm install script
-          ansible.builtin.command: /tmp/install_nvm.sh
+          ansible.builtin.command: "/tmp/install_nvm_{{ ansible_user_id }}.sh"
           args:
             creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
@@ -225,12 +224,12 @@
           when: not install_base_packages_pnpm_stat_debian.stat.exists
           ansible.builtin.get_url:
             url: https://get.pnpm.io/install.sh
-            dest: /tmp/install_pnpm.sh
+            dest: "/tmp/install_pnpm_{{ ansible_user_id }}.sh"
             mode: "0755"
 
         - name: Run pnpm install script
           when: not install_base_packages_pnpm_stat_debian.stat.exists
-          ansible.builtin.command: sh /tmp/install_pnpm.sh
+          ansible.builtin.command: "sh /tmp/install_pnpm_{{ ansible_user_id }}.sh"
           changed_when: false
 
         - name: Update pnpm

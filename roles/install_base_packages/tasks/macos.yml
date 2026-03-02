@@ -47,13 +47,12 @@
       block:
         - name: Download nvm install script
           ansible.builtin.get_url:
-            url: |
-              https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
-            dest: /tmp/install_nvm.sh
+            url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+            dest: "/tmp/install_nvm_{{ ansible_user_id }}.sh"
             mode: "0755"
 
         - name: Run nvm install script
-          ansible.builtin.command: /tmp/install_nvm.sh
+          ansible.builtin.command: "/tmp/install_nvm_{{ ansible_user_id }}.sh"
           args:
             creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
