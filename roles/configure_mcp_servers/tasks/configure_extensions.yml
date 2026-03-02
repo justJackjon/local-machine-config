@@ -13,8 +13,8 @@
 - name: Check if GitHub extension is already installed
   ansible.builtin.shell: >-
     {% if is_windows -%}
-    {{ configure_mcp_servers_gemini_base }} extensions list{%- else -%}
-    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions list'{%- endif %}
+    {{ configure_mcp_servers_gemini_base }} extensions list 2>&1{%- else -%}
+    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions list' 2>&1{%- endif %}
   environment:
     CI: "true"
     GEMINI_API_KEY: "dummy"
@@ -31,8 +31,8 @@
 - name: Install GitHub MCP Extension
   ansible.builtin.shell: >-
     {% if is_windows -%}
-    {{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update{%- else -%}
-    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update'{%- endif %}
+    {{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update 2>&1{%- else -%}
+    bash -lc '{{ configure_mcp_servers_gemini_base }} extensions install {{ configure_mcp_servers_mcp_github_extension_repo }} --auto-update' 2>&1{%- endif %}
   environment:
     CI: "true"
     GEMINI_API_KEY: "dummy"
