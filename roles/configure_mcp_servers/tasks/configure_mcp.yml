@@ -31,5 +31,9 @@
   args:
     executable: /bin/bash
   loop: "{{ configure_mcp_servers_list }}"
-  when: item.enabled | default(true)
+  when:
+    - item.enabled | default(true)
+    - >-
+      (item.name != 'semgrep') or
+      (configure_mcp_servers_semgrep_installed | default(true))
   changed_when: true

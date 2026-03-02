@@ -100,8 +100,8 @@
           - "  Action Needed:   {{ configure_mcp_servers_github_mcp_action_needed | default('None') }}"
           - ""
           - "Semgrep MCP Server:"
-          - "  Status:          Installed & Configured (Community)"
-          - "  Action Needed:   Run 'semgrep login' (Optional) for more rules."
+          - "  Status:          {{ 'Installed & Configured (Community)' if (configure_mcp_servers_semgrep_installed | default(true)) else 'Skipped (Python 3.14 Incompatibility)' }}"
+          - "  Action Needed:   {{ 'Run \'semgrep login\' (Optional) for more rules.' if (configure_mcp_servers_semgrep_installed | default(true)) else 'Install Semgrep via WSL or Docker for full functionality.' }}"
           - "=========================================="
       tags: configure_mcp_servers
 
