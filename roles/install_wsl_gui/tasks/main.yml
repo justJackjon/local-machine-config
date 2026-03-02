@@ -17,7 +17,7 @@
   become: true
   community.general.alternatives:
     name: x-terminal-emulator
-    path: /usr/bin/alacritty
+    path: /usr/local/bin/alacritty
     link: /usr/bin/x-terminal-emulator
 
 - name: Remove IBus to prevent Wayland/X11 conflict
