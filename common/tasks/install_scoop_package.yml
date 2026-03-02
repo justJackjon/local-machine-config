@@ -93,9 +93,12 @@
     cmd: "{{ install_base_packages_scoop_executable_path }} install {{ scoop_package.name }}"
   register: install_scoop_package_install_result
   changed_when: "'successfully' in install_scoop_package_install_result.stdout"
+  # NOTE: We must check stdout for manifest failure because scoop can return a zero
+  #       exit code even when it fails to find the app.
   failed_when:
     - install_scoop_package_install_result.rc != 0
     - "'already installed' not in install_scoop_package_install_result.stdout"
+    - "'Couldn\\'t find manifest' in install_scoop_package_install_result.stdout"
   environment:
     HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
     USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"

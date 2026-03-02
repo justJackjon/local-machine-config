@@ -71,6 +71,7 @@
       loop:
         - main
         - extras
+        - nerd-fonts
       register: scoop_bucket_add
       failed_when:
         - scoop_bucket_add.rc != 0
