@@ -10,6 +10,11 @@
   ansible.builtin.include_tasks: windows.yml
   when: is_windows
 
+- name: Set pnpm executable path (Linux)
+  when: is_debian_family
+  ansible.builtin.set_fact:
+    configure_mcp_pnpm_executable: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+
 - name: Set pnpm executable path (Windows)
   when: is_windows
   block:

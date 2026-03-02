@@ -244,15 +244,27 @@
 
     - name: Install pnpm packages
       community.general.pnpm:
+        name: "{{ item }}"
         global: true
         state: latest
+        executable: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+      environment:
+        PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
+        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.PATH }}"
       with_items:
         - tree-sitter-cli
         - neovim
 
+    - name: Ensure pipx binary directory is in PATH
+      ansible.builtin.command:
+        cmd: /usr/bin/pipx ensurepath
+      changed_when: false
+
     - name: Install pipx packages
       ansible.builtin.command:
-        cmd: pipx install {{ item }}
+        cmd: /usr/bin/pipx install {{ item }}
+      environment:
+        PATH: "{{ ansible_facts.env.HOME }}/.local/bin:{{ ansible_facts.env.PATH }}"
       with_items:
         - ansible-lint
         - pynvim
