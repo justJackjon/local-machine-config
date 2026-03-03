@@ -128,12 +128,14 @@
 
     - name: Configure NVM root
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe root {{ install_base_packages_scoop_root }}/persist/nvm/versions"
+        cmd: >
+          powershell.exe -Command "& '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\nvm.exe' root '{{ install_base_packages_scoop_root_win }}\persist\nvm\versions'"
       changed_when: false
 
     - name: Configure NVM symlink
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe symlink {{ install_base_packages_scoop_root }}/persist/nvm/nodejs"
+        cmd: >
+          powershell.exe -Command "& '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\nvm.exe' symlink '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs'"
       changed_when: false
 
     - name: Install Node.js LTS via NVM
@@ -145,9 +147,16 @@
         - install_base_packages_nvm_install.rc != 0
         - "'already installed' not in install_base_packages_nvm_install.stdout"
 
+    - name: Set Node.js version fact from NVM install output
+      ansible.builtin.set_fact:
+        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_search('\\d+\\.\\d+\\.\\d+') }}"
+
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe use lts"
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe use {{ install_base_packages_nvm_node_version }}"
+      when:
+        - install_base_packages_nvm_node_version is defined
+        - install_base_packages_nvm_node_version != ""
       changed_when: false
 
     - name: Download and Install AutoHotkey v1.1
