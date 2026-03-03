@@ -87,8 +87,11 @@
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
         install_base_packages_scoop_list:
+          # NOTE: nvm-windows does not use standard Scoop shims; it manages its own PATH and symlinks.
+          #       We set skip_which_check to true to avoid 'scoop which' validation failures.
           - name: nvm
             executable_name: nvm
+            skip_which_check: true
           - name: gh
             executable_name: gh
           - name: gnupg
@@ -117,13 +120,19 @@
         state: directory
         mode: "0755"
 
-    - name: Configure NVM root and symlink
+    - name: Configure NVM root and symlink path
       ansible.builtin.command:
         cmd: >
           powershell.exe -Command "
-          & '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\nvm.exe' root '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs';
-          & '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\nvm.exe' symlink '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\nodejs'"
+          $settings = '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\settings.txt';
+          $root = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs';
+          $path = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\nodejs';
+          'root: ' + $root + \"`r`n\" + 'path: ' + $path + \"`r`n\" + 'arch: 64' + \"`r`n\" + 'proxy: none' | Out-File -Encoding ASCII $settings;
+          Write-Host 'Updated NVM settings.txt';"
       changed_when: false
+      environment:
+        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
+        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
 
     - name: Install Node.js LTS via NVM
       ansible.builtin.command:
@@ -137,25 +146,18 @@
         NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
         NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
 
-    - name: Get installed Node.js versions
-      ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe list"
-      register: install_base_packages_nvm_list
-      changed_when: false
-      environment:
-        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
-        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
-
-    - name: Set Node.js version fact
+    - name: Set Node.js version fact from NVM install output
       ansible.builtin.set_fact:
-        # NOTE: We look for version numbers that don't match the NVM version (1.1.x or 1.2.x)
-        #       and pick the last (latest) one installed.
-        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_list.stdout | regex_findall('[0-9]+\\.[0-9]+\\.[0-9]+') | reject('search', '^1\\.[12]') | last | default('') }}"
+        # NOTE: nvm-windows output contains "Installing node.js vXX.XX.XX" or "Version XX.XX.XX is already installed."
+        #       We use regex_findall to extract the version following 'v' or 'Version ' and pick the first match.
+        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_findall('(?:node\\.js v|Version )(\\d+\\.\\d+\\.\\d+)') | first | default('') }}"
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
         cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe use {{ install_base_packages_nvm_node_version }}"
-      when: install_base_packages_nvm_node_version != ""
+      when:
+        - install_base_packages_nvm_node_version is defined
+        - install_base_packages_nvm_node_version != ""
       changed_when: false
       environment:
         NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
@@ -270,9 +272,12 @@
         cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
       environment:
         PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
-        PATH: "{{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ ansible_facts.env.PATH }}"
+        # NOTE: We explicitly add the NVM symlink path to the PATH to ensure that
+        #       pnpm can find the newly installed Node.js version even if the
+        #       shell environment hasn't been refreshed yet.
+        PATH: >-
+          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/nodejs:{{ ansible_facts.env.PATH }}
       with_items:
         - tree-sitter-cli
         - neovim
       changed_when: false
-
