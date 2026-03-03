@@ -131,12 +131,18 @@
         cmd: >
           powershell.exe -Command "& '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\nvm.exe' root '{{ install_base_packages_scoop_root_win }}\persist\nvm\versions'"
       changed_when: false
+      environment:
+        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\versions"
+        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs"
 
     - name: Configure NVM symlink
       ansible.builtin.command:
         cmd: >
           powershell.exe -Command "& '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\nvm.exe' symlink '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs'"
       changed_when: false
+      environment:
+        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\versions"
+        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs"
 
     - name: Install Node.js LTS via NVM
       ansible.builtin.command:
@@ -146,18 +152,33 @@
       failed_when:
         - install_base_packages_nvm_install.rc != 0
         - "'already installed' not in install_base_packages_nvm_install.stdout"
+      environment:
+        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\versions"
+        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs"
 
-    - name: Set Node.js version fact from NVM install output
+    - name: Get installed Node.js versions
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe list"
+      register: install_base_packages_nvm_list
+      changed_when: false
+      environment:
+        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\versions"
+        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs"
+
+    - name: Set Node.js version fact
       ansible.builtin.set_fact:
-        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_search('\\d+\\.\\d+\\.\\d+') }}"
+        # NOTE: We look for version numbers that don't match the NVM version (1.1.x)
+        #       and pick the last (latest) one installed.
+        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_list.stdout | regex_findall('[0-9]+\\.[0-9]+\\.[0-9]+') | reject('search', '^1\\.1') | last | default('') }}"
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
         cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe use {{ install_base_packages_nvm_node_version }}"
-      when:
-        - install_base_packages_nvm_node_version is defined
-        - install_base_packages_nvm_node_version != ""
+      when: install_base_packages_nvm_node_version != ""
       changed_when: false
+      environment:
+        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\versions"
+        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs"
 
     - name: Download and Install AutoHotkey v1.1
       block:
