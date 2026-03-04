@@ -63,13 +63,12 @@
         configure_shell_argcomplete_activation.rc != 0 and
         configure_shell_argcomplete_activation.rc != 141
 
-    - name: Manually create global argcomplete hook for Debian (workaround for buggy script)
+    - name: Activate global argcomplete for Debian
       when: is_debian_family
       become: true
-      ansible.builtin.copy:
-        src: python-argcomplete.sh
-        dest: /etc/bash_completion.d/python-argcomplete.sh
-        mode: "0644"
+      ansible.builtin.shell: activate-global-python-argcomplete --dest=/etc/bash_completion.d/python-argcomplete.sh
+      args:
+        creates: /etc/bash_completion.d/python-argcomplete.sh
 
     - name: Get user's home directory path in POSIX format
       when: is_windows
