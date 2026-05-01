@@ -29,6 +29,7 @@
           - ansible-lint
           - gh
           - gnupg
+          - pinentry-mac
           - tlrc # NOTE: (tldr rust client)
           - tree
           - alacritty

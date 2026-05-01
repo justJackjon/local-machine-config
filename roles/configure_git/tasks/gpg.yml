@@ -1,3 +1,8 @@
+- name: Set Homebrew prefix fact
+  when: is_mac
+  ansible.builtin.set_fact:
+    homebrew_prefix: "{{ '/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local' }}"
+
 - name: Clear stale GPG locks
   ansible.builtin.shell: |
     gpgconf --kill all || true
@@ -23,6 +28,15 @@
     path: ~/.gnupg
     state: directory
     mode: "0700"
+
+- name: Configure gpg-agent for macOS pinentry
+  when: is_mac
+  ansible.builtin.lineinfile:
+    path: ~/.gnupg/gpg-agent.conf
+    line: "pinentry-program {{ homebrew_prefix | default('/opt/homebrew') }}/bin/pinentry-mac"
+    create: true
+    mode: "0600"
+  notify: Restart gpg-agent
 
 - name: Prompt for GPG key passphrase
   ansible.builtin.pause:
