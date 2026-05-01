@@ -48,6 +48,9 @@
       {%- endif %}
   register: configure_mcp_servers_install_result
   changed_when: "'Installing extension' in configure_mcp_servers_install_result.stdout"
+  failed_when:
+    - configure_mcp_servers_install_result.rc != 0
+    - "'already installed' not in configure_mcp_servers_install_result.stdout"
   when:
     - configure_mcp_servers_github_pat_check.rc == 0
     - "'github' not in configure_mcp_servers_extension_list.stdout"
