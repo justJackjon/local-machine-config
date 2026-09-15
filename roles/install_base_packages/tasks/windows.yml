@@ -265,6 +265,14 @@
         cmd: "{{ install_base_packages_pnpm_executable_path }} config set pnpm-home \"{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm\""
       changed_when: false
 
+    # NOTE: We explicitly add the NVM symlink path to the PATH to ensure that
+    #       pnpm can find the newly installed Node.js version even if the
+    #       shell environment hasn't been refreshed yet.
+    - name: Set pnpm install PATH fact
+      ansible.builtin.set_fact:
+        install_base_packages_pnpm_install_path: >-
+          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/nodejs:{{ ansible_facts.env.PATH }}
+
     - name: Install pnpm packages
       # NOTE: We use the absolute path to the pnpm executable obtained from `scoop which`
       #       to ensure we are using the correct, Scoop-managed binary.
@@ -272,12 +280,19 @@
         cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
       environment:
         PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
-        # NOTE: We explicitly add the NVM symlink path to the PATH to ensure that
-        #       pnpm can find the newly installed Node.js version even if the
-        #       shell environment hasn't been refreshed yet.
-        PATH: >-
-          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/nodejs:{{ ansible_facts.env.PATH }}
+        PATH: "{{ install_base_packages_pnpm_install_path }}"
       with_items:
-        - tree-sitter-cli
         - neovim
+      changed_when: false
+
+    # NOTE: pnpm >= 10 ignores lifecycle scripts by default, so tree-sitter-cli's install script
+    #       (which downloads the native `tree-sitter` binary) is skipped unless explicitly allowed
+    #       via `--allow-build`. Without this, nvim-treesitter fails with a `spawn ... ENOENT` error
+    #       when it tries to run the missing binary.
+    - name: Install tree-sitter-cli with its build script allowed
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_pnpm_executable_path }} add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
+      environment:
+        PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
+        PATH: "{{ install_base_packages_pnpm_install_path }}"
       changed_when: false
