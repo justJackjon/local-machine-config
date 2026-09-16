@@ -17,6 +17,7 @@
         path: "{{ item }}"
       loop:
         - "{{ stow_dotfiles_win_home_dir.stdout }}/scoop/shims/git.exe"
+        - "{{ stow_dotfiles_win_home_dir.stdout }}/scoop/apps/git/current/cmd/git.exe"
         - "/c/PROGRA~1/Git/cmd/git.exe"
         - "/c/PROGRA~1/Git/bin/git.exe"
       register: stow_dotfiles_git_check
