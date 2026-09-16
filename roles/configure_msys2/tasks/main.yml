@@ -12,6 +12,26 @@
         regexp: '^#MSYS2_PATH_TYPE=inherit'
         line: 'MSYS2_PATH_TYPE=inherit'
 
+    - name: Update msys2.ini file to inherit the full Windows PATH
+      ansible.builtin.lineinfile:
+        path: '/msys2.ini'
+        regexp: '^#MSYS2_PATH_TYPE=inherit'
+        line: 'MSYS2_PATH_TYPE=inherit'
+
+    - name: Set persistent MSYS2_PATH_TYPE user environment variable
+      ansible.builtin.command:
+        cmd: powershell.exe -NoProfile -Command "[Environment]::SetEnvironmentVariable('MSYS2_PATH_TYPE', 'inherit', 'User')"
+      changed_when: false
+
+    # NOTE: Disable pacman's default 10-second download timeout in libcurl to prevent
+    #       timeouts and transfer stalls when retrieving large packages from mirrors.
+    - name: Configure pacman to disable download timeout
+      ansible.builtin.lineinfile:
+        path: /etc/pacman.conf
+        insertafter: '^\[options\]'
+        regexp: '^#?DisableDownloadTimeout'
+        line: 'DisableDownloadTimeout'
+
 - name: Set up local configuration files if none are present
   when: is_windows
   block:
