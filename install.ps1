@@ -122,8 +122,21 @@ function Install-Dependencies {
       Write-Host "Git for Windows is already installed."
     }
 
+    # NOTE: Ensure Windows OpenSSH Authentication Agent (ssh-agent) service is enabled and running
+    if (Get-Service ssh-agent -ErrorAction SilentlyContinue) {
+      try {
+        Set-Service -Name ssh-agent -StartupType Automatic -ErrorAction SilentlyContinue
+        Start-Service -Name ssh-agent -ErrorAction SilentlyContinue
+      } catch {
+        # Ignore if permissions or group policy prevent service modification
+      }
+    }
+
     Write-Info "Checking for Ansible in MSYS2 environment..."
     $ansibleCheck = & $msys2Shell -lc "which ansible-playbook 2>/dev/null"
+
+    # NOTE: Disable download timeout in pacman to avoid timeouts on large packages or slow mirrors.
+    & $msys2Shell -lc "grep -q '^DisableDownloadTimeout' /etc/pacman.conf || sed -i '/^\[options\]/a DisableDownloadTimeout' /etc/pacman.conf"
 
     if (-not $ansibleCheck) {
       Write-Info "Installing Ansible in MSYS2..."
@@ -205,11 +218,28 @@ if (-not (Test-Path -Path $LOCAL_REPO_PATH)) {
 } else {
   Write-Info "Repository already cloned. Pulling latest changes."
   Push-Location $LOCAL_REPO_PATH
-  # NOTE: Handle scenarios where git may not yet be available in the PowerShell PATH by catching the exception.
+  # NOTE: Handle scenarios where git may not yet be available in the PowerShell PATH or SSH keys are locked.
   try {
-    git stash --include-untracked | Out-Null
-    git pull | Out-Null
-    git stash pop | Out-Null
+    $hasChanges = (git status --porcelain)
+    if ($hasChanges) {
+      git stash --include-untracked | Out-Null
+    }
+
+    # Attempt git pull with batch mode to avoid interactive passphrase prompts when SSH key is unauthenticated
+    $pullOutput = git -c core.sshCommand="ssh -o BatchMode=yes" pull 2>&1
+    if ($LASTEXITCODE -ne 0) {
+      Write-Info "Pull from default remote failed or requires SSH authentication. Falling back to HTTPS..."
+      $pullOutput = git pull https://github.com/justjackjon/local-machine-config.git main 2>&1
+      if ($LASTEXITCODE -ne 0) {
+        Write-WarningMsg "Failed to pull latest changes from HTTPS fallback. Continuing with local version.`n$pullOutput"
+      } else {
+        Write-Info "Successfully pulled latest changes via HTTPS."
+      }
+    }
+
+    if ($hasChanges) {
+      git stash pop | Out-Null
+    }
   } catch {
     Write-WarningMsg "Failed to pull latest changes. Continuing with local version."
   }
