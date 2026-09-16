@@ -1,6 +1,8 @@
 - name: Set Gemini CLI base command fact
   ansible.builtin.set_fact:
-    configure_mcp_servers_gemini_base: "{{ configure_mcp_pnpm_executable | default('pnpm') }} dlx @google/gemini-cli"
+    # NOTE: In pnpm v10+, build scripts of unapproved dependencies are blocked (ERR_PNPM_IGNORED_BUILDS).
+    #       Passing --ignore-scripts to dlx ensures @google/gemini-cli runs cleanly without native compilation failures.
+    configure_mcp_servers_gemini_base: "{{ configure_mcp_pnpm_executable | default('pnpm') }} dlx --ignore-scripts @google/gemini-cli"
 
 - name: Check for GitHub MCP Personal Access Token
   ansible.builtin.shell: |
@@ -11,6 +13,7 @@
   ignore_errors: true
 
 - name: Check if GitHub extension is already installed
+  when: configure_mcp_servers_github_pat_check.rc == 0
   ansible.builtin.shell: >-
     {% if is_windows -%}
     {{ configure_mcp_servers_gemini_base }} extensions list 2>&1{%- else -%}
@@ -22,7 +25,7 @@
       {% if is_windows -%}{{ ansible_facts['env']['USERPROFILE'] }}\AppData\Local\pnpm{%- endif %}
     PATH: >-
       {% if is_windows -%}
-      {{ configure_mcp_win_home_dir.stdout ~ '/AppData/Local/pnpm;' ~ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
+      {{ configure_mcp_win_home_dir.stdout ~ '/AppData/Local/pnpm:' ~ configure_mcp_nodejs_path ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
       {%- else -%}
       {{ configure_mcp_nvm_node_bin ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nvm_node_bin is defined else ansible_facts.env.PATH }}
       {%- endif %}
@@ -42,7 +45,7 @@
       {% if is_windows -%}{{ ansible_facts['env']['USERPROFILE'] }}\AppData\Local\pnpm{%- endif %}
     PATH: >-
       {% if is_windows -%}
-      {{ configure_mcp_win_home_dir.stdout ~ '/AppData/Local/pnpm;' ~ configure_mcp_nodejs_path ~ ';' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
+      {{ configure_mcp_win_home_dir.stdout ~ '/AppData/Local/pnpm:' ~ configure_mcp_nodejs_path ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nodejs_path is defined else ansible_facts.env.PATH }}
       {%- else -%}
       {{ configure_mcp_nvm_node_bin ~ ':' ~ ansible_facts.env.PATH if configure_mcp_nvm_node_bin is defined else ansible_facts.env.PATH }}
       {%- endif %}
@@ -53,6 +56,7 @@
     - "'already installed' not in configure_mcp_servers_install_result.stdout"
   when:
     - configure_mcp_servers_github_pat_check.rc == 0
+    - configure_mcp_servers_extension_list.stdout is defined
     - "'github' not in configure_mcp_servers_extension_list.stdout"
   # noqa command-instead-of-shell yaml[line-length]
 
