@@ -33,6 +33,7 @@
   roles:
     - role: configure_msys2
       when: is_windows
+      tags: [install_base_packages, configure_shell]
 
     - role: install_base_packages
       tags: [install_base_packages, configure_git, configure_keyboard, configure_mcp_servers]
@@ -49,8 +50,10 @@
     - role: configure_keyboard
       tags: configure_keyboard
 
-    - install_browser
-    - install_lazyvim
+    - role: install_browser
+      tags: install_browser
+    - role: install_lazyvim
+      tags: install_lazyvim
     - role: stow_dotfiles
       tags: [stow_dotfiles, configure_mcp_servers]
 
