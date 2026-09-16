@@ -77,6 +77,22 @@
       register: configure_shell_win_home_dir
       changed_when: false
 
+    - name: Remove misplaced Scoop and Starship PATH export in MSYS2 bashrc
+      when: is_windows
+      ansible.builtin.lineinfile:
+        path: "{{ configure_shell_win_home_dir.stdout }}/.bashrc"
+        regexp: '^export PATH=.*scoop/apps/starship'
+        state: absent
+
+    - name: Ensure Scoop and Starship are in PATH in MSYS2 bashrc
+      when: is_windows
+      ansible.builtin.lineinfile:
+        path: "{{ configure_shell_win_home_dir.stdout }}/.bashrc"
+        line: 'export PATH="$PATH:{{ configure_shell_win_home_dir.stdout }}/scoop/apps/starship/current:{{ configure_shell_win_home_dir.stdout }}/scoop/shims"'
+        insertbefore: 'eval "\$\(starship init bash\)"'
+        create: true
+        mode: "0644"
+
     - name: Configure Starship for use with bash
       ansible.builtin.lineinfile:
         path: "{{ (configure_shell_win_home_dir.stdout | default('')) if is_windows else ansible_facts.env.HOME }}/.bashrc"
@@ -88,28 +104,36 @@
       when: is_windows
       ansible.builtin.lineinfile:
         path: "{{ ansible_facts.env.HOME }}/.bashrc"
-        line: "source /mingw64/lib/python3.12/site-packages/argcomplete/bash_completion.d/_python-argcomplete"
+        regexp: '^source /mingw64/lib/python.*/site-packages/argcomplete/bash_completion\.d/_python-argcomplete'
         state: absent
 
-    - name: Manually create global argcomplete hook for Windows (MSYS2)
+    - name: Find MinGW argcomplete hook for Windows (MSYS2)
       when: is_windows
+      ansible.builtin.find:
+        paths: /mingw64/lib
+        patterns: "_python-argcomplete"
+        recurse: true
+      register: configure_shell_mingw_argcomplete_find
+
+    - name: Manually create global argcomplete hook for Windows (MSYS2)
+      when:
+        - is_windows
+        - configure_shell_mingw_argcomplete_find.matched > 0
       ansible.builtin.lineinfile:
         path: "{{ ansible_facts.env.HOME }}/.bashrc"
-        line: "source /mingw64/lib/python{{ ansible_facts.python.version.major }}.{{ ansible_facts.python.version.minor }}/site-packages/argcomplete/bash_completion.d/_python-argcomplete"
+        line: "source {{ configure_shell_mingw_argcomplete_find.files[0].path }}"
         create: true
         mode: "0644"
 
-- name: Source .dotfilesrc in .bashrc
+- name: Clean up unguarded .dotfilesrc source line
   ansible.builtin.lineinfile:
     path: "{{ ansible_facts.env.HOME }}/.bashrc"
     line: "source {{ ansible_facts.env.HOME }}/.dotfilesrc"
+    state: absent
+
+- name: Source .dotfilesrc in .bashrc if present
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_facts.env.HOME }}/.bashrc"
+    line: '[ -f "{{ ansible_facts.env.HOME }}/.dotfilesrc" ] && source "{{ ansible_facts.env.HOME }}/.dotfilesrc"'
     create: true
     mode: "0644"
-
-- name: Install and Configure Starship
-  when: is_windows
-  block:
-    - name: Install Starship via pacman
-      community.general.pacman:
-        name: mingw-w64-x86_64-starship
-        state: present
