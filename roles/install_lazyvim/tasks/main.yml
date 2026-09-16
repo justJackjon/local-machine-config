@@ -17,10 +17,11 @@
       when: is_windows
       ansible.builtin.set_fact:
         install_lazyvim_minttyrc_file: "{{ install_lazyvim_win_home_dir + '/.minttyrc' if is_windows else '~/.minttyrc' }}"
+        install_lazyvim_localappdata_posix: "{{ install_lazyvim_win_home_dir }}/AppData/Local"
 
     - name: Set general facts
       ansible.builtin.set_fact:
-        install_lazyvim_nvim_config_dir: "{{ '$env:LOCALAPPDATA\nvim' if is_windows else '~/.config/nvim' }}"
+        install_lazyvim_nvim_config_dir: "{{ install_lazyvim_localappdata_posix + '/nvim' if is_windows else '~/.config/nvim' }}"
 
     - name: Ensure required dependencies are installed
       block:
@@ -199,20 +200,37 @@
       loop_control:
         loop_var: item
 
+    - name: Set git executable path (Windows)
+      when: is_windows
+      block:
+        - name: Check for Git in standard locations
+          ansible.builtin.stat:
+            path: "{{ item }}"
+          loop:
+            - "{{ install_lazyvim_win_home_dir }}/scoop/shims/git.exe"
+            - "{{ install_lazyvim_win_home_dir }}/scoop/apps/git/current/cmd/git.exe"
+            - "/c/PROGRA~1/Git/cmd/git.exe"
+            - "/c/PROGRA~1/Git/bin/git.exe"
+          register: install_lazyvim_git_check
+
+        - name: Set git executable path fact
+          ansible.builtin.set_fact:
+            install_lazyvim_git_executable: "{{ (install_lazyvim_git_check.results | selectattr('stat.exists') | map(attribute='item') | first) | default('git') }}"
+
     - name: Backup current Neovim Configuration (Windows)
       when: is_windows
       block:
         - name: Check for nvim config directory
           ansible.builtin.stat:
-            path: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim"
+            path: "{{ install_lazyvim_localappdata_posix }}/nvim"
           register: install_lazyvim_nvim_config_dir_stat
 
         - name: Backup nvim config directory
           when: install_lazyvim_nvim_config_dir_stat.stat.exists
           ansible.builtin.command:
             cmd: >
-              mv "{{ ansible_facts.env.LOCALAPPDATA }}/nvim"
-              "{{ ansible_facts.env.LOCALAPPDATA }}/nvim.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
+              mv "{{ install_lazyvim_localappdata_posix }}/nvim"
+              "{{ install_lazyvim_localappdata_posix }}/nvim.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
           register: install_lazyvim_backup_nvim_config_result
           failed_when: false
           changed_when: install_lazyvim_backup_nvim_config_result.rc == 0
@@ -222,19 +240,19 @@
             - install_lazyvim_nvim_config_dir_stat.stat.exists
             - install_lazyvim_backup_nvim_config_result.rc != 0
           ansible.builtin.debug:
-            msg: "WARNING: Could not backup {{ ansible_facts.env.LOCALAPPDATA }}/nvim due to permission errors. Skipping backup."
+            msg: "WARNING: Could not backup {{ install_lazyvim_localappdata_posix }}/nvim due to permission errors. Skipping backup."
 
         - name: Check for nvim-data directory
           ansible.builtin.stat:
-            path: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim-data"
+            path: "{{ install_lazyvim_localappdata_posix }}/nvim-data"
           register: install_lazyvim_nvim_data_dir_stat
 
         - name: Backup nvim-data directory
           when: install_lazyvim_nvim_data_dir_stat.stat.exists
           ansible.builtin.command:
             cmd: >
-              mv "{{ ansible_facts.env.LOCALAPPDATA }}/nvim-data"
-              "{{ ansible_facts.env.LOCALAPPDATA }}/nvim-data.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
+              mv "{{ install_lazyvim_localappdata_posix }}/nvim-data"
+              "{{ install_lazyvim_localappdata_posix }}/nvim-data.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
           register: install_lazyvim_backup_nvim_data_result
           failed_when: false
           changed_when: install_lazyvim_backup_nvim_data_result.rc == 0
@@ -244,24 +262,24 @@
             - install_lazyvim_nvim_data_dir_stat.stat.exists
             - install_lazyvim_backup_nvim_data_result.rc != 0
           ansible.builtin.debug:
-            msg: "WARNING: Could not backup {{ ansible_facts.env.LOCALAPPDATA }}/nvim-data due to permission errors. Skipping backup."
+            msg: "WARNING: Could not backup {{ install_lazyvim_localappdata_posix }}/nvim-data due to permission errors. Skipping backup."
 
         - name: Clone LazyVim starter
           ansible.builtin.git:
             repo: "https://github.com/LazyVim/starter"
-            dest: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim"
+            dest: "{{ install_lazyvim_localappdata_posix }}/nvim"
             version: main
-            executable: /c/PROGRA~1/Git/cmd/git
+            executable: "{{ install_lazyvim_git_executable | default(omit) }}"
 
         - name: Check for .git folder
           ansible.builtin.stat:
-            path: "{{ ansible_facts.env.LOCALAPPDATA }}/nvim/.git"
+            path: "{{ install_lazyvim_localappdata_posix }}/nvim/.git"
           register: install_lazyvim_git_folder_stat
 
         - name: Remove .git folder
           when: install_lazyvim_git_folder_stat.stat.exists
           ansible.builtin.command:
-            cmd: rm -rf "{{ ansible_facts.env.LOCALAPPDATA }}/nvim/.git"
+            cmd: rm -rf "{{ install_lazyvim_localappdata_posix }}/nvim/.git"
           changed_when: true
 
     - name: Install LazyVim
