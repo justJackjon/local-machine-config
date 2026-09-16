@@ -152,6 +152,23 @@
     - name: Windows-specific ssh-agent setup
       when: is_windows
       block:
+        - name: Configure SSH config for GitHub to use ansible-managed key on Windows
+          ansible.builtin.include_tasks: ../../../common/tasks/manage_ssh_config_entry.yml
+          vars:
+            ssh_config_host: "github.com"
+            ssh_config_marker: "# {mark} ANSIBLE MANAGED BLOCK FOR GITHUB"
+            ssh_config_block: |
+              Host github.com
+                AddKeysToAgent yes
+                IdentitiesOnly yes
+                IdentityFile ~/.ssh/ansible-managed/github/id_rsa
+
+        - name: Ensure Windows OpenSSH Authentication Agent service is enabled and running
+          when: has_admin_privileges | default(false)
+          ansible.builtin.command:
+            cmd: powershell.exe -Command "Set-Service -Name ssh-agent -StartupType Automatic; Start-Service -Name ssh-agent"
+          changed_when: false
+
         - name: Configure bashrc to use ssh-agent
           ansible.builtin.blockinfile:
             path: "{{ ansible_facts.env.HOME }}/.bashrc"
@@ -172,11 +189,17 @@
               # agent_run_state: 0=agent running w/ key; 1=agent w/o key; 2=agent not running
               agent_run_state=$(/usr/bin/ssh-add -l >| /dev/null 2>&1; echo $?)
 
-              if [ ! "$SSH_AUTH_SOCK" ] || [ $agent_run_state = 2 ]; then
-                  agent_start
-                  /usr/bin/ssh-add {{ configure_git_ssh_key_path }}
-              elif [ "$SSH_AUTH_SOCK" ] && [ $agent_run_state = 1 ]; then
-                  /usr/bin/ssh-add {{ configure_git_ssh_key_path }}
+              if [ -t 0 ]; then
+                  if [ ! "$SSH_AUTH_SOCK" ] || [ $agent_run_state = 2 ]; then
+                      agent_start
+                      /usr/bin/ssh-add {{ configure_git_ssh_key_path }}
+                  elif [ "$SSH_AUTH_SOCK" ] && [ $agent_run_state = 1 ]; then
+                      /usr/bin/ssh-add {{ configure_git_ssh_key_path }}
+                  fi
+              else
+                  if [ ! "$SSH_AUTH_SOCK" ] || [ $agent_run_state = 2 ]; then
+                      agent_start
+                  fi
               fi
 
               unset env
