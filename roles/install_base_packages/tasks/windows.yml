@@ -2,10 +2,19 @@
   when: is_windows
   block:
     # NOTE: The following packages are required for lazyvim and its plugins.
-    #       - mingw-w64-x86_64-fd: Required by lazyvim and snacks for file searching
+    #       - fd & ripgrep: Required by lazyvim and snacks for file and text searching (managed via Scoop)
     #       - mingw-w64-x86_64-lua-luarocks: Required by lazy and mason for Lua plugin management
     #       - mingw-w64-x86_64-imagemagick: Required by snacks for image previews
     #       - mingw-w64-x86_64-sqlite3: Required by lazyvim and snacks for history and frecency
+    # NOTE: Disable pacman's default 10-second download timeout in libcurl to prevent
+    #       connection timeouts and transfer stalls when retrieving large packages from mirrors.
+    - name: Configure pacman to disable download timeout
+      ansible.builtin.lineinfile:
+        path: /etc/pacman.conf
+        insertafter: '^\[options\]'
+        regexp: '^#?DisableDownloadTimeout'
+        line: 'DisableDownloadTimeout'
+
     - name: Install required packages for Windows with MSYS2
       community.general.pacman:
         name:
@@ -23,10 +32,8 @@
           - mingw-w64-x86_64-python-cffi
           - mingw-w64-x86_64-python-bcrypt
           - mingw-w64-x86_64-python-cryptography
-          - mingw-w64-x86_64-fzf
-          - mingw-w64-x86_64-ripgrep
           - mingw-w64-x86_64-jq
-          - mingw-w64-x86_64-fd
+          - jq
           - mingw-w64-x86_64-lua-luarocks
           - mingw-w64-x86_64-imagemagick
           - mingw-w64-x86_64-sqlite3
@@ -38,6 +45,10 @@
         state: latest
         update_cache: true
         extra_args: --overwrite "*"
+      register: install_base_packages_pacman_result
+      until: install_base_packages_pacman_result is not failed
+      retries: 3
+      delay: 5
 
     - name: Install Scoop packages
       block:
@@ -103,10 +114,21 @@
           - name: alacritty
             executable_name: alacritty
           - name: cascadiacode-nf
+          - name: fzf
+            executable_name: fzf
+          - name: ripgrep
+            executable_name: rg
+          - name: fd
+            executable_name: fd
           - name: perl
             executable_name: perl
           - name: pnpm
             executable_name: pnpm
+          # NOTE: starship uses env_add_path instead of standard Scoop shims (for performance).
+          #       We set skip_which_check to true to avoid 'scoop which' validation failures.
+          - name: starship
+            executable_name: starship
+            skip_which_check: true
 
     - name: Process Scoop packages
       ansible.builtin.include_tasks: ../../../common/tasks/install_scoop_package.yml
@@ -159,9 +181,26 @@
         - install_base_packages_nvm_node_version is defined
         - install_base_packages_nvm_node_version != ""
       changed_when: false
+      failed_when: false
       environment:
         NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
         NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
+
+    # NOTE: nvm-windows attempts to elevate via UAC to create directory symlinks.
+    #       Creating a directory Junction in PowerShell requires no administrator privileges.
+    - name: Ensure NVM nodejs junction exists
+      ansible.builtin.command:
+        cmd: >
+          powershell.exe -Command "
+          $link = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\nodejs';
+          $target = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\v{{ install_base_packages_nvm_node_version }}';
+          if (-not (Test-Path -Path $link)) {
+            New-Item -ItemType Junction -Path $link -Target $target | Out-Null;
+          }"
+      when:
+        - install_base_packages_nvm_node_version is defined
+        - install_base_packages_nvm_node_version != ""
+      changed_when: false
 
     - name: Download and Install AutoHotkey v1.1
       block:
@@ -260,9 +299,11 @@
         cmd: "{{ install_base_packages_pnpm_executable_path }} config set global-bin-dir \"{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm\""
       changed_when: false
 
-    - name: Configure pnpm pnpm-home
+    # NOTE: In pnpm v10+, pnpm-home is not a supported config key in config.yaml.
+    #       PNPM_HOME is an environment variable pointing to the global directory.
+    - name: Configure PNPM_HOME user environment variable
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_pnpm_executable_path }} config set pnpm-home \"{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm\""
+        cmd: powershell.exe -Command "[Environment]::SetEnvironmentVariable('PNPM_HOME', '{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm', 'User')"
       changed_when: false
 
     # NOTE: We explicitly add the NVM symlink path to the PATH to ensure that

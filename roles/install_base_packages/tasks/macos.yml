@@ -41,6 +41,7 @@
           - imagemagick
           - sqlite
           - pipx
+          - starship
         state: latest
         update_homebrew: true
 
