@@ -43,6 +43,7 @@
 
     - role: install_wsl_gui
       when: is_wsl | default(false)
+      tags: install_wsl_gui
 
     - role: configure_shell
       tags: [configure_shell, configure_mcp_servers]
