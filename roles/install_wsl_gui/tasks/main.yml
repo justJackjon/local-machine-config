@@ -8,6 +8,7 @@
   ansible.builtin.apt:
     name:
       - xfce4
+      - xfce4-terminal
       - xrdp
       - net-tools
     state: present
@@ -19,6 +20,39 @@
     name: x-terminal-emulator
     path: /usr/local/bin/alacritty
     link: /usr/bin/x-terminal-emulator
+
+- name: Set system-wide XFCE default terminal emulator to alacritty
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/xdg/xfce4/helpers.rc
+    regexp: "^TerminalEmulator=.*"
+    line: "TerminalEmulator=alacritty"
+    owner: root
+    group: root
+    mode: "0644"
+    create: true
+
+- name: Ensure user xfce4 configuration directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_facts.env.HOME }}/.config/xfce4"
+    state: directory
+    mode: "0755"
+
+- name: Set user XFCE default terminal emulator to alacritty
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_facts.env.HOME }}/.config/xfce4/helpers.rc"
+    regexp: "^TerminalEmulator=.*"
+    line: "TerminalEmulator=alacritty"
+    mode: "0644"
+    create: true
+
+- name: Set user XFCE terminal emulator dismissed flag
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_facts.env.HOME }}/.config/xfce4/helpers.rc"
+    regexp: "^TerminalEmulatorDismissed=.*"
+    line: "TerminalEmulatorDismissed=true"
+    mode: "0644"
+    create: true
 
 - name: Remove IBus to prevent Wayland/X11 conflict
   ansible.builtin.apt:
