@@ -120,6 +120,20 @@
           register: os_release_result
           changed_when: false
 
+        # NOTE: Ubuntu 25.10+ and 26.04+ use sudo-rs by default, which breaks Ansible become prompt matching.
+        # Check for /usr/bin/sudo.ws using raw so become can succeed.
+        - name: Check for sudo.ws on Debian-like systems
+          ansible.builtin.raw: test -x /usr/bin/sudo.ws && echo "found" || echo "not_found"
+          register: sudo_ws_check
+          changed_when: false
+
+        - name: Set ansible_become_exe to sudo.ws if available # noqa: var-naming[no-role-prefix]
+          ansible.builtin.set_fact:
+            ansible_become_exe: /usr/bin/sudo.ws
+          when:
+            - sudo_ws_check.stdout is defined
+            - "'found' in sudo_ws_check.stdout"
+
         - name: Install python3-venv package on Debian-like systems
           ansible.builtin.apt:
             name: python3-venv
