@@ -132,6 +132,21 @@
           ansible.builtin.set_fact:
             install_lazyvim_pnpm_home_dir: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
 
+        - name: Remove circular pnpm shim in bin directory if present
+          ansible.builtin.file:
+            path: "{{ install_lazyvim_pnpm_home_dir }}/bin/pnpm"
+            state: absent
+
+        - name: Find NVM Node bin directory (Unix)
+          ansible.builtin.shell: |
+            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
+          register: install_lazyvim_nvm_node_bin_raw
+          changed_when: false
+
+        - name: Set NVM Node bin fact (Unix)
+          ansible.builtin.set_fact:
+            install_lazyvim_node_bin_dir: "{{ install_lazyvim_nvm_node_bin_raw.stdout | trim }}"
+
         - name: Install pynvim for Python provider (Debian)
           when: is_debian_family
           become: true
@@ -146,11 +161,11 @@
             state: latest
 
         - name: Install neovim for Node.js provider (Unix)
-          ansible.builtin.command: pnpm add -g neovim
+          ansible.builtin.command: "{{ install_lazyvim_pnpm_home_dir }}/pnpm add -g neovim"
           changed_when: false
           environment:
             PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
-            PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ ansible_facts.env.PATH }}"
+            PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ install_lazyvim_pnpm_home_dir }}/bin:{{ install_lazyvim_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
 
     - name: Get pnpm executable path from Scoop (Windows)
       when: is_windows
