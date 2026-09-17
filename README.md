@@ -33,6 +33,9 @@ To start the setup on Linux or macOS, run the following command in your terminal
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh)"
 ```
 
+> [!NOTE]
+> The script will pause at the end (or upon failure) to allow you to review the output. Full logs are also saved to `/tmp/local-machine-config-install.log`.
+
 > [!WARNING]
 > Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.sh)
 

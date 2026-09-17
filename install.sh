@@ -4,6 +4,15 @@
 set -e
 set -o pipefail
 
+# Log file location
+LOG_FILE="${TMPDIR:-/tmp}/local-machine-config-install.log"
+
+# Save original stdout/stderr file descriptors
+exec 3>&1 4>&2
+
+# Redirect stdout and stderr through tee to log to file while displaying to console
+exec > >(tee "$LOG_FILE") 2>&1
+
 # Function to print messages
 info() {
   printf "\033[0;35mINFO: %s\033[0m\n" "$1"
@@ -27,6 +36,30 @@ warning() {
 note() {
   printf "\033[0;36mNOTE: %s\033[0m\n" "$1"
 }
+
+# Exit handler: restores file descriptors, reports log location, and pauses if interactive
+pause_and_exit() {
+  local exit_code=$?
+
+  # Restore original stdout/stderr so tee flushes and closes
+  exec 1>&3 2>&4 3>&- 4>&-
+  sleep 0.1
+
+  if [ "$exit_code" -eq 0 ]; then
+    info "Full logs saved to: ${LOG_FILE}"
+  else
+    error "Setup exited with code ${exit_code}. Full logs saved to: ${LOG_FILE}"
+  fi
+
+  # Pause if running in an interactive terminal to prevent the window closing before output is seen
+  if [ -t 0 ] || [ -t 1 ]; then
+    printf "\n"
+    read -r -p "Press Enter to exit..." </dev/tty 2>/dev/null || true
+  fi
+  exit "$exit_code"
+}
+
+trap pause_and_exit EXIT
 
 # Detect OS
 OS="$(uname -s)"
