@@ -52,6 +52,13 @@ if [ "$os" == "Linux" ]; then
   pipx ensurepath
   pipx install ansible ansible-core
 
+  # NOTE: Ubuntu 25.10+ and 26.04+ default to sudo-rs which breaks Ansible become prompt regex.
+  # If sudo.ws is available, set the system alternative so sudo points to sudo.ws.
+  if command -v sudo.ws &>/dev/null; then
+    info "Setting sudo alternative to /usr/bin/sudo.ws for Ansible become compatibility..."
+    sudo update-alternatives --set sudo /usr/bin/sudo.ws || true
+  fi
+
   info "Installing latest gh cli..."
   (type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
 	&& sudo mkdir -p -m 755 /etc/apt/keyrings \

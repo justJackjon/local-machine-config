@@ -23,3 +23,15 @@
       {{ ansible_facts.user_id }} hard nofile {{ configure_system_max_open_files }}
     marker: "# {mark} ANSIBLE MANAGED BLOCK for nofile limit"
     mode: '0644'
+
+- name: Check if sudo.ws exists
+  ansible.builtin.stat:
+    path: /usr/bin/sudo.ws
+  register: configure_system_sudo_ws_stat
+
+- name: Ensure traditional sudo.ws is used as default sudo alternative  # noqa: syntax-check[unknown-module]
+  when: configure_system_sudo_ws_stat.stat.exists | default(false)
+  become: true
+  community.general.alternatives:
+    name: sudo
+    path: /usr/bin/sudo.ws

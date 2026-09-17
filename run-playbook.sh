@@ -52,6 +52,14 @@ if [[ "$(uname -r)" == *[mM]icrosoft* ]] || [[ "$(uname -r)" == *[wW][sS][lL]* ]
   CMD="ANSIBLE_CONFIG=./ansible.cfg $CMD"
 fi
 
+# NOTE: In newer Ubuntu releases (e.g. 25.10+ / 26.04+), sudo-rs is the default sudo implementation
+#       and formats prompts as '[sudo: ...] Password:', which breaks Ansible's become prompt detection.
+#       When sudo.ws is available, set ANSIBLE_BECOME_EXE to use the traditional sudo wrapper.
+if command -v sudo.ws &>/dev/null; then
+  info "Legacy sudo (sudo.ws) detected. Setting ANSIBLE_BECOME_EXE to ensure Ansible become compatibility."
+  CMD="ANSIBLE_BECOME_EXE=sudo.ws $CMD"
+fi
+
 # Execute the final command, passing along any extra arguments provided to the script
 # This allows users to add flags like --syntax-check, --list-tasks, etc.
 info "Running command: $CMD $@"
