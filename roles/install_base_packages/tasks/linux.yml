@@ -12,13 +12,14 @@
       become: true
       ansible.builtin.apt:
         name:
+          - curl
           - python3-pip
           - pipx
           - bash-completion
           - stow
           - gnupg
           - xclip
-          - tldr
+          - tealdeer # NOTE: Fast Rust implementation providing /usr/bin/tldr (legacy python 'tldr' package dropped)
           - tree
           - jq
           - ssh-askpass
