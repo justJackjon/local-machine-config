@@ -65,6 +65,16 @@
             executable: /bin/bash
             creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
 
+        - name: Find NVM Node bin directory
+          ansible.builtin.shell: |
+            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
+          register: install_base_packages_nvm_node_bin_raw
+          changed_when: false
+
+        - name: Set NVM Node bin fact
+          ansible.builtin.set_fact:
+            install_base_packages_node_bin_dir: "{{ install_base_packages_nvm_node_bin_raw.stdout | trim }}"
+
     - name: Ensure pnpm global directory exists
       ansible.builtin.file:
         path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
@@ -80,7 +90,7 @@
         - neovim
       environment:
         PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.PATH }}"
+        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
 
     # NOTE: pnpm >= 10 ignores lifecycle scripts by default, so tree-sitter-cli's install script
     #       (which downloads the native `tree-sitter` binary) is skipped unless explicitly allowed
@@ -91,7 +101,7 @@
       ansible.builtin.command: pnpm add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest
       environment:
         PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.PATH }}"
+        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
       changed_when: false
 
     - name: Install pipx packages

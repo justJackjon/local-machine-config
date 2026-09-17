@@ -216,10 +216,26 @@
             executable: /bin/bash
             creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
 
+        - name: Find NVM Node bin directory
+          ansible.builtin.shell: |
+            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
+          register: install_base_packages_nvm_node_bin_raw
+          changed_when: false
+
+        - name: Set NVM Node bin fact
+          ansible.builtin.set_fact:
+            install_base_packages_node_bin_dir: "{{ install_base_packages_nvm_node_bin_raw.stdout | trim }}"
+
         - name: Check if pnpm is installed
           ansible.builtin.stat:
             path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
           register: install_base_packages_pnpm_stat_debian
+
+        - name: Ensure pnpm home directory exists
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
+            state: directory
+            mode: "0755"
 
         - name: Download pnpm install script
           when: not install_base_packages_pnpm_stat_debian.stat.exists
@@ -230,8 +246,36 @@
 
         - name: Run pnpm install script
           when: not install_base_packages_pnpm_stat_debian.stat.exists
-          ansible.builtin.command: "sh /tmp/install_pnpm_{{ ansible_user_id }}.sh"
-          changed_when: false
+          ansible.builtin.shell: >
+            set -o pipefail &&
+            export PNPM_HOME="{{ ansible_facts.env.HOME }}/.local/share/pnpm" &&
+            export SHELL="/bin/bash" &&
+            export PATH="$PNPM_HOME:$PATH" &&
+            bash /tmp/install_pnpm_{{ ansible_user_id }}.sh
+          args:
+            executable: /bin/bash
+          changed_when: true
+          failed_when: false
+
+        - name: Check if pnpm binary exists after install script
+          ansible.builtin.stat:
+            path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+          register: install_base_packages_pnpm_installed_stat
+
+        # NOTE: If standalone installer failed or didn't place pnpm in PNPM_HOME,
+        # fallback to npm from Node LTS (installed via nvm above) to ensure pnpm is present.
+        - name: Install pnpm via npm fallback if needed
+          when: not install_base_packages_pnpm_installed_stat.stat.exists
+          ansible.builtin.shell: >
+            set -o pipefail &&
+            source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh &&
+            npm install -g pnpm &&
+            export PNPM_HOME="{{ ansible_facts.env.HOME }}/.local/share/pnpm" &&
+            export SHELL="/bin/bash" &&
+            pnpm setup --force || cp "$(which pnpm)" "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+          args:
+            executable: /bin/bash
+          changed_when: true
 
         - name: Update pnpm
           when: install_base_packages_pnpm_stat_debian.stat.exists
@@ -250,7 +294,7 @@
         executable: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
       environment:
         PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.PATH }}"
+        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
       with_items:
         - neovim
 
@@ -263,7 +307,7 @@
       ansible.builtin.command: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
       environment:
         PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.PATH }}"
+        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
       changed_when: false
 
     - name: Ensure pipx binary directory is in PATH
