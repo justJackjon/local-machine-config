@@ -134,3 +134,19 @@
           - "Kinto is not supported on WSL2 due to limitations with the `uinput` kernel module."
           - "To enable macOS-style keybindings, please run this playbook on your Windows host."
       when: is_wsl
+
+    - name: Display Remote Desktop (XRDP) connection details for WSL2
+      when: is_wsl | default(false)
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "   WSL2 REMOTE DESKTOP (XRDP) DETAILS"
+          - "=========================================="
+          - "To connect to your XFCE desktop environment from Windows:"
+          - "  1. Open Remote Desktop Connection (mstsc.exe)"
+          - "  2. Computer:  localhost:3389"
+          - "  3. Session:   Xorg"
+          - "  4. Username:  {{ ansible_facts.user_id }}"
+          - "  5. Password:  <Your Linux/sudo password>"
+          - "=========================================="
+      tags: install_wsl_gui
