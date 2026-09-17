@@ -8,6 +8,8 @@
     #       - imagemagick: Required by snacks for image previews
     #       - sqlite3: Required by snacks for history and frecency
     #       - libsqlite3-dev: Required by snacks for history and frecency (dev headers)
+    # NOTE: libxkbcommon0, libxkbcommon-x11-0, libxkbcommon-dev, and libxcb-xfixes0-dev are
+    #       required for Alacritty to compile and dynamically load X11 keyboard libraries at runtime.
     - name: Install required packages for Debian based systems
       become: true
       ansible.builtin.apt:
@@ -31,6 +33,10 @@
           - sqlite3
           - libsqlite3-dev
           - libfontconfig1-dev
+          - libxkbcommon0
+          - libxkbcommon-x11-0
+          - libxkbcommon-dev
+          - libxcb-xfixes0-dev
           - pkg-config
           - openssh-client
         state: latest
@@ -64,6 +70,38 @@
       environment:
         PATH: "/root/.cargo/bin:{{ ansible_facts.env.PATH }}"
         CARGO_INSTALL_ROOT: "/usr/local"
+
+    - name: Install Alacritty desktop entry and icon
+      become: true
+      block:
+        - name: Download Alacritty icon
+          ansible.builtin.get_url:
+            url: https://raw.githubusercontent.com/alacritty/alacritty/master/extra/logo/alacritty-term.svg
+            dest: /usr/share/pixmaps/Alacritty.svg
+            mode: "0644"
+
+        - name: Install Alacritty desktop file
+          ansible.builtin.copy:
+            dest: /usr/share/applications/alacritty.desktop
+            mode: "0644"
+            content: |
+              [Desktop Entry]
+              Type=Application
+              TryExec=alacritty
+              Exec=alacritty
+              Icon=Alacritty
+              Terminal=false
+              Categories=System;TerminalEmulator;
+              Name=Alacritty
+              GenericName=Terminal
+              Comment=A fast, cross-platform, OpenGL terminal emulator
+              StartupNotify=true
+              StartupWMClass=Alacritty
+              Actions=New;
+
+              [Desktop Action New]
+              Name=New Terminal
+              Exec=alacritty
 
     - name: Install gh for Debian based systems
       become: true
