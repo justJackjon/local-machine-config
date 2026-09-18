@@ -70,6 +70,7 @@ After the main playbook has finished, you will need to start a new shell session
 - **Shell Configuration:** Sets up default shell, Starship prompt (Linux), and Ansible tab completion.
 - **Keyboard Customization:** Configures custom keyboard mappings and workspace switching shortcuts.
 - **Browser Installation:** Installs a web browser (Chrome or Firefox).
+- **Docker Installation:** Installs Docker Engine on Linux/WSL2 and Docker Desktop on macOS (Docker runs inside WSL2 on Windows hosts).
 - **Neovim & LazyVim Setup:** Automates the installation and configuration of Neovim with the LazyVim distribution, including a Nerd Font.
 - **Kinto.sh Integration:** Installs and configures Kinto.sh for improved keyboard experience on Linux.
 - **WSL GUI Setup:** Automates the installation and configuration of XFCE and XRDP for a graphical desktop environment within WSL.
@@ -101,6 +102,11 @@ This repository is structured into several Ansible roles, each responsible for a
   - Installs Google Chrome on Debian-based AMD64 systems.
   - Installs Firefox on Debian-based ARM64 systems (as Chrome is not available).
 
+- **`install_docker/`**:
+  - Installs Docker Engine (`docker-ce`) on Debian-based Linux and WSL2, enables and starts the `docker` service, and adds the current user to the `docker` group.
+  - Installs Docker Desktop via the Homebrew cask on macOS.
+  - Does not install anything on Windows — Docker runs inside WSL2 instead.
+
 - **`install_lazyvim/`**:
   - Installs Neovim.
   - Clones and sets up [LazyVim](https://www.lazyvim.org/) (a Neovim distribution).
@@ -125,6 +131,7 @@ The playbooks in this repository will install and configure the following softwa
 - **LazyVim** (Neovim distribution)
 - **Nerd Fonts** (Cascadia Code)
 - **Google Chrome** or **Mozilla Firefox** (depending on OS/architecture)
+- **Docker Engine** (Linux/WSL2) or **Docker Desktop** (macOS)
 - **XFCE** (Xfce Desktop Environment)
 - **XRDP** (X.Org RDP server)
 - **Kinto.sh** (Linux only)

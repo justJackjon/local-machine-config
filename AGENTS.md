@@ -52,6 +52,7 @@ local-machine-config/
 │   ├── configure_system/     # Linux file descriptor limits (limits.conf)
 │   ├── install_base_packages/# OS-specific package management (apt, brew, pacman, scoop)
 │   ├── install_browser/      # Google Chrome (amd64) or Firefox (arm64)
+│   ├── install_docker/       # Docker Engine (Linux/WSL2) and Docker Desktop (macOS)
 │   ├── install_lazyvim/      # Neovim, LazyVim starter, Cascadia Code Nerd Font, terminal fonts
 │   ├── install_spacevim/     # Deprecated (retained for backward compatibility)
 │   ├── install_wsl_gui/      # XFCE4 desktop + XRDP server in WSL2
@@ -74,6 +75,7 @@ local-machine-config/
 | **Terminal Font** | Cascadia Code NF (XFCE) | Cascadia Code NF (Terminal) | Cascadia Code NF (Mintty) | Host terminal / XFCE |
 | **Git / SSH / GPG** | `keychain` + `gh` + `gpg` | macOS Keychain + `gh` + `gpg` | Windows ssh-agent + `gh` + `gpg` | Inherited / agent |
 | **MCP Servers** | Semgrep + GitHub MCP | Semgrep + GitHub MCP | Semgrep (MinGW/pipx) + GitHub MCP | Semgrep + GitHub MCP |
+| **Container Runtime** | `docker-ce` (Docker Engine) | Docker Desktop | — (runs in WSL2) | `docker-ce` (Docker Engine) |
 | **Desktop GUI** | Native desktop / XFCE | Native Aqua | Windows Desktop | XFCE4 via XRDP |
 
 ---
@@ -141,6 +143,11 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 - **Linux:** Installs system tools, Rust via `rustup`, Alacritty via `cargo`, `gh`, `lazygit` (deb or tarball depending on OS version), `fzf` from source, `starship`, Node LTS via `nvm`, `pnpm`, and `ansible-lint`.
 - **macOS:** Installs Homebrew packages (`starship`, CLI utilities), `nvm`, Node LTS, `pnpm`, and global CLI utilities.
 - **Windows:** Pacman packages in MSYS2, Scoop packages (`nvm`, `gh`, `gnupg`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `perl`, `pnpm`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
+
+### `install_docker`
+- **Linux/WSL2:** Installs Docker Engine (`docker-ce`, `docker-ce-cli`, `containerd.io`, the Buildx and Compose plugins) from Docker's apt repository, enables and starts the `docker` service when systemd is available, and adds the current user to the `docker` group.
+- **macOS:** Installs Docker Desktop via the Homebrew cask. First launch and license acceptance remain manual.
+- **Windows:** Not installed — Docker runs inside WSL2 instead.
 
 ### `install_lazyvim`
 - Installs latest Neovim release.
