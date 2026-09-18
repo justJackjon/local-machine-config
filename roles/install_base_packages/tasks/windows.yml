@@ -324,6 +324,9 @@
         PATH: "{{ install_base_packages_pnpm_install_path }}"
       with_items:
         - neovim
+        # NOTE: Rafter is the local command-safety layer used by AI agents. Installing it
+        #       globally puts `rafter` on PATH, which is what the agent guard hooks invoke.
+        - "@rafter-security/cli"
       changed_when: false
 
     # NOTE: pnpm >= 10 ignores lifecycle scripts by default, so tree-sitter-cli's install script

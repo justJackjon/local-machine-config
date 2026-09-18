@@ -96,6 +96,7 @@ This repository is structured into several Ansible roles, each responsible for a
 - **`install_base_packages/`**:
   - Installs essential packages like `python3-pip` and `bash-completion` on Debian-based systems.
   - Installs equivalent packages via Homebrew on macOS and Pacman on Windows (MSYS2).
+  - Installs the Rafter CLI (`@rafter-security/cli`) globally via pnpm on all platforms for agent command-safety guardrails.
 
 - **`install_browser/`**:
   - Installs Google Chrome on Debian-based AMD64 systems.
@@ -135,6 +136,7 @@ The playbooks in this repository will install and configure the following softwa
 - **Bash & Bash Completion**
 - **Starship** (Linux only)
 - **argcomplete** (for Ansible tab completion)
+- **Rafter CLI** (`@rafter-security/cli`, agent command-safety guardrails)
 
 ## TODO:
 

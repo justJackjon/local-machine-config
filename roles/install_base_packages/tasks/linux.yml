@@ -335,6 +335,10 @@
         PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
       with_items:
         - neovim
+        # NOTE: Rafter is the local command-safety layer used by AI agents (opencode/Claude
+        #       Code). Installing it globally puts `rafter` on PATH, which is what the agent
+        #       guard hooks invoke.
+        - "@rafter-security/cli"
 
     # NOTE: pnpm >= 10 ignores lifecycle scripts by default, so tree-sitter-cli's install script
     #       (which downloads the native `tree-sitter` binary) is skipped unless explicitly allowed
