@@ -1,0 +1,77 @@
+- name: Install Docker Engine
+  become: true
+  block:
+    # NOTE: Docker Engine (docker-ce) is used rather than Docker Desktop for Linux. It is
+    #       headless and far lighter, and the devcontainer CLI only needs the docker CLI plus
+    #       a reachable daemon. That CLI silently swallows docker failures (any error carrying
+    #       an exit code), so a missing or stopped daemon must be surfaced here instead.
+    - name: Ensure Docker apt prerequisites are installed
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Ensure apt keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG keyring
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+        force: true
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: >
+          deb [arch={{ install_docker_apt_arch }} signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}
+          {{ ansible_facts.distribution_release }} stable
+        state: present
+        filename: docker
+
+    - name: Install Docker Engine packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: latest
+        update_cache: true
+
+    # NOTE: WSL2 only runs a systemd init when `[boot] systemd=true` is set in /etc/wsl.conf.
+    #       Without it there is no service manager, so the daemon cannot be enabled or started
+    #       here and must be launched another way.
+    - name: Check whether systemd is running
+      ansible.builtin.stat:
+        path: /run/systemd/system
+      register: install_docker_systemd_stat
+
+    - name: Ensure Docker service is enabled and running
+      when: install_docker_systemd_stat.stat.exists
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Warn when systemd is unavailable
+      when: not install_docker_systemd_stat.stat.exists
+      ansible.builtin.debug:
+        msg:
+          - "WARNING: systemd is not running, so the Docker daemon could not be enabled or started."
+          - "Enable systemd (set '[boot] systemd=true' in /etc/wsl.conf and restart WSL) or start dockerd manually."
+
+    # NOTE: Membership of the docker group only takes effect in a new shell session.
+    - name: Add the current user to the docker group
+      ansible.builtin.user:
+        name: "{{ ansible_facts.user_id }}"
+        groups: docker
+        append: true

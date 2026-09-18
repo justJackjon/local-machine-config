@@ -1,0 +1,10 @@
+- name: Install Docker Desktop
+  when: is_mac
+  block:
+    # NOTE: Docker Desktop is installed as a Homebrew cask. Its first launch requires manual
+    #       license acceptance, so the role installs it but deliberately does not start it.
+    - name: Install Docker Desktop via Homebrew
+      community.general.homebrew_cask:
+        name: docker
+        state: present
+        update_homebrew: true
