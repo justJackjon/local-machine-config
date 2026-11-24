@@ -3,9 +3,11 @@
   block:
     # NOTE: The following packages are required for lazyvim and its plugins.
     #       - fd & ripgrep: Required by lazyvim and snacks for file and text searching (managed via Scoop)
-    #       - mingw-w64-x86_64-lua-luarocks: Required by lazy and mason for Lua plugin management
+    #       - luarocks: Required by lazy and mason for Lua plugin management (managed via Scoop)
     #       - mingw-w64-x86_64-imagemagick: Required by snacks for image previews
-    #       - mingw-w64-x86_64-sqlite3: Required by lazyvim and snacks for history and frecency
+    #       - sqlite: Required by lazyvim and snacks for history and frecency (managed via Scoop)
+    # NOTE: mingw-w64-x86_64-lua-luarocks, -sqlite3 and -tldr have been removed from the MSYS2
+    #       mingw64 repo, so luarocks, sqlite and tealdeer (tldr) are installed via Scoop instead.
     # NOTE: Disable pacman's default 10-second download timeout in libcurl to prevent
     #       connection timeouts and transfer stalls when retrieving large packages from mirrors.
     - name: Configure pacman to disable download timeout
@@ -35,10 +37,7 @@
           # NOTE: mingw-w64-x86_64-jq has been removed from the MSYS2 mingw64 repo.
           #       The MSYS jq package provides /usr/bin/jq, which is what Ansible's shell tasks use.
           - jq
-          - mingw-w64-x86_64-lua-luarocks
           - mingw-w64-x86_64-imagemagick
-          - mingw-w64-x86_64-sqlite3
-          - mingw-w64-x86_64-tldr
           - bash-completion
           - stow
           - tree
@@ -121,6 +120,13 @@
             executable_name: rg
           - name: fd
             executable_name: fd
+          - name: luarocks
+            executable_name: luarocks
+          - name: sqlite
+            executable_name: sqlite3
+          # NOTE: tealdeer is a Rust tldr client, matching the Linux role (exposes 'tldr').
+          - name: tealdeer
+            executable_name: tldr
           - name: perl
             executable_name: perl
           - name: pnpm
