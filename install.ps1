@@ -149,24 +149,28 @@ function Install-Dependencies {
     Write-Info "Installing Ansible collections..."
     & $msys2Shell -lc "ansible-galaxy collection install community.general ansible.windows community.crypto community.windows" | Out-Host
 
-    $ghCheck = & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && which gh 2>/dev/null"
+    # NOTE: MSYS2 no longer publishes 'mingw-w64-x86_64-github-cli' (the mingw64 repo is being
+    #       wound down in favour of ucrt64). Install gh via Scoop instead, which is also how the
+    #       playbook manages it. The playbook runs with MSYS2_PATH_TYPE=inherit, so the Scoop shim
+    #       is visible to Ansible, and gh stores its auth in %APPDATA% regardless of the calling shell.
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+      Write-Info "Installing GitHub CLI via Scoop..."
+      scoop install gh | Out-Host
 
-    if (-not $ghCheck) {
-      Write-Info "Installing GitHub CLI in MSYS2..."
-      & $msys2Shell -lc "pacman -S --noconfirm mingw-w64-x86_64-github-cli" | Out-Host
-
-      if ($LASTEXITCODE -ne 0) {
+      if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
         Write-ErrorMsg "Failed to install GitHub CLI."
       }
+    } else {
+      Write-Host "GitHub CLI is already installed."
     }
 
     Write-Info "Authenticating gh CLI (user interaction required)..."
-    & $msys2Shell -lc "export PATH=/mingw64/bin:`$PATH && gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key" | Out-Host
+    gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key | Out-Host
 
     if ($LASTEXITCODE -eq 0) {
       Write-Info "gh CLI authentication complete."
     } else {
-      Write-WarningMsg "gh CLI authentication failed. You may need to run 'gh auth login' manually in an MSYS2 terminal."
+      Write-WarningMsg "gh CLI authentication failed. You may need to run 'gh auth login' manually."
     }
 
     try {
