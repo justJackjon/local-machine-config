@@ -32,7 +32,8 @@
           - mingw-w64-x86_64-python-cffi
           - mingw-w64-x86_64-python-bcrypt
           - mingw-w64-x86_64-python-cryptography
-          - mingw-w64-x86_64-jq
+          # NOTE: mingw-w64-x86_64-jq has been removed from the MSYS2 mingw64 repo.
+          #       The MSYS jq package provides /usr/bin/jq, which is what Ansible's shell tasks use.
           - jq
           - mingw-w64-x86_64-lua-luarocks
           - mingw-w64-x86_64-imagemagick
