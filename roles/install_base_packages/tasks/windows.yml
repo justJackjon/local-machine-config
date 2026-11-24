@@ -178,8 +178,10 @@
     - name: Set Node.js version fact from NVM install output
       ansible.builtin.set_fact:
         # NOTE: nvm-windows output contains "Installing node.js vXX.XX.XX" or "Version XX.XX.XX is already installed."
+        #       nvm-windows 2.x instead prints e.g. "SKIPPED: vXX.XX.XX is already installed", so we also accept a bare
+        #       'vXX.XX.XX'. Without a version, 'nvm use' and the nodejs junction are skipped and node is not on PATH.
         #       We use regex_findall to extract the version following 'v' or 'Version ' and pick the first match.
-        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_findall('(?:node\\.js v|Version )(\\d+\\.\\d+\\.\\d+)') | first | default('') }}"
+        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_findall('(?:node\\.js v|Version |\\bv)(\\d+\\.\\d+\\.\\d+)') | first | default('') }}"
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
