@@ -1,6 +1,8 @@
 - name: Install Semgrep (Windows)
+  # NOTE: pipx lives in a dedicated MinGW venv (see install_base_packages) because
+  #       mingw-w64-x86_64-python-pipx has been removed from the MSYS2 mingw64 repo.
   ansible.builtin.command:
-    cmd: /mingw64/bin/pipx.exe install semgrep
+    cmd: "{{ install_base_packages_pipx_python }} -m pipx install semgrep"
   register: configure_mcp_servers_semgrep_install
   # NOTE: Semgrep currently fails to build on Python 3.14 (MinGW) due to ruamel.yaml.clib
   #       incompatibility with the removal of ast.Str. We make this non-fatal.
@@ -13,6 +15,6 @@
 
 - name: Ensure pipx binary directory is in PATH
   ansible.builtin.command:
-    cmd: /mingw64/bin/pipx.exe ensurepath
+    cmd: "{{ install_base_packages_pipx_python }} -m pipx ensurepath"
   changed_when: false
   when: configure_mcp_servers_semgrep_installed

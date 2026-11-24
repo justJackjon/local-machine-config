@@ -20,12 +20,12 @@
         name:
           - mingw-w64-x86_64-python
           - mingw-w64-x86_64-python-pip
-          - mingw-w64-x86_64-python-pipx
+          # NOTE: mingw-w64-x86_64-python-pipx and -python-userpath have been removed from the
+          #       MSYS2 mingw64 repo. pipx is installed into a dedicated MinGW venv further below.
           - mingw-w64-x86_64-python-setuptools
           - mingw-w64-x86_64-python-argcomplete
           - mingw-w64-x86_64-python-packaging
           - mingw-w64-x86_64-python-platformdirs
-          - mingw-w64-x86_64-python-userpath
           - mingw-w64-x86_64-toolchain
           - mingw-w64-x86_64-rust
           - mingw-w64-x86_64-maturin
@@ -247,6 +247,26 @@
         cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
       register: install_base_packages_win_home_dir_raw
       changed_when: false
+
+    # NOTE: pipx is no longer packaged for MSYS2 mingw64, so we install it with pip into a
+    #       dedicated venv built from the MinGW64 Python. This keeps pipx-managed tools (e.g. Semgrep)
+    #       on the MinGW interpreter, matching the MinGW-based pipx shared environment check below.
+    #       Other roles should invoke pipx via '{{ install_base_packages_pipx_python }} -m pipx'.
+    - name: Set pipx venv facts
+      ansible.builtin.set_fact:
+        install_base_packages_pipx_venv: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/.venvs/pipx"
+        install_base_packages_pipx_python: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/.venvs/pipx/bin/python.exe"
+
+    - name: Create pipx virtual environment with MinGW64 Python
+      ansible.builtin.command:
+        cmd: /mingw64/bin/python.exe -m venv "{{ install_base_packages_pipx_venv }}"
+        creates: "{{ install_base_packages_pipx_venv }}/pyvenv.cfg"
+
+    - name: Install pipx into its virtual environment
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_pipx_python }} -m pip install --upgrade pipx"
+      register: install_base_packages_pipx_install
+      changed_when: "'Successfully installed' in install_base_packages_pipx_install.stdout"
 
     - name: Check if pipx shared environment exists
       ansible.builtin.stat:
