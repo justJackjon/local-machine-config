@@ -204,6 +204,14 @@ function Execute-Playbook {
   # NOTE: Set MSYS2_PATH_TYPE to inherit to ensure Windows-native environment variables 
   #       (like SystemRoot, TEMP, etc.) are preserved for Scoop and PowerShell.
   $env:MSYS2_PATH_TYPE = "inherit"
+
+  # NOTE: Start-Transcript in Windows PowerShell does not capture output from native executables,
+  #       so Ansible's output never reaches the transcript log. We have Ansible write its own log instead.
+  #       We avoid piping to Out-Host here as it line-buffers output and can hide interactive prompts.
+  $ansibleLogFile = Join-Path -Path $env:TEMP -ChildPath "local-machine-config-ansible.log"
+  $env:ANSIBLE_LOG_PATH = (& $msys2Shell -lc "cygpath -u '$ansibleLogFile'" | Out-String).Trim()
+  Write-Note "Ansible output will also be logged to: $ansibleLogFile"
+
   & $msys2Shell -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH && cd `"$msys2LocalRepoPath`" && ./run-playbook.sh"
 
   if ($LASTEXITCODE -ne 0) {
