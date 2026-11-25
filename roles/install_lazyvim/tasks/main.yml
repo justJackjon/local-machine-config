@@ -186,8 +186,23 @@
         PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
         PATH: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm:{{ ansible_facts.env.PATH }}"
 
+    # NOTE: The LazyVim starter is only installed when the Neovim config is not already a LazyVim config
+    #       (identified by the starter's 'lua/config/lazy.lua'). A missing config gets the starter; a non-LazyVim
+    #       config (e.g. SpaceVim) is backed up and replaced; an existing LazyVim config, including any
+    #       customisations, is left untouched. Previously every run backed up and re-cloned the config.
+    - name: Check for an existing LazyVim config
+      ansible.builtin.stat:
+        path: "{{ (install_lazyvim_nvim_config_dir | replace('~', ansible_facts.env.HOME, 1)) ~ '/lua/config/lazy.lua' }}"
+      register: install_lazyvim_existing_config_stat
+
+    - name: Set whether the LazyVim starter needs installing
+      ansible.builtin.set_fact:
+        install_lazyvim_install_starter: "{{ not install_lazyvim_existing_config_stat.stat.exists }}"
+
     - name: Define Neovim config paths to backup (Debian/MacOS)
-      when: is_debian_family or is_mac
+      when:
+        - is_debian_family or is_mac
+        - install_lazyvim_install_starter
       ansible.builtin.set_fact:
         install_lazyvim_nvim_backup_paths:
           - "{{ install_lazyvim_nvim_config_dir }}"
@@ -196,7 +211,9 @@
           - "~/.cache/nvim"
 
     - name: Backup current Neovim Configuration (Debian/MacOS)
-      when: is_debian_family or is_mac
+      when:
+        - is_debian_family or is_mac
+        - install_lazyvim_install_starter
       ansible.builtin.include_tasks: ../../common/tasks/backup_directory.yml
       loop: "{{ install_lazyvim_nvim_backup_paths }}"
       loop_control:
@@ -219,8 +236,10 @@
           ansible.builtin.set_fact:
             install_lazyvim_git_executable: "{{ (install_lazyvim_git_check.results | selectattr('stat.exists') | map(attribute='item') | first) | default('git') }}"
 
-    - name: Backup current Neovim Configuration (Windows)
-      when: is_windows
+    - name: Backup current Neovim Configuration and install LazyVim (Windows)
+      when:
+        - is_windows
+        - install_lazyvim_install_starter
       block:
         - name: Check for nvim config directory
           ansible.builtin.stat:
@@ -285,17 +304,19 @@
           changed_when: true
 
     - name: Install LazyVim
-      when: is_debian_family or is_mac
+      when:
+        - is_debian_family or is_mac
+        - install_lazyvim_install_starter
       block:
         - name: Clone LazyVim starter
           ansible.builtin.git:
             repo: "https://github.com/LazyVim/starter"
-            dest: "{{ install_lazyvim_nvim_config_dir }}"
+            dest: "{{ install_lazyvim_nvim_config_dir | replace('~', ansible_facts.env.HOME, 1) }}"
             version: main
 
         - name: Remove .git folder
           ansible.builtin.file:
-            path: "{{ install_lazyvim_nvim_config_dir }}/.git"
+            path: "{{ install_lazyvim_nvim_config_dir | replace('~', ansible_facts.env.HOME, 1) }}/.git"
             state: absent
 
     - name: Install Nerd Font

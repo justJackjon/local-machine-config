@@ -1,26 +1,21 @@
+# NOTE: Moves '{{ item }}' to a timestamped '<path>.bak-<timestamp>' sibling, never overwriting or deleting an
+#       earlier backup. Paths may start with '~'; they are expanded here because ansible.builtin.command does not
+#       run a shell, so a literal '~' would otherwise be passed to mv (which previously failed silently).
 - name: "Backup {{ item }}"
+  vars:
+    backup_directory_path: "{{ item | replace('~', ansible_facts.env.HOME, 1) if item.startswith('~') else item }}"
   block:
     - name: Check if path exists
       ansible.builtin.stat:
-        path: "{{ item }}"
+        path: "{{ backup_directory_path }}"
         follow: false
-      register: primary_path_stat
+      register: backup_directory_path_stat
 
-    - name: Check if backup path exists
-      ansible.builtin.stat:
-        path: "{{ item }}.bak"
-        follow: false
-      register: backup_path_stat
-
-    - name: Ensure old backup directory is removed
-      ansible.builtin.file:
-        path: "{{ item }}.bak"
-        state: absent
-      when: primary_path_stat.stat.exists and backup_path_stat.stat.exists
-      failed_when: false
-
-    - name: Move current config to backup
-      ansible.builtin.command: "mv {{ item }} {{ item }}.bak"
-      when: primary_path_stat.stat.exists
-      failed_when: false
-      changed_when: false
+    - name: Move current path to timestamped backup
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ backup_directory_path }}"
+          - "{{ backup_directory_path }}.bak-{{ ansible_facts.date_time.iso8601_basic_short }}"
+      when: backup_directory_path_stat.stat.exists
+      changed_when: true

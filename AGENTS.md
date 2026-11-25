@@ -166,9 +166,8 @@ The playbook does **not** install WSL itself; it only configures a WSL distro wh
 
 ### `install_lazyvim`
 - Installs latest Neovim release.
-- Backs up any pre-existing Neovim configurations (`~/.config/nvim` or `%LOCALAPPDATA%\nvim`) with a timestamped suffix.
-- Clones `https://github.com/LazyVim/starter` and removes `.git`.
-- **Known issue:** the backup + re-clone happens on **every** run, on all platforms, so a re-run moves a customised config aside (to `nvim.bak-<timestamp>`) and replaces it with a fresh starter. Nothing is lost, but it is not idempotent. See §7.
+- Installs the LazyVim starter (`https://github.com/LazyVim/starter`, `.git` removed) **only when the Neovim config (`~/.config/nvim` or `%LOCALAPPDATA%\nvim`) is not already a LazyVim config**, detected by `lua/config/lazy.lua`. An existing LazyVim config, including customisations, is never touched.
+- A non-LazyVim config (e.g. SpaceVim) is first moved to a timestamped `<path>.bak-<timestamp>` (plus Neovim's data/state/cache dirs); backups never overwrite each other.
 - Installs Cascadia Code Nerd Font and configures the relevant terminal emulator.
 
 ### `stow_dotfiles`
@@ -256,6 +255,8 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - When an agent drives PowerShell, native-argument quoting in 5.1 mangles embedded double quotes (`gh --jq '...'`, `bash -lc "..."`). Write scripts to a file and run the file instead.
 - A shell started before Scoop was installed won't have `~\scoop\shims` on PATH; rebuild PATH from the registry (`Machine` + `User`) before concluding a tool is missing.
 
+### `install_lazyvim` used to replace the Neovim config on every run
+- It backed up and re-cloned the starter unconditionally. On Linux/macOS the shared `backup_directory.yml` also deleted the previous fixed-name `.bak` first, and passed `~` paths to `ansible.builtin.command` (no shell, so `~` was never expanded and `mv` failed silently). Now gated on `lua/config/lazy.lua`, with timestamped backups and expanded paths. Verified on Windows (existing config untouched; fresh install clones the starter). The Linux/macOS backup path is fixed *by analogy* and not yet run there.
+
 ### Not yet idempotent (pre-existing)
-- `install_lazyvim` re-clones the LazyVim starter every run (see §5).
 - `configure_msys2 : Ensure .minttyrc file exists`, `Install AutoHotkey v1.1 silently` and `configure_git : Add SSH key to GitHub` report `changed` on every run without changing anything.
