@@ -25,6 +25,16 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.We
 > [!WARNING]
 > Piping content from the internet into your shell can be dangerous. It is recommended that you inspect the script's contents before running it. You can do this by visiting the script's URL in your browser: [https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1](https://raw.githubusercontent.com/justjackjon/local-machine-config/main/install.ps1)
 
+### New Windows Machine (with WSL2)
+
+The playbook does not install WSL itself. On a new Windows machine:
+
+1. Run the Windows installation above on the Windows host.
+2. Install WSL2 (`wsl --install -d Ubuntu` from an elevated prompt), reboot, launch Ubuntu once to create your user, then run the Linux installation below inside WSL. This sets up an XFCE desktop reachable over RDP.
+3. Connect to that desktop with Remote Desktop (`mstsc.exe`, using the WSL IP the playbook prints) and run `./run-playbook.sh` again from a terminal **inside** the XFCE session, so the XFCE keyboard and workspace settings are applied.
+
+See `AGENTS.md` for details and known pitfalls.
+
 ### Linux and macOS Installation
 
 To start the setup on Linux or macOS, run the following command in your terminal:

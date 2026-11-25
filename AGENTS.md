@@ -112,6 +112,14 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 & "$env:USERPROFILE\scoop\apps\msys2\current\usr\bin\bash.exe" -lc "cd /c/Users/JJB/Repos/local-machine-config && ./run-playbook.sh"
 ```
 
+### Setting Up a New Windows Machine (Windows → WSL2 → XFCE)
+
+The playbook does **not** install WSL itself; it only configures a WSL distro when run inside one. The full procedure is three runs:
+
+1. **Windows host:** run the Windows bootstrap below from an elevated PowerShell. Stay at the machine: it prompts for `gh auth login` (browser), SSH and GPG passphrases, and the Home Assistant URL/token. Logs: `%TEMP%\local-machine-config-install.log` (transcript) and `%TEMP%\local-machine-config-ansible.log` (Ansible output — the transcript cannot capture it).
+2. **Install WSL2 manually:** `wsl --install -d Ubuntu` from an elevated prompt, reboot, then launch Ubuntu once to create the Linux user. Inside WSL, run the Linux bootstrap below. This installs XFCE + XRDP (`install_wsl_gui`) and prints the RDP connection details.
+3. **Inside the XFCE desktop:** connect with `mstsc.exe` to the WSL IP (not `localhost`, which collides with the Windows console session), open a terminal in the XFCE session, and run `./run-playbook.sh` again. The XFCE keyboard/workspace settings in `configure_keyboard` only apply when `XDG_CURRENT_DESKTOP == 'XFCE'` (`is_inside_xfce`), so they are skipped by the plain WSL shell run in step 2.
+
 ### Running the Bootstrap Installers
 
 - **Windows Bootstrap:** Elevated PowerShell:
@@ -160,6 +168,7 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 - Installs latest Neovim release.
 - Backs up any pre-existing Neovim configurations (`~/.config/nvim` or `%LOCALAPPDATA%\nvim`) with a timestamped suffix.
 - Clones `https://github.com/LazyVim/starter` and removes `.git`.
+- **Known issue:** the backup + re-clone happens on **every** run, on all platforms, so a re-run moves a customised config aside (to `nvim.bak-<timestamp>`) and replaces it with a fresh starter. Nothing is lost, but it is not idempotent. See §7.
 - Installs Cascadia Code Nerd Font and configures the relevant terminal emulator.
 
 ### `stow_dotfiles`
@@ -212,3 +221,41 @@ Before finishing any modification in this repository:
 2. If working on a specific role, verify changes with the corresponding tag (e.g. `--tags "configure_git"`).
 3. Ensure `.gitattributes` line endings are respected (LF for Linux/macOS/Ansible files, CRLF for PowerShell).
 4. Run `git status` to verify no unexpected files or temporary artifacts remain.
+
+---
+
+## 7. Known Pitfalls & Lessons Learned
+
+Hard-won findings from debugging real runs. Read this before changing the Windows roles. Each entry notes where it was **verified**; entries marked *by analogy* were applied to other platforms without being run there yet.
+
+### Ansible `command` module expands `$VARS` — this wiped a user PATH once
+- **Symptom:** a PowerShell script embedded in `ansible.builtin.command` silently misbehaved; a PATH-update task filtered out every entry and wrote back only the additions.
+- **Cause:** `command` has `expand_argument_vars: true` by default, so `$NAME` matching an environment variable is substituted before execution. Bash's `$_` (last command, e.g. `/usr/bin/python3.14`) replaced PowerShell's pipeline variable `$_`. Unknown names (`$current`) survive, which makes this easy to miss.
+- **Rule:** every `command` task containing a literal `$` (PowerShell, etc.) **must** set `expand_argument_vars: false`. `shell` tasks are unaffected. Any task that rewrites PATH must also guard against dropping entries and preserve `REG_EXPAND_SZ` (read the raw value with `DoNotExpandEnvironmentNames`; never round-trip through `[Environment]::Get/SetEnvironmentVariable`, which writes `REG_SZ`). Verified on Windows; a repo-wide scan found no other affected `command` tasks.
+
+### MSYS2 is retiring its `mingw64` repo
+- **Symptom:** `pacman` fails with `package 'mingw-w64-x86_64-…' was not found` (pacman writes this to stderr, which the PowerShell transcript does not capture).
+- **Removed so far:** `github-cli`, `python-pipx`, `python-userpath`, `jq`, `lua-luarocks`, `sqlite3`, `tldr`. Replacements: `gh`, `luarocks`, `sqlite`, `tealdeer` via Scoop; MSYS `jq`. `ucrt64` is MSYS2's recommended environment, but migrating is a larger change that has not been attempted.
+- **Diagnose quickly:** `pacman -Si mingw-w64-x86_64-<name>` per package. `unzip` was previously only present transitively and is now listed explicitly (needed by `unarchive` for the Kinto zip). Windows-only.
+
+### nvm-windows 2.x is a different product from 1.x
+- Scoop's `nvm` jumped to 2.x. It refuses to support running outside `%LOCALAPPDATA%\Author Software\nvm` (`NVM4101`), so it is installed from the official release installer (silent Inno Setup flags: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LANG=english`; inspect an installer without running it via `innounp -x -m`).
+- It runs in **shim mode**: `node`/`npm`/`pnpm`/`yarn` are proxy executables in `...\nvm\.nodejs`. Its `pnpm` proxy shadows any other pnpm on PATH and errors (`pnpm is not installed for this Node.js version`) unless pnpm is installed into the active Node version. Node 25+ no longer bundles corepack, so `corepack enable` is not an option; use `npm install -g --allow-scripts=pnpm pnpm`.
+- `nvm install` output changed to `SKIPPED: vX.Y.Z is already installed`; parse a bare `vX.Y.Z`.
+- Its `.shim` directory and proxy executables carry explicit ACLs (user: read/execute + `WRITE_DAC` only). Deleting them needs `icacls <dir> /grant <user>:F /T` first — **not** `(OI)(CI)F`, whose inheritance flags leave files' explicit ACLs unchanged.
+- Upgrading from a Scoop install makes the official installer adopt the old Node root; the playbook resets it with `nvm cfg reset root`. Windows-only (Linux/macOS use nvm-sh, unaffected).
+
+### npm 11.20+ blocks install scripts by default
+- Packages that set themselves up in `preinstall`/`postinstall` (pnpm itself) need `--allow-scripts=<name>`. Verified on Windows; applied *by analogy* to the Linux npm fallback in `install_base_packages/tasks/linux.yml` (not yet run on Linux). macOS installs pnpm via Homebrew.
+
+### Scoop's pnpm leaves config behind
+- Scoop's pnpm manifest writes `storeDir`/`cacheDir`/`stateDir` (pointing into `scoop/apps/pnpm`) into pnpm's global `config.yaml`. Removing Scoop's pnpm does not remove them, so the next pnpm recreates the directory and Scoop lists a phantom `Install failed` app. The playbook deletes those keys. Windows-only.
+
+### Debugging Windows runs
+- `Start-Transcript` in Windows PowerShell 5.1 does not capture native executables' output, so `install.ps1` sets `ANSIBLE_LOG_PATH`. Don't pipe the playbook through `Out-Host` to work around it: that line-buffers output and hides prompts that don't end in a newline (passphrases).
+- When an agent drives PowerShell, native-argument quoting in 5.1 mangles embedded double quotes (`gh --jq '...'`, `bash -lc "..."`). Write scripts to a file and run the file instead.
+- A shell started before Scoop was installed won't have `~\scoop\shims` on PATH; rebuild PATH from the registry (`Machine` + `User`) before concluding a tool is missing.
+
+### Not yet idempotent (pre-existing)
+- `install_lazyvim` re-clones the LazyVim starter every run (see §5).
+- `configure_msys2 : Ensure .minttyrc file exists`, `Install AutoHotkey v1.1 silently` and `configure_git : Add SSH key to GitHub` report `changed` on every run without changing anything.
