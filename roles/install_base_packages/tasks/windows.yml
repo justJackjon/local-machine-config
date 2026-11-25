@@ -159,11 +159,15 @@
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
         USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
 
+    # NOTE: failed_when is false because a partially removed install (listed as 'Install failed') can make
+    #       'scoop uninstall' error. Any leftover app directory is removed after pnpm's config is cleaned up below.
     - name: Remove Scoop-managed pnpm
       when: install_base_packages_scoop_pnpm_status.stdout is search('(?m)^pnpm\\s+')
       ansible.builtin.command:
         cmd: "{{ install_base_packages_scoop_executable_path }} uninstall pnpm"
-      changed_when: true
+      register: install_base_packages_scoop_pnpm_uninstall
+      changed_when: "'was uninstalled' in install_base_packages_scoop_pnpm_uninstall.stdout"
+      failed_when: false
       environment:
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
         USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
@@ -276,6 +280,39 @@
             cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe reshim"
           register: install_base_packages_nvm_reshim
           changed_when: "'up to date' not in (install_base_packages_nvm_reshim.stdout ~ install_base_packages_nvm_reshim.stderr)"
+
+        # NOTE: Scoop's pnpm manifest writes storeDir/cacheDir/stateDir into pnpm's global config, pointing at
+        #       scoop/apps/pnpm/current. Uninstalling Scoop's pnpm leaves those settings behind, so the nvm-managed
+        #       pnpm keeps recreating that directory (which Scoop then lists as 'Install failed'). Removing the
+        #       settings restores pnpm's defaults under PNPM_HOME.
+        - name: Get pnpm directory settings
+          ansible.builtin.command:
+            cmd: "{{ install_base_packages_pnpm_executable_path }} config get {{ item }}"
+          loop:
+            - store-dir
+            - cache-dir
+            - state-dir
+          register: install_base_packages_pnpm_dir_settings
+          changed_when: false
+          environment:
+            PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
+
+        - name: Remove pnpm directory settings left by Scoop's pnpm
+          # NOTE: '.' matches either path separator, avoiding backslash escaping through YAML and Jinja.
+          when: item.stdout is search('scoop.apps.pnpm', ignorecase=true)
+          ansible.builtin.command:
+            cmd: "{{ install_base_packages_pnpm_executable_path }} config delete {{ item.item }}"
+          loop: "{{ install_base_packages_pnpm_dir_settings.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+          changed_when: true
+          environment:
+            PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
+
+        - name: Remove leftover Scoop pnpm app directory
+          ansible.builtin.file:
+            path: "{{ install_base_packages_scoop_root }}/apps/pnpm"
+            state: absent
 
     - name: Download and Install AutoHotkey v1.1
       block:
