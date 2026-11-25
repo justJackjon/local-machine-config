@@ -265,6 +265,11 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - When an agent drives PowerShell, native-argument quoting in 5.1 mangles embedded double quotes (`gh --jq '...'`, `bash -lc "..."`). Write scripts to a file and run the file instead.
 - A shell started before Scoop was installed won't have `~\scoop\shims` on PATH; rebuild PATH from the registry (`Machine` + `User`) before concluding a tool is missing.
 
+### ansible-core 2.22's `git` module can't update a shallow tag clone
+- **Symptom:** the second and later runs fail at `Clone fzf repository` with `'NoneType' object has no attribute 'startswith'` (traceback via `ANSIBLE_DISPLAY_TRACEBACK=always`: `get_head_branch` in `modules/git.py`).
+- **Cause:** `depth: 1` + a tag `version` leaves a detached HEAD with no `refs/remotes/origin/HEAD`; on update, the module reads that missing ref as `None`. Fresh clones are fine.
+- **Fix:** fzf is cloned only fresh. Its current tag is checked with `git describe --tags --exact-match`, and an outdated clone is deleted and re-cloned. Don't combine `depth` with in-place updates of a tag checkout. Verified in WSL2 Ubuntu.
+
 ### Debugging WSL runs from the Windows host
 - An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."`. `run-playbook.sh` always appends Ansible's output to `${TMPDIR:-/tmp}/local-machine-config-ansible.log` (override with `ANSIBLE_LOG_PATH`), so `tail -200 /tmp/local-machine-config-ansible.log` shows the latest run. `/tmp/local-machine-config-install.log` is written only by `install.sh`. WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.
 - `sudo` in WSL needs the user's password, so an agent can't do a full run. Test a change with a small playbook that skips `become`, then have the user re-run `./run-playbook.sh` in WSL.

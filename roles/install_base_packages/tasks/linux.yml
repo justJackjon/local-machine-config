@@ -198,20 +198,46 @@
           ansible.builtin.set_fact:
             install_base_packages_fzf_version: "{{ install_base_packages_fzf_release_info.json.tag_name }}"
 
+        # NOTE: The clone is only ever created fresh, never updated in place. ansible-core 2.22's `git`
+        #       module crashes (`'NoneType' object has no attribute 'startswith'`, in get_head_branch)
+        #       when it fetches into an existing `depth: 1` clone with a detached HEAD (a checked-out
+        #       tag), because such a clone has no `refs/remotes/origin/HEAD`. So every run after the
+        #       first failed. Found and verified in WSL2 Ubuntu (Nov 2026). An outdated clone is
+        #       replaced, which also re-runs fzf's installer for the new version.
+        - name: Check which fzf release is cloned
+          ansible.builtin.command:
+            argv: [git, -C, "{{ ansible_facts.env.HOME }}/.fzf", describe, --tags, --exact-match]
+          register: install_base_packages_fzf_cloned_tag
+          changed_when: false
+          failed_when: false
+
+        - name: Set whether fzf needs (re)installing
+          ansible.builtin.set_fact:
+            install_base_packages_fzf_needs_install: "{{ install_base_packages_fzf_cloned_tag.stdout | trim != install_base_packages_fzf_version }}"
+
+        - name: Remove an outdated fzf clone
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.fzf"
+            state: absent
+
         - name: Clone fzf repository
-          ansible.builtin.git:
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.git: # noqa: latest[git]
             repo: "https://github.com/junegunn/fzf.git"
             dest: "{{ ansible_facts.env.HOME }}/.fzf"
             version: "{{ install_base_packages_fzf_version }}"
             depth: 1
-            force: true
-          changed_when: false # noqa: latest[git]
+
+        - name: Check if the fzf binary is installed
+          ansible.builtin.stat:
+            path: "{{ ansible_facts.env.HOME }}/.fzf/bin/fzf"
+          register: install_base_packages_fzf_binary_stat
 
         - name: Run fzf install script
+          when: not install_base_packages_fzf_binary_stat.stat.exists
           ansible.builtin.command: "{{ ansible_facts.env.HOME }}/.fzf/install --all"
-          args:
-            creates: "{{ ansible_facts.env.HOME }}/.fzf/bin/fzf"
-          changed_when: false
+          changed_when: true
 
     - name: Install Starship
       block:
