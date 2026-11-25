@@ -166,7 +166,7 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 - Manages SSH key (`ed25519` at `~/.ssh/ansible-managed/github/id_rsa`). Prompts for passphrase on creation.
 - Manages GPG key (RSA 4096). Prompts for passphrase on creation.
 - Registers public keys with GitHub via `gh ssh-key add` and `gh gpg-key add`.
-- Sets global `user.name` ("Jackjon Butcher"), `user.email` ("jackjon@justjackjon.dev"), `commit.gpgsign=true`, and signing key.
+- Sets global `user.name` ("Jackjon Butcher"), `user.email` ("jackjon@jjb.codes"), `commit.gpgsign=true`, and signing key.
 - Switches git remote URL from HTTPS to SSH (`git@github.com:justjackjon/local-machine-config.git`).
 
 ### `configure_mcp_servers`
