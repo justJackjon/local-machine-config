@@ -264,10 +264,16 @@
           ansible.builtin.set_fact:
             install_base_packages_node_bin_dir: "{{ install_base_packages_nvm_node_bin_raw.stdout | trim }}"
 
-        - name: Check if pnpm is installed
-          ansible.builtin.stat:
-            path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
-          register: install_base_packages_pnpm_stat_debian
+        # NOTE: The pnpm executable is resolved rather than hard-coded, because its location depends
+        #       on the pnpm version (see common/tasks/resolve_pnpm_executable.yml).
+        - name: Find an existing pnpm
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_pnpm_executable.yml
+          vars:
+            resolve_pnpm_node_bin_dir: "{{ install_base_packages_node_bin_dir }}"
+
+        - name: Record whether pnpm was already installed
+          ansible.builtin.set_fact:
+            install_base_packages_pnpm_preinstalled: "{{ resolved_pnpm_executable_path | length > 0 }}"
 
         - name: Ensure pnpm home directory exists
           ansible.builtin.file:
@@ -276,37 +282,46 @@
             mode: "0755"
 
         - name: Download pnpm install script
-          when: not install_base_packages_pnpm_stat_debian.stat.exists
+          when: not install_base_packages_pnpm_preinstalled
           ansible.builtin.get_url:
             url: https://get.pnpm.io/install.sh
             dest: "/tmp/install_pnpm_{{ ansible_user_id }}.sh"
             mode: "0755"
 
         - name: Run pnpm install script
-          when: not install_base_packages_pnpm_stat_debian.stat.exists
+          when: not install_base_packages_pnpm_preinstalled
           ansible.builtin.shell: >
             set -o pipefail &&
             export PNPM_HOME="{{ ansible_facts.env.HOME }}/.local/share/pnpm" &&
             export SHELL="/bin/bash" &&
-            export PATH="$PNPM_HOME:$PATH" &&
+            export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH" &&
             bash /tmp/install_pnpm_{{ ansible_user_id }}.sh
           args:
             executable: /bin/bash
           changed_when: true
           failed_when: false
 
-        - name: Check if pnpm binary exists after install script
-          ansible.builtin.stat:
-            path: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
-          register: install_base_packages_pnpm_installed_stat
+        - name: Update pnpm
+          when: install_base_packages_pnpm_preinstalled
+          ansible.builtin.command:
+            cmd: "{{ resolved_pnpm_executable_path }} self-update"
+            chdir: "{{ ansible_facts.env.HOME }}"
+          environment:
+            PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
+          changed_when: false
 
-        # NOTE: If standalone installer failed or didn't place pnpm in PNPM_HOME,
-        # fallback to npm from Node LTS (installed via nvm above) to ensure pnpm is present.
+        - name: Find pnpm after installing or updating it
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_pnpm_executable.yml
+          vars:
+            resolve_pnpm_node_bin_dir: "{{ install_base_packages_node_bin_dir }}"
+
+        # NOTE: If the standalone installer failed, fall back to npm from Node LTS (installed via nvm
+        #       above) to ensure pnpm is present.
         # NOTE: npm 11.20+ skips install scripts that are not explicitly allowed, and pnpm uses them to set
         #       itself up, hence --allow-scripts=pnpm (older npm versions ignore the unknown flag). This was
-        #       found and verified on Windows; it is applied here by analogy and has not yet been run on Linux.
+        #       found and verified on Windows; it is applied here by analogy.
         - name: Install pnpm via npm fallback if needed
-          when: not install_base_packages_pnpm_installed_stat.stat.exists
+          when: resolved_pnpm_executable_path | length == 0
           ansible.builtin.shell: >
             set -o pipefail &&
             source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh &&
@@ -318,21 +333,30 @@
             executable: /bin/bash
           changed_when: true
 
-        - name: Update pnpm
-          when: install_base_packages_pnpm_stat_debian.stat.exists
-          ansible.builtin.shell:
-            cmd: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm self-update"
-          args:
-            executable: /bin/bash
-            chdir: "{{ ansible_facts.env.HOME }}"
-          changed_when: false
+        - name: Find pnpm after the npm fallback
+          when: resolved_pnpm_executable_path | length == 0
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_pnpm_executable.yml
+          vars:
+            resolve_pnpm_node_bin_dir: "{{ install_base_packages_node_bin_dir }}"
+
+        - name: Fail if no working pnpm was found
+          ansible.builtin.assert:
+            that: resolved_pnpm_executable_path | length > 0
+            fail_msg: >-
+              No working pnpm found in ~/.local/share/pnpm/bin, ~/.local/share/pnpm or on PATH after
+              running the installer and the npm fallback.
+            quiet: true
+
+        - name: Set pnpm executable fact
+          ansible.builtin.set_fact:
+            install_base_packages_pnpm_executable_path: "{{ resolved_pnpm_executable_path }}"
 
     - name: Install pnpm packages
       community.general.pnpm:
         name: "{{ item }}"
         global: true
         state: latest
-        executable: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
+        executable: "{{ install_base_packages_pnpm_executable_path }}"
       environment:
         PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
         PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
@@ -349,7 +373,7 @@
     #       when it tries to run the missing binary. The `community.general.pnpm` module has no
     #       equivalent option, so we install it directly via the pnpm CLI instead.
     - name: Install tree-sitter-cli with its build script allowed
-      ansible.builtin.command: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
+      ansible.builtin.command: "{{ install_base_packages_pnpm_executable_path }} add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
       environment:
         PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
         PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"

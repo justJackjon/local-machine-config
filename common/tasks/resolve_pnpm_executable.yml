@@ -1,0 +1,36 @@
+---
+# Resolves a working pnpm executable on Linux/macOS and sets `resolved_pnpm_executable_path`
+# (an empty string if no working pnpm is found).
+#
+# Optional input: `resolve_pnpm_node_bin_dir` - the nvm Node.js bin directory, prepended to PATH.
+#
+# NOTE: pnpm's standalone installer (get.pnpm.io) changed layout in v11. pnpm <= 10 put the
+#       binary at `$PNPM_HOME/pnpm`; pnpm >= 11 installs itself under `$PNPM_HOME/global/v11` and
+#       links a launcher into `$PNPM_HOME/bin/pnpm` (the managed ~/.bashrc puts `$PNPM_HOME/bin` on
+#       PATH). Hard-coding `$PNPM_HOME/pnpm` made a fresh WSL run (pnpm 12.23.0, Nov 2026) fail
+#       with `[Errno 2] No such file or directory`. An older setup could also leave a circular
+#       `bin/pnpm` behind, so each candidate must actually run (`--version`, with a timeout where
+#       available) before it is chosen. The PATH fallback covers Homebrew's pnpm on macOS.
+- name: Resolve the pnpm executable
+  ansible.builtin.shell: |
+    run_with_timeout() {
+      if command -v timeout >/dev/null 2>&1; then timeout 30 "$@"; else "$@"; fi
+    }
+    for candidate in "$PNPM_HOME/bin/pnpm" "$PNPM_HOME/pnpm" "$(command -v pnpm)"; do
+      if [ -n "$candidate" ] && [ -x "$candidate" ] && run_with_timeout "$candidate" --version >/dev/null 2>&1; then
+        echo "$candidate"
+        exit 0
+      fi
+    done
+  args:
+    executable: /bin/bash
+  environment:
+    PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
+    PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ resolve_pnpm_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
+  register: resolve_pnpm_executable_result
+  changed_when: false
+  failed_when: false
+
+- name: Set the resolved pnpm executable fact
+  ansible.builtin.set_fact:
+    resolved_pnpm_executable_path: "{{ resolve_pnpm_executable_result.stdout | default('') | trim }}"
