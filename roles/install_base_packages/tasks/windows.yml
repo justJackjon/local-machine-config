@@ -132,8 +132,9 @@
             executable_name: tldr
           - name: perl
             executable_name: perl
-          - name: pnpm
-            executable_name: pnpm
+          # NOTE: pnpm is intentionally not installed via Scoop. nvm-windows 2.x (shim mode) places its own
+          #       pnpm/yarn proxy shims on the user PATH ahead of Scoop's shims and routes them to the copy of
+          #       pnpm installed in the active Node.js version, so pnpm is installed through nvm further below.
           # NOTE: starship uses env_add_path instead of standard Scoop shims (for performance).
           #       We set skip_which_check to true to avoid 'scoop which' validation failures.
           - name: starship
@@ -145,6 +146,27 @@
       loop: "{{ install_base_packages_scoop_list }}"
       loop_control:
         loop_var: scoop_package
+
+    # NOTE: Earlier versions of this playbook installed pnpm via Scoop. Remove it so only the
+    #       nvm-managed pnpm remains (see the NOTE in the Scoop packages list above).
+    - name: Check for Scoop-managed pnpm
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} list pnpm"
+      register: install_base_packages_scoop_pnpm_status
+      changed_when: false
+      failed_when: false
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+    - name: Remove Scoop-managed pnpm
+      when: install_base_packages_scoop_pnpm_status.stdout is search('(?m)^pnpm\\s+')
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} uninstall pnpm"
+      changed_when: true
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
 
     - name: Ensure NVM root directory exists
       ansible.builtin.file:
@@ -213,6 +235,47 @@
         - install_base_packages_nvm_node_version is defined
         - install_base_packages_nvm_node_version != ""
       changed_when: false
+
+    # NOTE: nvm-windows 2.x (shim mode) exposes node/npm/pnpm/yarn through proxy shims in
+    #       scoop/persist/nvm/.nodejs, which it adds to the user PATH. Its pnpm proxy runs the pnpm installed
+    #       in the active Node.js version, so we install pnpm there with npm. Node.js 25+ no longer bundles
+    #       corepack, so 'corepack enable' (as suggested by the proxy's error message) is not an option.
+    - name: Set nvm shim facts
+      ansible.builtin.set_fact:
+        install_base_packages_nvm_shim_dir: "{{ install_base_packages_scoop_root }}/persist/nvm/.nodejs"
+        install_base_packages_pnpm_executable_path: "{{ install_base_packages_scoop_root }}/persist/nvm/.nodejs/pnpm.exe"
+
+    - name: Provide pnpm via nvm-windows
+      when:
+        - install_base_packages_nvm_node_version is defined
+        - install_base_packages_nvm_node_version != ""
+      block:
+        - name: Get nvm auto-installed modules
+          ansible.builtin.command:
+            cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe cfg get auto_installed_modules"
+          register: install_base_packages_nvm_auto_modules
+          changed_when: false
+
+        # NOTE: Ensures pnpm is installed automatically into any Node.js version nvm installs in future.
+        - name: Configure nvm to auto-install pnpm with new Node.js versions
+          when: "'pnpm' not in install_base_packages_nvm_auto_modules.stdout"
+          ansible.builtin.command:
+            cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe cfg set auto_installed_modules=pnpm"
+          changed_when: true
+
+        # NOTE: npm 11.20+ skips install scripts that are not explicitly allowed, and pnpm uses them to set itself up.
+        - name: Install pnpm into the active Node.js version
+          ansible.builtin.command:
+            cmd: "{{ install_base_packages_nvm_shim_dir }}/npm.exe install -g --allow-scripts=pnpm pnpm"
+            creates: "{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/v{{ install_base_packages_nvm_node_version }}/node_modules/pnpm/package.json"
+
+        # NOTE: nvm prompts before running global modules it does not yet trust ('untrusted_module_handler_action'),
+        #       which would hang a non-interactive run. 'nvm reshim' re-trusts package-manager entrypoints.
+        - name: Rebuild and re-trust nvm shims
+          ansible.builtin.command:
+            cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe reshim"
+          register: install_base_packages_nvm_reshim
+          changed_when: "'up to date' not in (install_base_packages_nvm_reshim.stdout ~ install_base_packages_nvm_reshim.stderr)"
 
     - name: Download and Install AutoHotkey v1.1
       block:
@@ -300,26 +363,8 @@
         - install_base_packages_pipx_shared_venv_cfg.stat.exists
         - install_base_packages_pipx_shared_is_mingw.rc != 0
 
-    - name: Get pnpm executable path from Scoop
-      ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_executable_path }} which pnpm"
-      register: pnpm_executable_path_raw
-      changed_when: false
-      environment:
-        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
-        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-      failed_when: >-
-        pnpm_executable_path_raw.rc != 0 or
-        'WARN' in pnpm_executable_path_raw.stdout or
-        'not found' in pnpm_executable_path_raw.stdout
-
-    - name: Set pnpm executable path fact
-      ansible.builtin.set_fact:
-        # NOTE: We convert the Windows-style path (with tildes and backslashes) into a POSIX-style
-        #       path that the MSYS2-based Ansible executor can understand and execute.
-        #       We use regex_replace with '\\\\' which YAML turns into '\\' and Jinja2/Regex turns into a single literal '\'.
-        install_base_packages_pnpm_executable_path: "{{ pnpm_executable_path_raw.stdout | trim | replace('~', install_base_packages_win_home_posix) | regex_replace('\\\\', '/') }}"
-
+    # NOTE: install_base_packages_pnpm_executable_path is set in 'Provide pnpm via nvm-windows' above.
+    #       We no longer resolve pnpm with 'scoop which', which follows PATH order and returns nvm's proxy shim.
     - name: Ensure pnpm global directory exists
       ansible.builtin.file:
         path: "{{ install_base_packages_win_home_posix }}/AppData/Local/pnpm"
@@ -344,11 +389,11 @@
     - name: Set pnpm install PATH fact
       ansible.builtin.set_fact:
         install_base_packages_pnpm_install_path: >-
-          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/nodejs:{{ ansible_facts.env.PATH }}
+          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_nvm_shim_dir }}:{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/nodejs:{{ ansible_facts.env.PATH }}
 
     - name: Install pnpm packages
-      # NOTE: We use the absolute path to the pnpm executable obtained from `scoop which`
-      #       to ensure we are using the correct, Scoop-managed binary.
+      # NOTE: We use the absolute path to nvm's pnpm proxy shim to ensure we are using the
+      #       nvm-managed pnpm for the active Node.js version.
       ansible.builtin.command:
         cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
       environment:
