@@ -295,7 +295,9 @@
     #       '%LOCALAPPDATA%\Author Software\nvm\.nodejs'. Its installer does not reliably add that directory to the
     #       user PATH (an upgrade from Scoop kept Scoop's old scoop/persist/nvm/.nodejs entry instead), so we manage
     #       it here and drop the stale Scoop entry. pnpm's global bin directory (PNPM_HOME) is added too, so global
-    #       CLIs such as 'rafter' and 'tree-sitter' are on PATH.
+    #       CLIs such as 'rafter' and 'tree-sitter' are on PATH, as are the bin directories of the Claude Code
+    #       ('%USERPROFILE%\.local\bin') and agy ('%LOCALAPPDATA%\agy\bin') CLIs installed by configure_mcp_servers,
+    #       whose official installers do not add them.
     # NOTE: expand_argument_vars must be false for any command task that embeds PowerShell. Otherwise the
     #       command module expands '$NAME' environment variables in the arguments, and PowerShell's pipeline
     #       variable '$_' is replaced with bash's '$_' (the last command run, e.g. /usr/bin/python3.14). That
@@ -311,7 +313,11 @@
           $key = Get-Item -Path 'HKCU:\Environment';
           $current = [string]$key.GetValue('Path', '', 'DoNotExpandEnvironmentNames');
           $stale = Join-Path $env:USERPROFILE 'scoop\persist\nvm\.nodejs';
-          $wanted = @((Join-Path $env:LOCALAPPDATA 'Author Software\nvm\.nodejs'), (Join-Path $env:LOCALAPPDATA 'pnpm'));
+          $wanted = @(
+            (Join-Path $env:LOCALAPPDATA 'Author Software\nvm\.nodejs'),
+            (Join-Path $env:LOCALAPPDATA 'pnpm'),
+            (Join-Path $env:USERPROFILE '.local\bin'),
+            (Join-Path $env:LOCALAPPDATA 'agy\bin'));
           $original = @($current -split ';' | Where-Object { $_ });
           $entries = @($original | Where-Object { $_ -ine $stale });
           if ($entries.Count -lt ($original.Count - 1)) { throw ('Refusing to update PATH: filter would drop ' + ($original.Count - $entries.Count) + ' entries') };
