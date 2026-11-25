@@ -38,6 +38,7 @@ local-machine-config/
 │       ├── backup_directory.yml         # Safe file/folder backup helper (.bak)
 │       ├── install_scoop_package.yml    # Robust Windows Scoop installer & soft-repair
 │       ├── manage_ssh_config_entry.yml  # Idempotent ~/.ssh/config blockinfile manager
+│       ├── resolve_pnpm_executable.yml  # Finds a working pnpm on Linux/macOS (layout varies by version)
 │       ├── set_os_facts.yml             # Discovers is_debian_family, is_mac, is_windows, is_wsl
 │       ├── set_python_interpreter.yml   # Resolves Python interpreter & venv per platform
 │       └── set_sys_architecture_facts.yml # Discovers is_amd64 and is_arm64
@@ -245,7 +246,12 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - Upgrading from a Scoop install makes the official installer adopt the old Node root; the playbook resets it with `nvm cfg reset root`. Windows-only (Linux/macOS use nvm-sh, unaffected).
 
 ### npm 11.20+ blocks install scripts by default
-- Packages that set themselves up in `preinstall`/`postinstall` (pnpm itself) need `--allow-scripts=<name>`. Verified on Windows; applied *by analogy* to the Linux npm fallback in `install_base_packages/tasks/linux.yml` (not yet run on Linux). macOS installs pnpm via Homebrew.
+- Packages that set themselves up in `preinstall`/`postinstall` (pnpm itself) need `--allow-scripts=<name>`. Verified on Windows; applied *by analogy* to the Linux npm fallback in `install_base_packages/tasks/linux.yml` (not yet exercised on Linux: the standalone installer succeeded there). macOS installs pnpm via Homebrew.
+
+### pnpm's standalone installer moved the binary in v11 (Linux/macOS)
+- **Symptom:** `Install pnpm packages` fails with `[Errno 2] No such file or directory: b'/home/<user>/.local/share/pnpm/pnpm'`, although `pnpm` works in a new shell.
+- **Cause:** pnpm <= 10 put its binary at `$PNPM_HOME/pnpm`. pnpm >= 11 installs into `$PNPM_HOME/global/v11/...` and links a launcher at `$PNPM_HOME/bin/pnpm` (its `pnpm setup` block in `~/.bashrc` puts `$PNPM_HOME/bin` on PATH). Separately, `install_lazyvim` deleted `$PNPM_HOME/bin/pnpm` as a pnpm 10-era "circular shim", which would have removed the real launcher.
+- **Fix:** never hard-code the pnpm path on Unix. Include `common/tasks/resolve_pnpm_executable.yml`, which tries `bin/pnpm`, `pnpm`, then PATH, keeps the first that runs `--version`, and sets `resolved_pnpm_executable_path`. Verified in WSL2 Ubuntu (pnpm 12.23.0); macOS uses the same resolver *by analogy* (it finds Homebrew's pnpm via PATH).
 
 ### Several `gpg`s on Windows — only one keyring is right
 - Git for Windows' bundled gpg (the `gpg` Scoop shim) and MSYS2's gpg (both 2.4.x) share `~/.gnupg`, where `configure_git` creates the signing key. Scoop's `gnupg` (2.5.x) was a separate portable install with its own keyring (`scoop/apps/gnupg/current/home`), and its `bin` landed on the user PATH ahead of `scoop/shims`, so every signed `git commit` from a Windows shell failed with `No secret key`. Scoop's `gnupg` is no longer installed (and is purged if present).
@@ -258,6 +264,10 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - `Start-Transcript` in Windows PowerShell 5.1 does not capture native executables' output, so `install.ps1` sets `ANSIBLE_LOG_PATH`. Don't pipe the playbook through `Out-Host` to work around it: that line-buffers output and hides prompts that don't end in a newline (passphrases).
 - When an agent drives PowerShell, native-argument quoting in 5.1 mangles embedded double quotes (`gh --jq '...'`, `bash -lc "..."`). Write scripts to a file and run the file instead.
 - A shell started before Scoop was installed won't have `~\scoop\shims` on PATH; rebuild PATH from the registry (`Machine` + `User`) before concluding a tool is missing.
+
+### Debugging WSL runs from the Windows host
+- An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."` (e.g. `tail -100 /tmp/local-machine-config-install.log`). WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.
+- `sudo` in WSL needs the user's password, so an agent can't do a full run. Test a change with a small playbook that skips `become`, then have the user re-run `./run-playbook.sh` in WSL.
 
 ### `install_lazyvim` used to replace the Neovim config on every run
 - It backed up and re-cloned the starter unconditionally. On Linux/macOS the shared `backup_directory.yml` also deleted the previous fixed-name `.bak` first, and passed `~` paths to `ansible.builtin.command` (no shell, so `~` was never expanded and `mv` failed silently). Now gated on `lua/config/lazy.lua`, with timestamped backups and expanded paths. Verified on Windows (existing config untouched; fresh install clones the starter). The Linux/macOS backup path is fixed *by analogy* and not yet run there.
