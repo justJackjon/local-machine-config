@@ -142,7 +142,9 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 ### `install_base_packages`
 - **Linux:** Installs system tools, Rust via `rustup`, Alacritty via `cargo`, `gh`, `lazygit` (deb or tarball depending on OS version), `fzf` from source, `starship`, Node LTS via `nvm`, `pnpm`, and `ansible-lint`.
 - **macOS:** Installs Homebrew packages (`starship`, CLI utilities), `nvm`, Node LTS, `pnpm`, and global CLI utilities.
-- **Windows:** Pacman packages in MSYS2, Scoop packages (`nvm`, `gh`, `gnupg`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `perl`, `pnpm`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
+- **Windows:** Pacman packages in MSYS2, Scoop packages (`nvm`, `gh`, `gnupg`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `luarocks`, `sqlite`, `tealdeer`, `perl`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
+  - **Node.js & pnpm:** Provided by nvm-windows 2.x in shim mode. Its proxy shims (`scoop/persist/nvm/.nodejs`) sit on the user PATH ahead of Scoop's shims, so pnpm is installed into the active Node.js version via npm (and listed in nvm's `auto_installed_modules`) rather than via Scoop. Roles invoke pnpm via the absolute shim path `scoop/persist/nvm/.nodejs/pnpm.exe`, never `scoop which pnpm`.
+  - **pipx:** Installed with pip into a dedicated MinGW64 venv (`~/.venvs/pipx`), as the mingw64 pipx package is no longer published. Invoke it as `~/.venvs/pipx/bin/python.exe -m pipx`.
 - **All platforms:** Installs the Rafter CLI (`@rafter-security/cli`, exposing `rafter`) globally via pnpm — the local command-safety layer invoked by AI agent guard hooks.
 
 ### `install_docker`
