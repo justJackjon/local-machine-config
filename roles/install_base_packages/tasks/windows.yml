@@ -38,6 +38,9 @@
           #       The MSYS jq package provides /usr/bin/jq, which is what Ansible's shell tasks use.
           - jq
           - mingw-w64-x86_64-imagemagick
+          # NOTE: unzip is required by ansible.builtin.unarchive for .zip files (e.g. the Kinto download
+          #       in configure_keyboard). It is listed explicitly rather than relied on as a transitive dependency.
+          - unzip
           - bash-completion
           - stow
           - tree
