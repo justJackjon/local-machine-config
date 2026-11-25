@@ -302,12 +302,15 @@
 
         # NOTE: If standalone installer failed or didn't place pnpm in PNPM_HOME,
         # fallback to npm from Node LTS (installed via nvm above) to ensure pnpm is present.
+        # NOTE: npm 11.20+ skips install scripts that are not explicitly allowed, and pnpm uses them to set
+        #       itself up, hence --allow-scripts=pnpm (older npm versions ignore the unknown flag). This was
+        #       found and verified on Windows; it is applied here by analogy and has not yet been run on Linux.
         - name: Install pnpm via npm fallback if needed
           when: not install_base_packages_pnpm_installed_stat.stat.exists
           ansible.builtin.shell: >
             set -o pipefail &&
             source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh &&
-            npm install -g pnpm &&
+            npm install -g --allow-scripts=pnpm pnpm &&
             export PNPM_HOME="{{ ansible_facts.env.HOME }}/.local/share/pnpm" &&
             export SHELL="/bin/bash" &&
             pnpm setup --force || cp "$(which pnpm)" "{{ ansible_facts.env.HOME }}/.local/share/pnpm/pnpm"
