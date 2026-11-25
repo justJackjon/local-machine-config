@@ -266,7 +266,7 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - A shell started before Scoop was installed won't have `~\scoop\shims` on PATH; rebuild PATH from the registry (`Machine` + `User`) before concluding a tool is missing.
 
 ### Debugging WSL runs from the Windows host
-- An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."` (e.g. `tail -100 /tmp/local-machine-config-install.log`). WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.
+- An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."`. `run-playbook.sh` always appends Ansible's output to `${TMPDIR:-/tmp}/local-machine-config-ansible.log` (override with `ANSIBLE_LOG_PATH`), so `tail -200 /tmp/local-machine-config-ansible.log` shows the latest run. `/tmp/local-machine-config-install.log` is written only by `install.sh`. WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.
 - `sudo` in WSL needs the user's password, so an agent can't do a full run. Test a change with a small playbook that skips `become`, then have the user re-run `./run-playbook.sh` in WSL.
 
 ### `install_lazyvim` used to replace the Neovim config on every run

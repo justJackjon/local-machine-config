@@ -60,6 +60,12 @@ if command -v sudo.ws &>/dev/null; then
   CMD="ANSIBLE_BECOME_EXE=sudo.ws $CMD"
 fi
 
+# NOTE: Always keep a log of Ansible's output, so a failed run can be diagnosed afterwards (including
+#       by an agent on the Windows host reading WSL's /tmp) without copying output from the terminal.
+#       Ansible appends to this file. install.ps1 sets its own path on Windows, which is respected here.
+export ANSIBLE_LOG_PATH="${ANSIBLE_LOG_PATH:-${TMPDIR:-/tmp}/local-machine-config-ansible.log}"
+info "Ansible output is also logged to: $ANSIBLE_LOG_PATH"
+
 # Execute the final command, passing along any extra arguments provided to the script
 # This allows users to add flags like --syntax-check, --list-tasks, etc.
 info "Running command: $CMD $@"
