@@ -132,11 +132,9 @@
           ansible.builtin.set_fact:
             install_lazyvim_pnpm_home_dir: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
 
-        - name: Remove circular pnpm shim in bin directory if present
-          ansible.builtin.file:
-            path: "{{ install_lazyvim_pnpm_home_dir }}/bin/pnpm"
-            state: absent
-
+        # NOTE: This role used to delete `$PNPM_HOME/bin/pnpm` as a "circular shim" (a pnpm 10-era
+        #       workaround). From pnpm 11 that file is pnpm's real launcher, so deleting it removed pnpm.
+        #       The executable is now resolved instead (see common/tasks/resolve_pnpm_executable.yml).
         - name: Find NVM Node bin directory (Unix)
           ansible.builtin.shell: |
             find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
@@ -160,8 +158,19 @@
             name: pynvim
             state: latest
 
+        - name: Find the pnpm executable (Unix)
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_pnpm_executable.yml
+          vars:
+            resolve_pnpm_node_bin_dir: "{{ install_lazyvim_node_bin_dir }}"
+
+        - name: Fail if no working pnpm was found (Unix)
+          ansible.builtin.assert:
+            that: resolved_pnpm_executable_path | length > 0
+            fail_msg: No working pnpm found; it is installed by the install_base_packages role.
+            quiet: true
+
         - name: Install neovim for Node.js provider (Unix)
-          ansible.builtin.command: "{{ install_lazyvim_pnpm_home_dir }}/pnpm add -g neovim"
+          ansible.builtin.command: "{{ resolved_pnpm_executable_path }} add -g neovim"
           changed_when: false
           environment:
             PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
