@@ -172,12 +172,13 @@
       ansible.builtin.set_fact:
         # NOTE: pnpm is provided by nvm-windows 2.x through its proxy shim (see install_base_packages).
         #       We use the shim's absolute path rather than 'scoop which', which follows PATH order.
-        install_lazyvim_pnpm_executable_path: "{{ install_lazyvim_win_home_dir }}/scoop/persist/nvm/.nodejs/pnpm.exe"
+        #       The path contains a space ('Author Software'), so it must be quoted when executed.
+        install_lazyvim_pnpm_executable_path: "{{ install_lazyvim_win_home_dir }}/AppData/Local/Author Software/nvm/.nodejs/pnpm.exe"
 
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
       ansible.builtin.command:
-        cmd: "{{ install_lazyvim_pnpm_executable_path }} add -g neovim"
+        cmd: "\"{{ install_lazyvim_pnpm_executable_path }}\" add -g neovim"
       changed_when: false
       environment:
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"

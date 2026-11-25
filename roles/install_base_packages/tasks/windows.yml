@@ -101,11 +101,9 @@
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
         install_base_packages_scoop_list:
-          # NOTE: nvm-windows does not use standard Scoop shims; it manages its own PATH and symlinks.
-          #       We set skip_which_check to true to avoid 'scoop which' validation failures.
-          - name: nvm
-            executable_name: nvm
-            skip_which_check: true
+          # NOTE: nvm-windows is intentionally not installed via Scoop. nvm-windows 2.x refuses to support
+          #       running from outside its per-user install root (NVM4101), and Scoop extracts it into
+          #       scoop/apps/nvm. It is installed from the official installer further below.
           - name: gh
             executable_name: gh
           - name: gnupg
@@ -172,83 +170,166 @@
         HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
         USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
 
-    - name: Ensure NVM root directory exists
-      ansible.builtin.file:
-        path: "{{ install_base_packages_win_home_posix }}/scoop/persist/nvm/nodejs"
-        state: directory
-        mode: "0755"
+    # NOTE: nvm-windows 2.x is installed per-user into '%LOCALAPPDATA%\Author Software\nvm' by its official
+    #       installer (PrivilegesRequired=lowest, so no elevation is needed). That path contains a space, so
+    #       executables under it must be quoted when passed to ansible.builtin.command.
+    - name: Set nvm-windows facts
+      ansible.builtin.set_fact:
+        install_base_packages_nvm_home: "{{ install_base_packages_win_home_posix }}/AppData/Local/Author Software/nvm"
+        install_base_packages_nvm_executable_path: "{{ install_base_packages_win_home_posix }}/AppData/Local/Author Software/nvm/nvm.exe"
+        install_base_packages_nvm_shim_dir: "{{ install_base_packages_win_home_posix }}/AppData/Local/Author Software/nvm/.nodejs"
+        install_base_packages_pnpm_executable_path: "{{ install_base_packages_win_home_posix }}/AppData/Local/Author Software/nvm/.nodejs/pnpm.exe"
 
-    - name: Configure NVM root and symlink path
+    # NOTE: Earlier versions of this playbook installed nvm via Scoop (see the NOTE in the Scoop packages list).
+    #       Its uninstaller removes its scoop/apps/nvm PATH entry and NVM_HOME; its data in scoop/persist/nvm
+    #       is cleaned up below once the official install has taken over.
+    - name: Check for Scoop-managed nvm
       ansible.builtin.command:
-        cmd: >
-          powershell.exe -Command "
-          $settings = '{{ install_base_packages_scoop_root_win }}\apps\nvm\current\settings.txt';
-          $root = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs';
-          $path = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\nodejs';
-          'root: ' + $root + \"`r`n\" + 'path: ' + $path + \"`r`n\" + 'arch: 64' + \"`r`n\" + 'proxy: none' | Out-File -Encoding ASCII $settings;
-          Write-Host 'Updated NVM settings.txt';"
+        cmd: "{{ install_base_packages_scoop_executable_path }} list nvm"
+      register: install_base_packages_scoop_nvm_status
       changed_when: false
+      failed_when: false
       environment:
-        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
-        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+    - name: Remove Scoop-managed nvm
+      when: install_base_packages_scoop_nvm_status.stdout is search('(?m)^nvm\\s+')
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} uninstall nvm"
+      register: install_base_packages_scoop_nvm_uninstall
+      changed_when: "'was uninstalled' in install_base_packages_scoop_nvm_uninstall.stdout"
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+    - name: Check if nvm-windows is installed
+      ansible.builtin.stat:
+        path: "{{ install_base_packages_nvm_executable_path }}"
+      register: install_base_packages_nvm_executable_stat
+
+    - name: Install nvm-windows from the official installer
+      when: not install_base_packages_nvm_executable_stat.stat.exists
+      block:
+        - name: Get latest nvm-windows release from GitHub
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/nvm-windows/nvm/releases/latest
+            headers:
+              Accept: application/vnd.github+json
+            return_content: true
+          register: install_base_packages_nvm_release
+
+        - name: Select nvm-windows installer asset
+          ansible.builtin.set_fact:
+            install_base_packages_nvm_installer_asset: >-
+              {{ install_base_packages_nvm_release.json.assets
+                 | selectattr('name', 'search', '-' ~ ('arm64' if (is_arm64 | default(false)) else 'x64') ~ '-setup\.exe$')
+                 | first }}
+
+        # NOTE: GitHub publishes a 'sha256:<hex>' digest for each release asset, which get_url verifies.
+        - name: Download nvm-windows installer
+          ansible.builtin.get_url:
+            url: "{{ install_base_packages_nvm_installer_asset.browser_download_url }}"
+            dest: "{{ install_base_packages_win_home_posix }}/Downloads/nvm-setup.exe"
+            checksum: "{{ install_base_packages_nvm_installer_asset.digest }}"
+            mode: "0755"
+
+        - name: Run nvm-windows installer silently
+          ansible.builtin.command:
+            cmd: >-
+              powershell.exe -NoProfile -Command "
+              $p = Start-Process -FilePath (Join-Path $env:USERPROFILE 'Downloads\nvm-setup.exe')
+              -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/LANG=english' -Wait -PassThru;
+              exit $p.ExitCode"
+            creates: "{{ install_base_packages_nvm_executable_path }}"
+            # NOTE: See the NOTE on the user PATH task below for why this must be false.
+            expand_argument_vars: false
+
+        - name: Remove nvm-windows installer
+          ansible.builtin.file:
+            path: "{{ install_base_packages_win_home_posix }}/Downloads/nvm-setup.exe"
+            state: absent
+
+    # NOTE: When upgrading from a Scoop install, the official installer adopts the existing Node.js root under
+    #       scoop/persist/nvm. Reset it to nvm's default ('%LOCALAPPDATA%\Author Software\nvm\installs') so the
+    #       layout matches a fresh machine; Node.js LTS is then (re)installed there below.
+    - name: Get nvm Node.js install root
+      ansible.builtin.command:
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" cfg get root"
+      register: install_base_packages_nvm_root
+      changed_when: false
+
+    - name: Reset nvm Node.js install root left over from Scoop
+      when: "'scoop' in (install_base_packages_nvm_root.stdout | lower)"
+      ansible.builtin.command:
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" cfg reset root"
+      changed_when: true
 
     - name: Install Node.js LTS via NVM
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe install lts"
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" install lts"
       register: install_base_packages_nvm_install
       changed_when: "'is already installed' not in install_base_packages_nvm_install.stdout"
       failed_when:
         - install_base_packages_nvm_install.rc != 0
         - "'already installed' not in install_base_packages_nvm_install.stdout"
-      environment:
-        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
-        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
 
     - name: Set Node.js version fact from NVM install output
       ansible.builtin.set_fact:
         # NOTE: nvm-windows output contains "Installing node.js vXX.XX.XX" or "Version XX.XX.XX is already installed."
         #       nvm-windows 2.x instead prints e.g. "SKIPPED: vXX.XX.XX is already installed", so we also accept a bare
-        #       'vXX.XX.XX'. Without a version, 'nvm use' and the nodejs junction are skipped and node is not on PATH.
+        #       'vXX.XX.XX'. Without a version, 'nvm use' and the pnpm setup below are skipped.
         #       We use regex_findall to extract the version following 'v' or 'Version ' and pick the first match.
         install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_findall('(?:node\\.js v|Version |\\bv)(\\d+\\.\\d+\\.\\d+)') | first | default('') }}"
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe use {{ install_base_packages_nvm_node_version }}"
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" use {{ install_base_packages_nvm_node_version }}"
       when:
         - install_base_packages_nvm_node_version is defined
         - install_base_packages_nvm_node_version != ""
       changed_when: false
       failed_when: false
-      environment:
-        NVM_HOME: "{{ install_base_packages_scoop_root_win }}\\apps\\nvm\\current"
-        NVM_SYMLINK: "{{ install_base_packages_scoop_root_win }}\\persist\\nvm\\nodejs\\nodejs"
-
-    # NOTE: nvm-windows attempts to elevate via UAC to create directory symlinks.
-    #       Creating a directory Junction in PowerShell requires no administrator privileges.
-    - name: Ensure NVM nodejs junction exists
-      ansible.builtin.command:
-        cmd: >
-          powershell.exe -Command "
-          $link = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\nodejs';
-          $target = '{{ install_base_packages_scoop_root_win }}\persist\nvm\nodejs\v{{ install_base_packages_nvm_node_version }}';
-          if (-not (Test-Path -Path $link)) {
-            New-Item -ItemType Junction -Path $link -Target $target | Out-Null;
-          }"
-      when:
-        - install_base_packages_nvm_node_version is defined
-        - install_base_packages_nvm_node_version != ""
-      changed_when: false
 
     # NOTE: nvm-windows 2.x (shim mode) exposes node/npm/pnpm/yarn through proxy shims in
-    #       scoop/persist/nvm/.nodejs, which it adds to the user PATH. Its pnpm proxy runs the pnpm installed
-    #       in the active Node.js version, so we install pnpm there with npm. Node.js 25+ no longer bundles
-    #       corepack, so 'corepack enable' (as suggested by the proxy's error message) is not an option.
-    - name: Set nvm shim facts
-      ansible.builtin.set_fact:
-        install_base_packages_nvm_shim_dir: "{{ install_base_packages_scoop_root }}/persist/nvm/.nodejs"
-        install_base_packages_pnpm_executable_path: "{{ install_base_packages_scoop_root }}/persist/nvm/.nodejs/pnpm.exe"
+    #       '%LOCALAPPDATA%\Author Software\nvm\.nodejs'. Its installer does not reliably add that directory to the
+    #       user PATH (an upgrade from Scoop kept Scoop's old scoop/persist/nvm/.nodejs entry instead), so we manage
+    #       it here and drop the stale Scoop entry. pnpm's global bin directory (PNPM_HOME) is added too, so global
+    #       CLIs such as 'rafter' and 'tree-sitter' are on PATH.
+    # NOTE: expand_argument_vars must be false for any command task that embeds PowerShell. Otherwise the
+    #       command module expands '$NAME' environment variables in the arguments, and PowerShell's pipeline
+    #       variable '$_' is replaced with bash's '$_' (the last command run, e.g. /usr/bin/python3.14). That
+    #       silently broke the Where-Object filter below and wiped the user PATH down to the added entries.
+    # NOTE: The raw (unexpanded) registry value is read and written as REG_EXPAND_SZ, so entries such as
+    #       '%USERPROFILE%\AppData\Local\Microsoft\WindowsApps' are preserved rather than flattened.
+    #       As a safeguard, nothing is written if more than the stale entry would be dropped.
+    - name: Ensure nvm shims and pnpm global bin directory are on the user PATH
+      ansible.builtin.command:
+        cmd: >-
+          powershell.exe -NoProfile -Command "
+          $ErrorActionPreference = 'Stop';
+          $key = Get-Item -Path 'HKCU:\Environment';
+          $current = [string]$key.GetValue('Path', '', 'DoNotExpandEnvironmentNames');
+          $stale = Join-Path $env:USERPROFILE 'scoop\persist\nvm\.nodejs';
+          $wanted = @((Join-Path $env:LOCALAPPDATA 'Author Software\nvm\.nodejs'), (Join-Path $env:LOCALAPPDATA 'pnpm'));
+          $original = @($current -split ';' | Where-Object { $_ });
+          $entries = @($original | Where-Object { $_ -ine $stale });
+          if ($entries.Count -lt ($original.Count - 1)) { throw ('Refusing to update PATH: filter would drop ' + ($original.Count - $entries.Count) + ' entries') };
+          foreach ($w in $wanted) { if (-not ($entries | Where-Object { $_ -ieq $w })) { $entries += $w } };
+          $updated = $entries -join ';';
+          if ($updated -ne $current) {
+            Set-ItemProperty -Path 'HKCU:\Environment' -Name 'Path' -Value $updated -Type ExpandString;
+            [Environment]::SetEnvironmentVariable('LMC_PATH_REFRESH', '1', 'User');
+            [Environment]::SetEnvironmentVariable('LMC_PATH_REFRESH', $null, 'User');
+            Write-Output 'PATH updated'
+          }"
+        expand_argument_vars: false
+      register: install_base_packages_user_path_update
+      changed_when: "'PATH updated' in install_base_packages_user_path_update.stdout"
 
+    # NOTE: nvm-windows 2.x's pnpm proxy runs the pnpm installed in the active Node.js version, so we install
+    #       pnpm there with npm. Node.js 25+ no longer bundles corepack, so 'corepack enable' (as suggested by
+    #       the proxy's error message) is not an option.
     - name: Provide pnpm via nvm-windows
       when:
         - install_base_packages_nvm_node_version is defined
@@ -256,7 +337,7 @@
       block:
         - name: Get nvm auto-installed modules
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe cfg get auto_installed_modules"
+            cmd: "\"{{ install_base_packages_nvm_executable_path }}\" cfg get auto_installed_modules"
           register: install_base_packages_nvm_auto_modules
           changed_when: false
 
@@ -264,20 +345,20 @@
         - name: Configure nvm to auto-install pnpm with new Node.js versions
           when: "'pnpm' not in install_base_packages_nvm_auto_modules.stdout"
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe cfg set auto_installed_modules=pnpm"
+            cmd: "\"{{ install_base_packages_nvm_executable_path }}\" cfg set auto_installed_modules=pnpm"
           changed_when: true
 
         # NOTE: npm 11.20+ skips install scripts that are not explicitly allowed, and pnpm uses them to set itself up.
         - name: Install pnpm into the active Node.js version
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_nvm_shim_dir }}/npm.exe install -g --allow-scripts=pnpm pnpm"
-            creates: "{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/v{{ install_base_packages_nvm_node_version }}/node_modules/pnpm/package.json"
+            cmd: "\"{{ install_base_packages_nvm_shim_dir }}/npm.exe\" install -g --allow-scripts=pnpm pnpm"
+            creates: "{{ install_base_packages_nvm_home }}/installs/v{{ install_base_packages_nvm_node_version }}/node_modules/pnpm/package.json"
 
         # NOTE: nvm prompts before running global modules it does not yet trust ('untrusted_module_handler_action'),
         #       which would hang a non-interactive run. 'nvm reshim' re-trusts package-manager entrypoints.
         - name: Rebuild and re-trust nvm shims
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_scoop_root }}/apps/nvm/current/nvm.exe reshim"
+            cmd: "\"{{ install_base_packages_nvm_executable_path }}\" reshim"
           register: install_base_packages_nvm_reshim
           changed_when: "'up to date' not in (install_base_packages_nvm_reshim.stdout ~ install_base_packages_nvm_reshim.stderr)"
 
@@ -287,7 +368,7 @@
         #       settings restores pnpm's defaults under PNPM_HOME.
         - name: Get pnpm directory settings
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_pnpm_executable_path }} config get {{ item }}"
+            cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" config get {{ item }}"
           loop:
             - store-dir
             - cache-dir
@@ -301,7 +382,7 @@
           # NOTE: '.' matches either path separator, avoiding backslash escaping through YAML and Jinja.
           when: item.stdout is search('scoop.apps.pnpm', ignorecase=true)
           ansible.builtin.command:
-            cmd: "{{ install_base_packages_pnpm_executable_path }} config delete {{ item.item }}"
+            cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" config delete {{ item.item }}"
           loop: "{{ install_base_packages_pnpm_dir_settings.results }}"
           loop_control:
             label: "{{ item.item }}"
@@ -313,6 +394,27 @@
           ansible.builtin.file:
             path: "{{ install_base_packages_scoop_root }}/apps/pnpm"
             state: absent
+
+        # NOTE: Node.js versions, shims and caches from the old Scoop-managed nvm. By this point the official
+        #       install owns the Node.js root and its own shims, so this data is no longer referenced.
+        #       nvm protects its .shim directory and the (hard-linked) proxy executables in it with explicit ACLs that
+        #       only grant the user read/execute and WRITE_DAC, so ansible.builtin.file cannot delete them. We grant the
+        #       user full control first. The grant must be a plain ':F' (not '(OI)(CI)F'): inheritance flags only
+        #       affect directories, so they leave the files' explicit ACLs unchanged.
+        - name: Remove leftover Scoop nvm data directory
+          ansible.builtin.command:
+            cmd: >-
+              powershell.exe -NoProfile -Command "
+              $d = Join-Path $env:USERPROFILE 'scoop\persist\nvm';
+              if (Test-Path -LiteralPath $d) {
+                icacls $d /grant ($env:USERNAME + ':F') /T /C /Q | Out-Null;
+                Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction Stop;
+                Write-Output 'removed'
+              }"
+            # NOTE: See the NOTE on the user PATH task above for why this must be false.
+            expand_argument_vars: false
+          register: install_base_packages_scoop_nvm_data_removal
+          changed_when: "'removed' in install_base_packages_scoop_nvm_data_removal.stdout"
 
     - name: Download and Install AutoHotkey v1.1
       block:
@@ -353,7 +455,7 @@
             - install_base_packages_autohotkey_install_failed_due_to_permissions is defined
             - install_base_packages_autohotkey_install_failed_due_to_permissions
 
-    # NOTE: install_base_packages_pnpm_executable_path is set in 'Provide pnpm via nvm-windows' above.
+    # NOTE: install_base_packages_pnpm_executable_path is set in 'Set nvm-windows facts' above.
     #       We no longer resolve pnpm with 'scoop which', which follows PATH order and returns nvm's proxy shim.
     - name: Ensure pnpm global directory exists
       ansible.builtin.file:
@@ -363,7 +465,7 @@
 
     - name: Configure pnpm global-bin-dir
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_pnpm_executable_path }} config set global-bin-dir \"{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm\""
+        cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" config set global-bin-dir \"{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm\""
       changed_when: false
 
     # NOTE: In pnpm v10+, pnpm-home is not a supported config key in config.yaml.
@@ -373,19 +475,19 @@
         cmd: powershell.exe -Command "[Environment]::SetEnvironmentVariable('PNPM_HOME', '{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm', 'User')"
       changed_when: false
 
-    # NOTE: We explicitly add the NVM symlink path to the PATH to ensure that
-    #       pnpm can find the newly installed Node.js version even if the
+    # NOTE: We explicitly add nvm's shim directory to the PATH to ensure that
+    #       pnpm (and build scripts such as tree-sitter-cli's) can find node even if the
     #       shell environment hasn't been refreshed yet.
     - name: Set pnpm install PATH fact
       ansible.builtin.set_fact:
         install_base_packages_pnpm_install_path: >-
-          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_nvm_shim_dir }}:{{ install_base_packages_scoop_root }}/persist/nvm/nodejs/nodejs:{{ ansible_facts.env.PATH }}
+          {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_nvm_shim_dir }}:{{ ansible_facts.env.PATH }}
 
     - name: Install pnpm packages
       # NOTE: We use the absolute path to nvm's pnpm proxy shim to ensure we are using the
       #       nvm-managed pnpm for the active Node.js version.
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_pnpm_executable_path }} add -g {{ item }}"
+        cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" add -g {{ item }}"
       environment:
         PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
         PATH: "{{ install_base_packages_pnpm_install_path }}"
@@ -402,7 +504,7 @@
     #       when it tries to run the missing binary.
     - name: Install tree-sitter-cli with its build script allowed
       ansible.builtin.command:
-        cmd: "{{ install_base_packages_pnpm_executable_path }} add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
+        cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
       environment:
         PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
         PATH: "{{ install_base_packages_pnpm_install_path }}"
