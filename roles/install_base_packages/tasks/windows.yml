@@ -106,8 +106,11 @@
           #       scoop/apps/nvm. It is installed from the official installer further below.
           - name: gh
             executable_name: gh
-          - name: gnupg
-            executable_name: gpg
+          # NOTE: gnupg is intentionally not installed via Scoop. Scoop's GnuPG is a portable install with its own
+          #       keyring (scoop/apps/gnupg/current/home), and its bin directory lands on the user PATH ahead of
+          #       scoop/shims, so 'gpg' in Windows shells could not see the signing key that configure_git creates in
+          #       ~/.gnupg, and every signed 'git commit' failed with "No secret key". Git for Windows' bundled gpg
+          #       (exposed as the 'gpg' Scoop shim) and MSYS2's gpg both use ~/.gnupg, so no separate GnuPG is needed.
           - name: neovim
             executable_name: nvim
           - name: lazygit
@@ -144,6 +147,28 @@
       loop: "{{ install_base_packages_scoop_list }}"
       loop_control:
         loop_var: scoop_package
+
+    # NOTE: Earlier versions of this playbook installed GnuPG via Scoop (see the NOTE in the Scoop packages list).
+    #       '--purge' also removes its separate, unused keyring.
+    - name: Check for Scoop-managed GnuPG
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} list gnupg"
+      register: install_base_packages_scoop_gnupg_status
+      changed_when: false
+      failed_when: false
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+    - name: Remove Scoop-managed GnuPG
+      when: install_base_packages_scoop_gnupg_status.stdout is search('(?m)^gnupg\\s+')
+      ansible.builtin.command:
+        cmd: "{{ install_base_packages_scoop_executable_path }} uninstall gnupg --purge"
+      register: install_base_packages_scoop_gnupg_uninstall
+      changed_when: "'was uninstalled' in install_base_packages_scoop_gnupg_uninstall.stdout"
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
 
     # NOTE: Earlier versions of this playbook installed pnpm via Scoop. Remove it so only the
     #       nvm-managed pnpm remains (see the NOTE in the Scoop packages list above).

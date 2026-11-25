@@ -148,7 +148,7 @@ The playbook does **not** install WSL itself; it only configures a WSL distro wh
 ### `install_base_packages`
 - **Linux:** Installs system tools, Rust via `rustup`, Alacritty via `cargo`, `gh`, `lazygit` (deb or tarball depending on OS version), `fzf` from source, `starship`, Node LTS via `nvm`, `pnpm`, and `ansible-lint`.
 - **macOS:** Installs Homebrew packages (`starship`, CLI utilities), `nvm`, Node LTS, `pnpm`, and global CLI utilities.
-- **Windows:** Pacman packages in MSYS2, Scoop packages (`gh`, `gnupg`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `luarocks`, `sqlite`, `tealdeer`, `perl`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
+- **Windows:** Pacman packages in MSYS2, Scoop packages (`gh`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `luarocks`, `sqlite`, `tealdeer`, `perl`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
   - **nvm-windows:** Installed per-user from the official GitHub release installer (checksum-verified) into `%LOCALAPPDATA%\Author Software\nvm`, not via Scoop: nvm 2.x reports running from any other location as unsupported (`NVM4101`). Node.js versions live under `...\nvm\installs`. The path contains a space, so quote it in `command` tasks.
   - **Node.js & pnpm:** nvm-windows 2.x runs in shim mode. Its proxy shims (`%LOCALAPPDATA%\Author Software\nvm\.nodejs`) are added to the user PATH by the playbook, along with pnpm's global bin directory (`%LOCALAPPDATA%\pnpm`). pnpm is installed into the active Node.js version via npm (and listed in nvm's `auto_installed_modules`) rather than via Scoop. Roles invoke pnpm via the absolute, quoted shim path `.../nvm/.nodejs/pnpm.exe`, never `scoop which pnpm`.
 - **All platforms:** Installs the Rafter CLI (`@rafter-security/cli`, exposing `rafter`) globally via pnpm — the local command-safety layer invoked by AI agent guard hooks.
@@ -246,6 +246,10 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 
 ### npm 11.20+ blocks install scripts by default
 - Packages that set themselves up in `preinstall`/`postinstall` (pnpm itself) need `--allow-scripts=<name>`. Verified on Windows; applied *by analogy* to the Linux npm fallback in `install_base_packages/tasks/linux.yml` (not yet run on Linux). macOS installs pnpm via Homebrew.
+
+### Several `gpg`s on Windows — only one keyring is right
+- Git for Windows' bundled gpg (the `gpg` Scoop shim) and MSYS2's gpg (both 2.4.x) share `~/.gnupg`, where `configure_git` creates the signing key. Scoop's `gnupg` (2.5.x) was a separate portable install with its own keyring (`scoop/apps/gnupg/current/home`), and its `bin` landed on the user PATH ahead of `scoop/shims`, so every signed `git commit` from a Windows shell failed with `No secret key`. Scoop's `gnupg` is no longer installed (and is purged if present).
+- **Diagnose:** run `<gpg.exe> --version` (shows `Home:`) and `--list-secret-keys` for each candidate. Windows-only.
 
 ### Scoop's pnpm leaves config behind
 - Scoop's pnpm manifest writes `storeDir`/`cacheDir`/`stateDir` (pointing into `scoop/apps/pnpm`) into pnpm's global `config.yaml`. Removing Scoop's pnpm does not remove them, so the next pnpm recreates the directory and Scoop lists a phantom `Install failed` app. The playbook deletes those keys. Windows-only.
