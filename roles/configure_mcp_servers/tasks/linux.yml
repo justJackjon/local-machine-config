@@ -1,5 +1,0 @@
-- name: Install Semgrep (Linux)
-  community.general.pipx:
-    name: semgrep
-    state: latest
-    source: semgrep

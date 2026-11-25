@@ -1,4 +1,0 @@
-- name: Install Semgrep (macOS)
-  community.general.homebrew:
-    name: semgrep
-    state: latest

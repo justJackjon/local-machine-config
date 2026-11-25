@@ -46,7 +46,6 @@ local-machine-config/
 ├── roles/
 │   ├── configure_git/        # GPG & SSH key generation, GitHub registration, gitconfig
 │   ├── configure_keyboard/   # Keyboard maps, XFCE & macOS workspace shortcuts, Kinto.sh/AHK
-│   ├── configure_mcp_servers/# MCP server configs (Semgrep, Gemini CLI GitHub MCP extension)
 │   ├── configure_msys2/      # MSYS2 path inheritance, home directory sync, Dracula theme
 │   ├── configure_shell/      # Default shell (macOS Bash), Starship prompt, argcomplete
 │   ├── configure_system/     # Linux file descriptor limits (limits.conf)
@@ -74,7 +73,6 @@ local-machine-config/
 | **Editor** | Neovim + LazyVim | Neovim + LazyVim | Neovim + LazyVim | Neovim + LazyVim |
 | **Terminal Font** | Cascadia Code NF (XFCE) | Cascadia Code NF (Terminal) | Cascadia Code NF (Mintty) | Host terminal / XFCE |
 | **Git / SSH / GPG** | `keychain` + `gh` + `gpg` | macOS Keychain + `gh` + `gpg` | Windows ssh-agent + `gh` + `gpg` | Inherited / agent |
-| **MCP Servers** | Semgrep + GitHub MCP | Semgrep + GitHub MCP | Semgrep (MinGW/pipx) + GitHub MCP | Semgrep + GitHub MCP |
 | **Container Runtime** | `docker-ce` (Docker Engine) | Docker Desktop | — (runs in WSL2) | `docker-ce` (Docker Engine) |
 | **Desktop GUI** | Native desktop / XFCE | Native Aqua | Windows Desktop | XFCE4 via XRDP |
 
@@ -93,8 +91,7 @@ Always execute playbooks via `./run-playbook.sh`. The script inspects the runnin
 # Syntax check
 ./run-playbook.sh --syntax-check
 
-# Target specific tags (e.g. MCP servers or Git configuration)
-./run-playbook.sh --tags "configure_mcp_servers"
+# Target specific tags (e.g. Git configuration or LazyVim)
 ./run-playbook.sh --tags "configure_git"
 ./run-playbook.sh --tags "install_lazyvim"
 
@@ -144,7 +141,6 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 - **macOS:** Installs Homebrew packages (`starship`, CLI utilities), `nvm`, Node LTS, `pnpm`, and global CLI utilities.
 - **Windows:** Pacman packages in MSYS2, Scoop packages (`nvm`, `gh`, `gnupg`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `luarocks`, `sqlite`, `tealdeer`, `perl`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
   - **Node.js & pnpm:** Provided by nvm-windows 2.x in shim mode. Its proxy shims (`scoop/persist/nvm/.nodejs`) sit on the user PATH ahead of Scoop's shims, so pnpm is installed into the active Node.js version via npm (and listed in nvm's `auto_installed_modules`) rather than via Scoop. Roles invoke pnpm via the absolute shim path `scoop/persist/nvm/.nodejs/pnpm.exe`, never `scoop which pnpm`.
-  - **pipx:** Installed with pip into a dedicated MinGW64 venv (`~/.venvs/pipx`), as the mingw64 pipx package is no longer published. Invoke it as `~/.venvs/pipx/bin/python.exe -m pipx`.
 - **All platforms:** Installs the Rafter CLI (`@rafter-security/cli`, exposing `rafter`) globally via pnpm — the local command-safety layer invoked by AI agent guard hooks.
 
 ### `install_docker`
@@ -168,11 +164,6 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
 - Registers public keys with GitHub via `gh ssh-key add` and `gh gpg-key add`.
 - Sets global `user.name` ("Jackjon Butcher"), `user.email` ("jackjon@jjb.codes"), `commit.gpgsign=true`, and signing key.
 - Switches git remote URL from HTTPS to SSH (`git@github.com:justjackjon/local-machine-config.git`).
-
-### `configure_mcp_servers`
-- Installs Semgrep (`pipx` on Linux/Windows, `brew` on macOS).
-- Configures Semgrep MCP server in `~/.gemini/settings.json` using `jq`.
-- Installs the GitHub MCP Extension using `@google/gemini-cli` via `pnpm dlx` if `GITHUB_MCP_PAT` is present in `~/.gemini/.env`.
 
 ---
 
@@ -198,18 +189,18 @@ Commit messages in this repository adhere to the **Gitmoji + Scope** format:
 ```
 
 **Common Examples:**
-- `:bug:   (configure_mcp_servers): Fix idempotency in settings update`
+- `:bug:   (configure_git): Fix idempotency in GPG key check`
 - `:sparkles:   (roles): Add pinentry for gpg keys on macos`
 - `:wrench:   (playbooks): Update python interpreter facts`
 - `:memo:   (docs): Update AGENTS.md with execution guidelines`
 
 ### 4. Preserving Comments & Rationale
-- Existing tasks contain critical `# NOTE:` comments explaining why certain workarounds exist (e.g., WSL world-writable mounts, Cloudflare blocks on AutoHotkey Scoop manifests, `ruamel.yaml.clib` incompatibilities with Python 3.14).
+- Existing tasks contain critical `# NOTE:` comments explaining why certain workarounds exist (e.g., WSL world-writable mounts, Cloudflare blocks on AutoHotkey Scoop manifests, nvm-windows 2.x proxy shims shadowing Scoop's on PATH).
 - **Never remove or overwrite `# NOTE:` comments** unless the workaround is being intentionally retired.
 
 ### 5. Verification Checklist for Agents
 Before finishing any modification in this repository:
 1. Run `./run-playbook.sh --syntax-check` to verify YAML validity and syntax.
-2. If working on a specific role, verify changes with the corresponding tag (e.g. `--tags "configure_mcp_servers"`).
+2. If working on a specific role, verify changes with the corresponding tag (e.g. `--tags "configure_git"`).
 3. Ensure `.gitattributes` line endings are respected (LF for Linux/macOS/Ansible files, CRLF for PowerShell).
 4. Run `git status` to verify no unexpected files or temporary artifacts remain.

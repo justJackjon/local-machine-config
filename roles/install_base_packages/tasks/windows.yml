@@ -23,7 +23,7 @@
           - mingw-w64-x86_64-python
           - mingw-w64-x86_64-python-pip
           # NOTE: mingw-w64-x86_64-python-pipx and -python-userpath have been removed from the
-          #       MSYS2 mingw64 repo. pipx is installed into a dedicated MinGW venv further below.
+          #       MSYS2 mingw64 repo. pipx is not needed on Windows (it was only used for Semgrep).
           - mingw-w64-x86_64-python-setuptools
           - mingw-w64-x86_64-python-argcomplete
           - mingw-w64-x86_64-python-packaging
@@ -352,53 +352,6 @@
           when:
             - install_base_packages_autohotkey_install_failed_due_to_permissions is defined
             - install_base_packages_autohotkey_install_failed_due_to_permissions
-
-    - name: Get user's home directory path in POSIX format
-      ansible.builtin.command:
-        cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
-      register: install_base_packages_win_home_dir_raw
-      changed_when: false
-
-    # NOTE: pipx is no longer packaged for MSYS2 mingw64, so we install it with pip into a
-    #       dedicated venv built from the MinGW64 Python. This keeps pipx-managed tools (e.g. Semgrep)
-    #       on the MinGW interpreter, matching the MinGW-based pipx shared environment check below.
-    #       Other roles should invoke pipx via '{{ install_base_packages_pipx_python }} -m pipx'.
-    - name: Set pipx venv facts
-      ansible.builtin.set_fact:
-        install_base_packages_pipx_venv: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/.venvs/pipx"
-        install_base_packages_pipx_python: "{{ install_base_packages_win_home_dir_raw.stdout | trim }}/.venvs/pipx/bin/python.exe"
-
-    - name: Create pipx virtual environment with MinGW64 Python
-      ansible.builtin.command:
-        cmd: /mingw64/bin/python.exe -m venv "{{ install_base_packages_pipx_venv }}"
-        creates: "{{ install_base_packages_pipx_venv }}/pyvenv.cfg"
-
-    - name: Install pipx into its virtual environment
-      ansible.builtin.command:
-        cmd: "{{ install_base_packages_pipx_python }} -m pip install --upgrade pipx"
-      register: install_base_packages_pipx_install
-      changed_when: "'Successfully installed' in install_base_packages_pipx_install.stdout"
-
-    - name: Check if pipx shared environment exists
-      ansible.builtin.stat:
-        path: "{{ install_base_packages_win_home_dir_raw.stdout }}/.local/pipx/shared/pyvenv.cfg"
-      register: install_base_packages_pipx_shared_venv_cfg
-
-    - name: Check if pipx shared environment is MinGW-based
-      ansible.builtin.command:
-        cmd: grep -q "mingw64" "{{ install_base_packages_win_home_dir_raw.stdout }}/.local/pipx/shared/pyvenv.cfg"
-      register: install_base_packages_pipx_shared_is_mingw
-      changed_when: false
-      failed_when: false
-      when: install_base_packages_pipx_shared_venv_cfg.stat.exists
-
-    - name: Remove incompatible (non-MinGW) pipx shared environment
-      ansible.builtin.file:
-        path: "{{ install_base_packages_win_home_dir_raw.stdout }}/.local/pipx/shared"
-        state: absent
-      when:
-        - install_base_packages_pipx_shared_venv_cfg.stat.exists
-        - install_base_packages_pipx_shared_is_mingw.rc != 0
 
     # NOTE: install_base_packages_pnpm_executable_path is set in 'Provide pnpm via nvm-windows' above.
     #       We no longer resolve pnpm with 'scoop which', which follows PATH order and returns nvm's proxy shim.
