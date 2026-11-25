@@ -1,0 +1,144 @@
+# NOTE: Home Assistant (2025.2+) serves MCP over Streamable HTTP at '<url>/api/mcp' once its "Model Context
+#       Protocol" integration is added. Clients authenticate with a long-lived access token (created under the
+#       Home Assistant user profile > Security) sent as a Bearer header.
+# NOTE: Every task that handles the token sets no_log so it never reaches the console or ANSIBLE_LOG_PATH.
+
+- name: Check for local Home Assistant settings
+  ansible.builtin.stat:
+    path: "{{ configure_mcp_servers_home_assistant_config_file }}"
+  register: configure_mcp_servers_home_assistant_config_stat
+
+- name: Prompt for Home Assistant settings
+  when: not configure_mcp_servers_home_assistant_config_stat.stat.exists
+  block:
+    - name: Prompt for Home Assistant URL
+      ansible.builtin.pause:
+        prompt: "Home Assistant URL, e.g. http://homeassistant.local:8123 (leave blank to skip Home Assistant MCP setup)"
+      register: configure_mcp_servers_home_assistant_url_prompt
+
+    - name: Prompt for Home Assistant long-lived access token
+      when: configure_mcp_servers_home_assistant_url_prompt.user_input | trim | length > 0
+      ansible.builtin.pause:
+        prompt: "Home Assistant long-lived access token (input hidden)"
+        echo: false
+      register: configure_mcp_servers_home_assistant_token_prompt
+      no_log: true
+
+    - name: Ensure local config directory exists
+      when: configure_mcp_servers_home_assistant_url_prompt.user_input | trim | length > 0
+      ansible.builtin.file:
+        path: "{{ configure_mcp_servers_local_config_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Save Home Assistant settings locally
+      when: configure_mcp_servers_home_assistant_url_prompt.user_input | trim | length > 0
+      ansible.builtin.copy:
+        content: "{{ {'url': configure_mcp_servers_home_assistant_url_prompt.user_input | trim | regex_replace('/+$', ''),
+                      'token': configure_mcp_servers_home_assistant_token_prompt.user_input | trim} | to_nice_yaml }}"
+        dest: "{{ configure_mcp_servers_home_assistant_config_file }}"
+        mode: "0600"
+      no_log: true
+
+- name: Check for local Home Assistant settings after prompting
+  ansible.builtin.stat:
+    path: "{{ configure_mcp_servers_home_assistant_config_file }}"
+  register: configure_mcp_servers_home_assistant_config_stat
+
+- name: Skip Home Assistant MCP setup
+  when: not configure_mcp_servers_home_assistant_config_stat.stat.exists
+  ansible.builtin.debug:
+    msg: "No Home Assistant URL given; skipping Home Assistant MCP setup. Re-run this role to configure it."
+
+- name: Configure Home Assistant MCP server for Claude Code and agy
+  when: configure_mcp_servers_home_assistant_config_stat.stat.exists
+  block:
+    - name: Load local Home Assistant settings
+      ansible.builtin.include_vars:
+        file: "{{ configure_mcp_servers_home_assistant_config_file }}"
+        name: configure_mcp_servers_home_assistant
+      no_log: true
+
+    - name: Set Home Assistant MCP URL fact
+      ansible.builtin.set_fact:
+        configure_mcp_servers_home_assistant_mcp_url: "{{ configure_mcp_servers_home_assistant.url }}/api/mcp"
+
+    # --- Claude Code (user scope, stored in ~/.claude.json) ---
+    # NOTE: 'claude mcp get' exits non-zero when the server is not registered. Its output can include headers,
+    #       so it is no_log. If the registered URL differs, the server is removed and re-added. To rotate the token,
+    #       update the local settings file and run 'claude mcp remove -s user home-assistant' before re-running.
+    - name: Check Home Assistant MCP server in Claude Code
+      ansible.builtin.command:
+        cmd: "\"{{ configure_mcp_servers_claude_executable_path }}\" mcp get {{ configure_mcp_servers_home_assistant_server_name }}"
+      register: configure_mcp_servers_claude_mcp_get
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Remove outdated Home Assistant MCP server from Claude Code
+      when:
+        - configure_mcp_servers_claude_mcp_get.rc == 0
+        - configure_mcp_servers_home_assistant_mcp_url not in configure_mcp_servers_claude_mcp_get.stdout
+      ansible.builtin.command:
+        cmd: "\"{{ configure_mcp_servers_claude_executable_path }}\" mcp remove -s user {{ configure_mcp_servers_home_assistant_server_name }}"
+      changed_when: true
+
+    - name: Add Home Assistant MCP server to Claude Code
+      when: >-
+        configure_mcp_servers_claude_mcp_get.rc != 0 or
+        configure_mcp_servers_home_assistant_mcp_url not in configure_mcp_servers_claude_mcp_get.stdout
+      ansible.builtin.command:
+        argv:
+          - "{{ configure_mcp_servers_claude_executable_path }}"
+          - mcp
+          - add
+          - --scope
+          - user
+          - --transport
+          - http
+          - "{{ configure_mcp_servers_home_assistant_server_name }}"
+          - "{{ configure_mcp_servers_home_assistant_mcp_url }}"
+          - --header
+          - "Authorization: Bearer {{ configure_mcp_servers_home_assistant.token }}"
+      changed_when: true
+      no_log: true
+
+    # --- Antigravity CLI (agy), stored in ~/.gemini/config/mcp_config.json ---
+    # NOTE: agy reads remote servers from 'serverUrl' (Streamable HTTP only) with optional 'headers'. Its config
+    #       does not document environment-variable expansion, so the token is written to this user-only file.
+    - name: Set agy MCP config path fact
+      ansible.builtin.set_fact:
+        configure_mcp_servers_agy_mcp_config: "{{ configure_mcp_servers_user_home }}/.gemini/config/mcp_config.json"
+
+    - name: Ensure agy config directory exists
+      ansible.builtin.file:
+        path: "{{ configure_mcp_servers_user_home }}/.gemini/config"
+        state: directory
+        mode: "0700"
+
+    - name: Check for existing agy MCP config
+      ansible.builtin.stat:
+        path: "{{ configure_mcp_servers_agy_mcp_config }}"
+      register: configure_mcp_servers_agy_mcp_config_stat
+
+    - name: Read existing agy MCP config
+      when: configure_mcp_servers_agy_mcp_config_stat.stat.exists
+      ansible.builtin.slurp:
+        src: "{{ configure_mcp_servers_agy_mcp_config }}"
+      register: configure_mcp_servers_agy_mcp_config_raw
+      no_log: true
+
+    # NOTE: Merges only our server into any existing config, leaving other servers untouched.
+    - name: Write Home Assistant MCP server to agy config
+      ansible.builtin.copy:
+        content: >-
+          {{ ((configure_mcp_servers_agy_mcp_config_raw.content | b64decode | from_json)
+              if configure_mcp_servers_agy_mcp_config_stat.stat.exists else {})
+             | combine({'mcpServers': {configure_mcp_servers_home_assistant_server_name: {
+                 'serverUrl': configure_mcp_servers_home_assistant_mcp_url,
+                 'headers': {'Authorization': 'Bearer ' ~ configure_mcp_servers_home_assistant.token}}}},
+               recursive=true)
+             | to_nice_json(indent=2) }}
+        dest: "{{ configure_mcp_servers_agy_mcp_config }}"
+        mode: "0600"
+      no_log: true

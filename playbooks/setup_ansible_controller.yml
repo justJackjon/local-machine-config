@@ -65,6 +65,9 @@
     - role: configure_git
       tags: configure_git
 
+    - role: configure_mcp_servers
+      tags: configure_mcp_servers
+
   post_tasks:
     - name: Display final instructions
       ansible.builtin.debug:

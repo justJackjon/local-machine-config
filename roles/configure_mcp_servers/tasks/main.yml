@@ -1,0 +1,11 @@
+- name: Install AI CLIs (Windows)
+  ansible.builtin.include_tasks: install_clis_windows.yml
+  when: is_windows
+
+- name: Install AI CLIs (Linux and macOS)
+  ansible.builtin.include_tasks: install_clis_unix.yml
+  when: not is_windows
+
+- name: Configure Home Assistant MCP server
+  ansible.builtin.include_tasks: home_assistant.yml
+  when: not (configure_mcp_servers_skip_home_assistant | bool)

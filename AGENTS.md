@@ -46,6 +46,7 @@ local-machine-config/
 ├── roles/
 │   ├── configure_git/        # GPG & SSH key generation, GitHub registration, gitconfig
 │   ├── configure_keyboard/   # Keyboard maps, XFCE & macOS workspace shortcuts, Kinto.sh/AHK
+│   ├── configure_mcp_servers/# Claude Code & Antigravity (agy) CLIs, Home Assistant MCP server
 │   ├── configure_msys2/      # MSYS2 path inheritance, home directory sync, Dracula theme
 │   ├── configure_shell/      # Default shell (macOS Bash), Starship prompt, argcomplete
 │   ├── configure_system/     # Linux file descriptor limits (limits.conf)
@@ -143,6 +144,12 @@ On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
   - **nvm-windows:** Installed per-user from the official GitHub release installer (checksum-verified) into `%LOCALAPPDATA%\Author Software\nvm`, not via Scoop: nvm 2.x reports running from any other location as unsupported (`NVM4101`). Node.js versions live under `...\nvm\installs`. The path contains a space, so quote it in `command` tasks.
   - **Node.js & pnpm:** nvm-windows 2.x runs in shim mode. Its proxy shims (`%LOCALAPPDATA%\Author Software\nvm\.nodejs`) are added to the user PATH by the playbook, along with pnpm's global bin directory (`%LOCALAPPDATA%\pnpm`). pnpm is installed into the active Node.js version via npm (and listed in nvm's `auto_installed_modules`) rather than via Scoop. Roles invoke pnpm via the absolute, quoted shim path `.../nvm/.nodejs/pnpm.exe`, never `scoop which pnpm`.
 - **All platforms:** Installs the Rafter CLI (`@rafter-security/cli`, exposing `rafter`) globally via pnpm — the local command-safety layer invoked by AI agent guard hooks.
+
+### `configure_mcp_servers`
+- Installs the Claude Code CLI (`claude`) and Antigravity CLI (`agy`) with their vendors' official install scripts if missing. On Windows they live in `%USERPROFILE%\.local\bin` and `%LOCALAPPDATA%\agy\bin`, which `install_base_packages` adds to the user PATH; the role always calls them by absolute path.
+- Registers Home Assistant's MCP server (`<url>/api/mcp`, Streamable HTTP, long-lived access token as a Bearer header) for Claude Code (`claude mcp add --scope user`, stored in `~/.claude.json`) and agy (`~/.gemini/config/mcp_config.json`, `serverUrl` + `headers`). Plain `http://` local URLs work with header auth.
+- The Home Assistant URL and token are **never committed**: they are prompted for on first run (token input hidden) and saved to `~/.config/local-machine-config/home_assistant.yml` (mode 0600). Leave the URL blank to skip, or pass `-e configure_mcp_servers_skip_home_assistant=true`. All token-handling tasks use `no_log`.
+- To rotate the token: edit the local settings file, run `claude mcp remove -s user home-assistant`, then re-run `--tags configure_mcp_servers`.
 
 ### `install_docker`
 - **Linux/WSL2:** Installs Docker Engine (`docker-ce`, `docker-ce-cli`, `containerd.io`, the Buildx and Compose plugins) from Docker's apt repository, enables and starts the `docker` service when systemd is available, and adds the current user to the `docker` group.

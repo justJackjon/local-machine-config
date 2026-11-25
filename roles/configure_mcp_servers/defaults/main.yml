@@ -1,0 +1,10 @@
+configure_mcp_servers_home_assistant_server_name: home-assistant
+
+# NOTE: The Home Assistant URL and long-lived access token are deliberately not stored in this (public)
+#       repository. They are prompted for on first run and saved to this local, user-only file.
+configure_mcp_servers_local_config_dir: "{{ ansible_facts['env']['HOME'] }}/.config/local-machine-config"
+configure_mcp_servers_home_assistant_config_file: "{{ configure_mcp_servers_local_config_dir }}/home_assistant.yml"
+
+# NOTE: Set to true (e.g. --extra-vars configure_mcp_servers_skip_home_assistant=true) to install the CLIs
+#       without configuring Home Assistant, such as on a machine that cannot reach it or in a non-interactive run.
+configure_mcp_servers_skip_home_assistant: false

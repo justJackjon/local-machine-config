@@ -1,0 +1,26 @@
+- name: Set AI CLI path facts (Linux and macOS)
+  ansible.builtin.set_fact:
+    configure_mcp_servers_user_home: "{{ ansible_facts['env']['HOME'] }}"
+    configure_mcp_servers_claude_executable_path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/claude"
+
+- name: Install Claude Code CLI
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://claude.ai/install.sh | bash
+    executable: /bin/bash
+    creates: "{{ configure_mcp_servers_claude_executable_path }}"
+
+# NOTE: The agy installer's install location on Linux/macOS is not documented, so we detect an existing
+#       install via a login shell's PATH rather than a fixed path.
+- name: Check for Antigravity CLI (agy)
+  ansible.builtin.command:
+    cmd: bash -lc 'command -v agy'
+  register: configure_mcp_servers_agy_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Antigravity CLI (agy)
+  when: configure_mcp_servers_agy_check.rc != 0
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://antigravity.google/cli/install.sh | bash
+    executable: /bin/bash
+  changed_when: true

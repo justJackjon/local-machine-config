@@ -1,0 +1,28 @@
+- name: Get user's home directory in POSIX format
+  ansible.builtin.command:
+    cmd: cygpath -u "{{ ansible_facts['env']['USERPROFILE'] }}"
+  register: configure_mcp_servers_win_home_raw
+  changed_when: false
+
+- name: Set AI CLI path facts (Windows)
+  ansible.builtin.set_fact:
+    configure_mcp_servers_user_home: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}"
+    configure_mcp_servers_claude_executable_path: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}/.local/bin/claude.exe"
+    configure_mcp_servers_agy_executable_path: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}/AppData/Local/agy/bin/agy.exe"
+
+# NOTE: Both CLIs are installed with their vendors' official PowerShell installers. Neither reliably adds its
+#       bin directory to the user PATH, so install_base_packages manages '%USERPROFILE%\.local\bin' (Claude Code)
+#       and '%LOCALAPPDATA%\agy\bin' (agy) on the user PATH. This role always calls them by absolute path.
+# NOTE: expand_argument_vars must be false for command tasks that embed PowerShell; see the NOTE on the
+#       user PATH task in install_base_packages.
+- name: Install Claude Code CLI
+  ansible.builtin.command:
+    cmd: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"
+    creates: "{{ configure_mcp_servers_claude_executable_path }}"
+    expand_argument_vars: false
+
+- name: Install Antigravity CLI (agy)
+  ansible.builtin.command:
+    cmd: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "irm https://antigravity.google/cli/install.ps1 | iex"
+    creates: "{{ configure_mcp_servers_agy_executable_path }}"
+    expand_argument_vars: false
