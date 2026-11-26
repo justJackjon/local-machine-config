@@ -6,6 +6,12 @@ configure_keyboard_enable_windows_xfce_mode: true
 # and multi-OS keyboards such as Logitech's in Windows mode), 'mac' when it sends Win (Apple layouts).
 configure_keyboard_windows_kinto_kbtype: win
 
+# Type British - Mac characters (Shift+2 = @, Opt+3 = #, and so on) on a UK keyboard.
+# Windows: Kinto remaps on top of the "United Kingdom" layout. XFCE: the built-in xkb layout below.
+configure_keyboard_windows_mac_gb_layout: true
+configure_keyboard_xfce_xkb_layout: gb
+configure_keyboard_xfce_xkb_variant: mac
+
 configure_keyboard_linux_kinto_config_path: "/home/{{ ansible_facts.user_id }}/.config/kinto/kinto.py"
 # NOTE: The following path is an assumption based on common application behavior on Windows.
 #       The actual path will be determined by Kinto's setup.py and Python's installation location.

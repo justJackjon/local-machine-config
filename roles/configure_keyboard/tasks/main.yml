@@ -165,6 +165,50 @@
               - "xflock4"
           changed_when: true
 
+    # NOTE: Over RDP (WSL2), Windows' Kinto leaves the session alone, so XFCE's own layout decides the
+    #       characters. gb(mac) is xkb's "English (UK, Macintosh)": Shift+2 = @, § above Tab, and so on.
+    #       Its third level (# on 3, € on 2) is on Right Alt, as xkb's Mac layouts do; the Option key
+    #       arrives as Super, which XFCE's Super+Ctrl workspace shortcuts need.
+    #       XkbDisable is set last so xfsettingsd applies the layout and variant together.
+    - name: Configure XFCE keyboard layout
+      tags: configure_keyboard
+      when: is_inside_xfce
+      block:
+        - name: Get current XFCE keyboard layout settings
+          ansible.builtin.command:
+            argv:
+              - xfconf-query
+              - --channel
+              - keyboard-layout
+              - --property
+              - "{{ item.property }}"
+          loop:
+            - { property: /Default/XkbLayout, type: string, value: "{{ configure_keyboard_xfce_xkb_layout }}" }
+            - { property: /Default/XkbVariant, type: string, value: "{{ configure_keyboard_xfce_xkb_variant }}" }
+            - { property: /Default/XkbDisable, type: bool, value: "false" }
+          register: configure_keyboard_xfce_layout_current
+          failed_when: false
+          changed_when: false
+
+        - name: Set XFCE keyboard layout settings if different
+          when: item.rc != 0 or item.stdout != item.item.value
+          ansible.builtin.command:
+            argv:
+              - xfconf-query
+              - --channel
+              - keyboard-layout
+              - --property
+              - "{{ item.item.property }}"
+              - --create
+              - --type
+              - "{{ item.item.type }}"
+              - --set
+              - "{{ item.item.value }}"
+          loop: "{{ configure_keyboard_xfce_layout_current.results }}"
+          loop_control:
+            label: "{{ item.item.property }}"
+          changed_when: true
+
     - name: Configure Workspace Switching Shortcuts
       tags: configure_keyboard
       block:
@@ -321,6 +365,18 @@
                     path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
                     regexp: "(; )(.*)(; {{ 'MacModifiers' if configure_keyboard_windows_kinto_kbtype == 'mac' else 'WinModifiers' }})"
                     replace: '\2\3'
+
+                # NOTE: Added to Kinto's own script, not run as a separate one: AutoHotkey hotkeys ignore
+                #       keys sent by other AutoHotkey scripts, so a separate script would never see the
+                #       Alt that Kinto sends for the Option key. Inserted before Kinto's optional
+                #       Option-character scheme (US Mac), so these take precedence when both are on.
+                - name: Add British - Mac layout remaps to kinto.ahk
+                  when: configure_keyboard_windows_mac_gb_layout
+                  ansible.builtin.blockinfile:
+                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    block: "{{ lookup('file', 'snippets/kinto/windows_mac_gb_layout.ahk') }}"
+                    marker: "; {mark} ANSIBLE MANAGED BLOCK: British - Mac layout"
+                    insertbefore: '^; ###   Special character insertion'
 
                 - name: Copy rendered kinto.ahk
                   ansible.builtin.copy:
