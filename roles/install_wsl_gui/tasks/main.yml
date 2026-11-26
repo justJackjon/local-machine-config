@@ -13,6 +13,7 @@
       - net-tools
     state: present
   become: true
+  register: install_wsl_gui_packages_result
 
 - name: Set alacritty as the default terminal emulator  # noqa: syntax-check[unknown-module]
   become: true
@@ -70,6 +71,7 @@
     mode: "0644"
     create: true
   become: true
+  register: install_wsl_gui_xwrapper_result
 
 - name: Configure XRDP startup script to fix D-Bus and start XFCE
   ansible.builtin.copy:
@@ -94,10 +96,24 @@
       # Use startxfce4, which handles dbus-launch and other session setup
       startxfce4
   become: true
+  register: install_wsl_gui_startwm_result
 
+# NOTE: XRDP is only restarted when its packages or configuration changed; previously it was restarted
+#       (and reported `changed`) on every run. It is never restarted from inside the XFCE session, because
+#       that would end the RDP session running the playbook. A change made from inside XFCE takes effect
+#       on the next run outside it (or after `sudo systemctl restart xrdp`).
 - name: Restart XRDP service
   ansible.builtin.service:
     name: xrdp
     state: restarted
   become: true
-  when: not is_inside_xfce
+  when:
+    - not is_inside_xfce
+    - install_wsl_gui_packages_result is changed or install_wsl_gui_xwrapper_result is changed or install_wsl_gui_startwm_result is changed
+
+- name: Ensure XRDP is running and enabled
+  ansible.builtin.service:
+    name: xrdp
+    state: started
+    enabled: true
+  become: true
