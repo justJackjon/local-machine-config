@@ -379,22 +379,59 @@
                   register: configure_keyboard_startup_dir_win
                   changed_when: false
 
-                - name: Create shortcut in Windows Startup folder
+                - name: Get POSIX style path for Startup folder
+                  ansible.builtin.command: cygpath -u "{{ configure_keyboard_startup_dir_win.stdout }}"
+                  register: configure_keyboard_startup_dir_posix
+                  changed_when: false
+
+                # NOTE: This used to be a `mklink` symlink, which needs admin rights (or Developer Mode)
+                #       and was found missing after a run that reported creating it. A .lnk shortcut needs
+                #       neither. Remove the old symlink so Kinto doesn't start twice.
+                - name: Remove legacy Kinto symlink from Windows Startup folder
+                  ansible.builtin.file:
+                    path: "{{ configure_keyboard_startup_dir_posix.stdout }}/kinto-start.vbs"
+                    state: absent
+
+                - name: Check for Kinto shortcut in Windows Startup folder
+                  ansible.builtin.stat:
+                    path: "{{ configure_keyboard_startup_dir_posix.stdout }}/kinto-start.lnk"
+                  register: configure_keyboard_kinto_startup_shortcut
+
+                - name: Create Kinto shortcut in Windows Startup folder
+                  when: not configure_keyboard_kinto_startup_shortcut.stat.exists
                   ansible.builtin.command:
                     argv:
-                      - cmd.exe
-                      - /c
-                      - mklink
-                      - "{{ configure_keyboard_startup_dir_win.stdout }}\\\\kinto-start.vbs"
-                      - "{{ configure_keyboard_kinto_dir_win.stdout }}\\\\kinto-start.vbs"
-                  args:
-                    creates: "{{ configure_keyboard_startup_dir_win.stdout }}\\\\kinto-start.vbs"
+                      - powershell.exe
+                      - -NoProfile
+                      - -Command
+                      - >-
+                        $s = (New-Object -ComObject WScript.Shell).CreateShortcut('{{ configure_keyboard_startup_dir_win.stdout }}\kinto-start.lnk');
+                        $s.TargetPath = '{{ configure_keyboard_kinto_dir_win.stdout }}\kinto-start.vbs';
+                        $s.WorkingDirectory = '{{ configure_keyboard_kinto_dir_win.stdout }}';
+                        $s.Save()
+                    expand_argument_vars: false
                   register: configure_keyboard_kinto_install_result_win
+                  changed_when: true
 
-                - name: Run Kinto for the first time
-                  ansible.builtin.command: >
-                    powershell.exe -Command "Start-Process -FilePath 'C:\Program Files\AutoHotkey\AutoHotkey.exe'
-                    -ArgumentList '\"{{ configure_keyboard_kinto_dir_win.stdout | replace('\\', '\\\\') }}\\kinto.ahk\" win'"
+                - name: Check whether Kinto is running
+                  ansible.builtin.command:
+                    argv:
+                      - powershell.exe
+                      - -NoProfile
+                      - -Command
+                      - >-
+                        @(Get-CimInstance Win32_Process -Filter "Name LIKE 'AutoHotkey%'" |
+                        Where-Object { $_.CommandLine -match 'kinto\.ahk' }).Count
+                    expand_argument_vars: false
+                  register: configure_keyboard_kinto_running
+                  changed_when: false
+
+                - name: Start Kinto
+                  when: configure_keyboard_kinto_running.stdout | trim == '0'
+                  ansible.builtin.command:
+                    argv:
+                      - wscript.exe
+                      - "{{ configure_keyboard_kinto_dir_win.stdout }}\\kinto-start.vbs"
                   changed_when: true
 
     - name: Clean-up Kinto.sh Install
@@ -402,7 +439,7 @@
       when: >
         not is_wsl and
         ((configure_keyboard_kinto_install_result is defined and configure_keyboard_kinto_install_result is changed) or
-         (configure_keyboard_kinto_install_result_win is defined and configure_keyboard_kinto_install_result_win is changed))
+         is_windows)
       block:
         - name: Remove files downloaded by Kinto install script on Linux
           when: ansible_facts.system == 'Linux'
@@ -414,6 +451,8 @@
             - kinto.zip
           become: true
 
+        # NOTE: The Windows install re-downloads Kinto on every run (to pick up updates), so always
+        #       clean up, not only when the Startup shortcut is first created.
         - name: Remove files downloaded by Kinto install script on Windows
           when: is_windows
           ansible.builtin.file:
