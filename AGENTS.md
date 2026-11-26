@@ -276,6 +276,10 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - **Cause:** XFCE starts its own, empty `ssh-agent`, and the whole session (including terminals) inherits its `SSH_AUTH_SOCK`. The key lives in keychain's agent. With no `~/.ssh/config` on Linux, ssh only tried the default key names, never `~/.ssh/ansible-managed/github/id_rsa`.
 - **Fix:** `configure_git` now writes the same `Host github.com` block on Linux as on Windows (`IdentityFile`, `IdentitiesOnly`, `AddKeysToAgent`), so ssh offers the right key and asks for the passphrase if the current agent lacks it. **Diagnose:** `ssh -vT git@github.com` shows which keys are offered; `ssh-add -l` shows what the current agent holds. Verified in WSL2 Ubuntu.
 
+### Deprecations to avoid (ansible-core 2.22)
+- **Injected facts:** use `ansible_facts.user_id` (and so on), never top-level fact variables such as `ansible_user_id`. `INJECT_FACTS_AS_VARS` stops defaulting to true in a later ansible-core release.
+- **apt repositories:** use `ansible.builtin.deb822_repository` (writes `<name>.sources`; needs `python3-debian`), not `apt_repository` (removed in ansible-core 2.25). When migrating, delete the old `<name>.list`, and refresh the apt cache yourself: deb822_repository doesn't. The gh and Docker repositories were migrated and verified in WSL2 Ubuntu.
+
 ### Debugging WSL runs from the Windows host
 - An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."`. `run-playbook.sh` always appends Ansible's output to `${TMPDIR:-/tmp}/local-machine-config-ansible.log` (override with `ANSIBLE_LOG_PATH`), so `tail -200 /tmp/local-machine-config-ansible.log` shows the latest run. `/tmp/local-machine-config-install.log` is written only by `install.sh`. WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.
 - `sudo` in WSL needs the user's password, so an agent can't do a full run. Test a change with a small playbook that skips `become`, then have the user re-run `./run-playbook.sh` in WSL.
