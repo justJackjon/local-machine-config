@@ -296,9 +296,77 @@
               - --property
               - "{{ item.item }}"
               - --reset
+              - --recursive
           loop: "{{ configure_keyboard_super_shortcuts.results | default([]) }}"
           loop_control:
             label: "{{ item.item }}"
+          register: configure_keyboard_super_shortcuts_removed
+          changed_when: true
+
+        # NOTE: A running xfsettingsd kept its key grabs for the removed shortcuts (Ctrl+R still opened
+        #       the app finder), so restart it. --replace hands over to the new instance, which forks.
+        - name: Restart xfsettingsd so it drops the removed shortcuts
+          when: is_inside_xfce and configure_keyboard_super_shortcuts_removed is changed
+          ansible.builtin.shell: setsid xfsettingsd --replace >/dev/null 2>&1 </dev/null &
+          changed_when: true
+
+        - name: Ensure ~/.local/bin exists
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.local/bin"
+            state: directory
+            mode: "0755"
+
+        # NOTE: Opt+2/Opt+3 (€, #). xkb's Mac layouts put these on Right Alt, and xrdp can't load the
+        #       custom key type that moves them to Option, so a small script patches the live keymap.
+        #       See the script's docstring for how, and why the earlier shortcut-based attempt failed.
+        - name: Install the Option-key character script
+          ansible.builtin.copy:
+            src: xkb/lmc-mac-option-keys
+            dest: "{{ ansible_facts.env.HOME }}/.local/bin/lmc-mac-option-keys"
+            mode: "0755"
+          register: configure_keyboard_mac_option_script
+
+        - name: Ensure the XFCE autostart directory exists
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.config/autostart"
+            state: directory
+            mode: "0755"
+
+        - name: Start the Option-key character script with the XFCE session
+          ansible.builtin.copy:
+            dest: "{{ ansible_facts.env.HOME }}/.config/autostart/lmc-mac-option-keys.desktop"
+            mode: "0644"
+            content: |
+              [Desktop Entry]
+              Type=Application
+              Name=Mac Option-key characters
+              Comment=Option+2 and Option+3 type € and # (local-machine-config)
+              Exec={{ ansible_facts.env.HOME }}/.local/bin/lmc-mac-option-keys --watch
+              OnlyShowIn=XFCE;
+              X-GNOME-Autostart-enabled=true
+
+        - name: Check whether the Option-key character script is running
+          when: is_inside_xfce
+          ansible.builtin.command: pgrep -u {{ ansible_facts.user_id }} -f 'lmc-mac-option-keys --watch'
+          register: configure_keyboard_mac_option_running
+          failed_when: false
+          changed_when: false
+
+        - name: Stop an outdated Option-key character script
+          when:
+            - is_inside_xfce
+            - configure_keyboard_mac_option_script is changed
+            - configure_keyboard_mac_option_running.rc == 0
+          ansible.builtin.command: pkill -u {{ ansible_facts.user_id }} -f 'lmc-mac-option-keys --watch'
+          changed_when: true
+
+        - name: Start the Option-key character script in this session
+          when:
+            - is_inside_xfce
+            - configure_keyboard_mac_option_running.rc != 0 or configure_keyboard_mac_option_script is changed
+          ansible.builtin.shell: >-
+            setsid {{ ansible_facts.env.HOME }}/.local/bin/lmc-mac-option-keys --watch
+            >/dev/null 2>&1 </dev/null &
           changed_when: true
 
     - name: Configure Workspace Switching Shortcuts

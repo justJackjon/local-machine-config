@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Make Option+2 and Option+3 type the British - Mac characters (EUR and #) in an X session.
+
+Installed by local-machine-config for WSL2's XFCE session over XRDP, where xrdp applies the
+gb(mac) layout and ctrl:swap_lalt_lctl_lwin (Opt -> Alt). xkb's Mac layouts put those characters on
+Right Alt (level 3); on a Mac they're on Option, which here is Alt.
+
+For the 2 and 3 keys only, a key type maps Alt to level 3, and a RedirectKey action re-sends the key
+with Alt cleared and level 3 (Mod5) set. Apps then see AltGr+3, which they treat as text: without
+the redirect, Chrome took Alt+2/Alt+3 as its switch-tab shortcuts and Alacritty prefixed Escape.
+Every other Alt combination is unchanged (Opt+B is still Meta-B in a terminal).
+
+xrdp reloads the keymap on every connection, so `--watch` re-applies the change whenever it's gone.
+
+Usage: lmc-mac-option-keys [--watch]
+"""
+
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+TYPE_NAME = "LMC_MAC_OPTION"
+KEYS = ("AE02", "AE03")
+WATCH_INTERVAL_SECONDS = 2
+
+TYPE_DEFINITION = """
+    type "%s" {
+        modifiers= Shift+Mod1+Mod5;
+        map[Shift]= Level2;
+        map[Mod1]= Level3;
+        map[Shift+Mod1]= Level3;
+        map[Mod5]= Level3;
+        map[Shift+Mod5]= Level3;
+        level_name[Level1]= "Base";
+        level_name[Level2]= "Shift";
+        level_name[Level3]= "Option";
+    };
+""" % TYPE_NAME
+
+
+def read_keymap(display):
+    return subprocess.run(
+        ["xkbcomp", "-xkb", display, "-"], capture_output=True, text=True, check=True
+    ).stdout
+
+
+def patch_keymap(keymap):
+    """Return the patched keymap, or None if it can't be patched (e.g. no level 3 on those keys)."""
+    patched, count = re.subn(
+        r'(xkb_types\s+"[^"]*"\s*\{)', lambda m: m.group(1) + TYPE_DEFINITION, keymap, count=1
+    )
+    if count != 1:
+        return None
+
+    for key in KEYS:
+        match = re.search(r"key <%s> \{(.*?)\};" % key, patched, re.S)
+        if not match:
+            return None
+        symbols = re.search(r"symbols\[Group1\]\s*=\s*\[([^\]]*)\]", match.group(1))
+        if not symbols:
+            return None
+        levels = [level.strip() for level in symbols.group(1).split(",")]
+        if len(levels) < 3 or levels[2] in ("", "NoSymbol"):
+            return None
+        replacement = (
+            'key <%s> { type= "%s", symbols[Group1]= [ %s ], '
+            "actions[Group1]= [ NoAction(), NoAction(), "
+            "RedirectKey(key=<%s>, clearmods=Mod1, mods=Mod5) ] };"
+        ) % (key, TYPE_NAME, ", ".join(levels[:3]), key)
+        patched = patched[: match.start()] + replacement + patched[match.end():]
+
+    return patched
+
+
+def apply_once(display):
+    """Apply the change if it's missing. Returns True if the keymap was changed."""
+    keymap = read_keymap(display)
+    if TYPE_NAME in keymap:
+        return False
+
+    patched = patch_keymap(keymap)
+    if patched is None:
+        return False
+
+    with tempfile.NamedTemporaryFile("w", suffix=".xkb", delete=False) as handle:
+        handle.write(patched)
+        path = handle.name
+    try:
+        subprocess.run(["xkbcomp", "-w", "0", path, display], capture_output=True, check=True)
+    finally:
+        os.unlink(path)
+    return True
+
+
+def main():
+    display = os.environ.get("DISPLAY")
+    if not display:
+        sys.exit("lmc-mac-option-keys: DISPLAY is not set")
+
+    if "--watch" not in sys.argv[1:]:
+        print("applied" if apply_once(display) else "already applied (or not applicable)")
+        return
+
+    failures = 0
+    while True:
+        try:
+            apply_once(display)
+            failures = 0
+        except subprocess.CalledProcessError:
+            # The keymap may be mid-reload; try again shortly. A minute of failures means the X
+            # server has gone (the session ended), so stop.
+            failures += 1
+            if failures * WATCH_INTERVAL_SECONDS >= 60:
+                sys.exit(0)
+        time.sleep(WATCH_INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    main()
