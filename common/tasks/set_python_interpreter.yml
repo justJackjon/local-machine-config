@@ -135,11 +135,17 @@
             # NOTE: Compare exactly: 'found' is also a substring of 'not_found'.
             - sudo_ws_check.stdout | trim == 'found'
 
+        - name: Check apt repositories on Debian-like systems
+          ansible.builtin.include_tasks: check_apt_sources.yml
+          when:
+            - "os_release_result.stdout is defined"
+            - "'debian' in os_release_result.stdout or 'ubuntu' in os_release_result.stdout"
+
+        # NOTE: The package lists were just updated by check_apt_sources.yml.
         - name: Install python3-venv package on Debian-like systems
           ansible.builtin.apt:
             name: python3-venv
             state: present
-            update_cache: true
           become: true
           when:
             - "os_release_result.stdout is defined"
