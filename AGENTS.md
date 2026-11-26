@@ -294,6 +294,11 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - **XFCE:** xfconf `keyboard-layout` `/Default/XkbLayout=gb`, `/Default/XkbVariant=mac` (xkb's "English (UK, Macintosh)"), then `XkbDisable=false`. Only runs inside the XFCE session. Its third level (`#`, `€`) is on Right Alt; Option arrives over RDP as Super, which XFCE's workspace shortcuts use. Applied *by reading xkb's `symbols/gb`*; not yet run in an XFCE session.
 - **macOS:** the built-in "British" input source (not automated).
 
+### Prompts appeared only after typing the answer (`install.sh`, Linux/macOS)
+- **Symptom:** the Home Assistant URL prompt waited for input before its question was shown.
+- **Cause:** `install.sh` sends all output through `tee` to its log, so Ansible's stdout was a pipe and a `pause` prompt without a trailing newline stayed buffered.
+- **Fix:** `install.sh` runs the playbook on the original terminal (`1>&3 2>&4`). The playbook's output goes to `run-playbook.sh`'s Ansible log, not the install log. Verified in WSL2 under a pseudo-terminal: before the fix, the typed reply appeared before the question, and after it, the question came first. The same rule is why `install.ps1` doesn't pipe the playbook through `Out-Host`.
+
 ### Debugging WSL runs from the Windows host
 - An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."`. `run-playbook.sh` always appends Ansible's output to `${TMPDIR:-/tmp}/local-machine-config-ansible.log` (override with `ANSIBLE_LOG_PATH`), so `tail -200 /tmp/local-machine-config-ansible.log` shows the latest run. `/tmp/local-machine-config-install.log` is written only by `install.sh`. WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.
 - `sudo` in WSL needs the user's password, so an agent can't do a full run. Test a change with a small playbook that skips `become`, then have the user re-run `./run-playbook.sh` in WSL.

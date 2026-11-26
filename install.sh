@@ -61,6 +61,15 @@ pause_and_exit() {
 
 trap pause_and_exit EXIT
 
+# Run the playbook on the original terminal rather than through tee.
+# NOTE: When Ansible's stdout is a pipe, a prompt without a trailing newline (the `pause` prompts for
+#       the Home Assistant URL and token) stays buffered, so the playbook waits for input before the
+#       question appears. run-playbook.sh logs Ansible's output to ANSIBLE_LOG_PATH instead.
+run_playbook() {
+  info "Ansible output is not copied to ${LOG_FILE}; run-playbook.sh logs it to ${ANSIBLE_LOG_PATH:-${TMPDIR:-/tmp}/local-machine-config-ansible.log}"
+  ./run-playbook.sh --ask-become-pass 1>&3 2>&4
+}
+
 # Detect OS
 OS="$(uname -s)"
 case "$OS" in
@@ -170,7 +179,7 @@ info "gh CLI authentication complete."
 if [ -f "./ansible.cfg" ] && [ -f "./run-playbook.sh" ]; then
   info "Detected execution from within the repository. Skipping clone/pull."
   chmod +x run-playbook.sh
-  ./run-playbook.sh --ask-become-pass
+  run_playbook
 else
   # Clone repository
   REPO_DIR="$HOME/Repos"
@@ -209,7 +218,7 @@ else
   info "Executing Ansible playbook..."
   cd "${REPO_DIR}/local-machine-config"
   chmod +x run-playbook.sh
-  ./run-playbook.sh --ask-become-pass
+  run_playbook
 fi
 
 
