@@ -11,6 +11,7 @@
           - ca-certificates
           - curl
           - gnupg
+          - python3-debian # NOTE: Required by ansible.builtin.deb822_repository below
         state: present
         update_cache: true
 
@@ -27,14 +28,24 @@
         mode: "0644"
         force: true
 
+    # NOTE: ansible.builtin.apt_repository is deprecated (removed in ansible-core 2.25), so the repository
+    #       is written as a deb822 `docker.sources` file instead (needs python3-debian, installed by
+    #       install_base_packages). The legacy one-line `docker.list` is removed so apt doesn't see the
+    #       repository twice. The package install below refreshes the apt cache.
+    - name: Remove legacy Docker apt source list
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+
     - name: Add Docker apt repository
-      ansible.builtin.apt_repository:
-        repo: >
-          deb [arch={{ install_docker_apt_arch }} signed-by=/etc/apt/keyrings/docker.asc]
-          https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}
-          {{ ansible_facts.distribution_release }} stable
-        state: present
-        filename: docker
+      ansible.builtin.deb822_repository:
+        name: docker
+        types: deb
+        uris: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}"
+        suites: "{{ ansible_facts.distribution_release }}"
+        components: stable
+        architectures: "{{ install_docker_apt_arch }}"
+        signed_by: /etc/apt/keyrings/docker.asc
 
     - name: Install Docker Engine packages
       ansible.builtin.apt:

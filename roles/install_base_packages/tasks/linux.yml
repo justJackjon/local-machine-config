@@ -15,6 +15,7 @@
       ansible.builtin.apt:
         name:
           - curl
+          - python3-debian # NOTE: Required by ansible.builtin.deb822_repository (gh and Docker apt repositories)
           - python3-pip
           - pipx
           - bash-completion
@@ -119,19 +120,32 @@
             mode: '0644'
             force: true
 
+        # NOTE: ansible.builtin.apt_repository is deprecated (removed in ansible-core 2.25), so the repository
+        #       is written as a deb822 `github-cli.sources` file instead (needs python3-debian, installed above).
+        #       The legacy one-line `github-cli.list` is removed so apt doesn't see the repository twice.
+        #       Unlike apt_repository, deb822_repository doesn't refresh the apt cache, so the install below
+        #       does that when the repository changed.
+        - name: Remove legacy GitHub CLI apt source list
+          ansible.builtin.file:
+            path: /etc/apt/sources.list.d/github-cli.list
+            state: absent
+
         - name: Add GitHub CLI apt repository
-          ansible.builtin.apt_repository:
-            repo: >
-              deb [arch={{ 'amd64' if ansible_facts.architecture == 'x86_64' else 'arm64' if ansible_facts.architecture == 'aarch64' else 'i386' }}
-              signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg]
-              https://cli.github.com/packages stable main
-            state: present
-            filename: github-cli
+          ansible.builtin.deb822_repository:
+            name: github-cli
+            types: deb
+            uris: https://cli.github.com/packages
+            suites: stable
+            components: main
+            architectures: "{{ 'amd64' if ansible_facts.architecture == 'x86_64' else 'arm64' if ansible_facts.architecture == 'aarch64' else 'i386' }}"
+            signed_by: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+          register: install_base_packages_gh_repository
 
         - name: Install latest gh CLI
           ansible.builtin.apt:
             name: gh
             state: latest
+            update_cache: "{{ install_base_packages_gh_repository is changed }}"
             update_cache: true
 
     - name: Install lazygit
@@ -251,13 +265,13 @@
           when: install_base_packages_starship_check.rc != 0
           ansible.builtin.get_url:
             url: https://starship.rs/install.sh
-            dest: "/tmp/install_starship_{{ ansible_user_id }}.sh"
+            dest: "/tmp/install_starship_{{ ansible_facts.user_id }}.sh"
             mode: "0755"
 
         - name: Run Starship install script
           when: install_base_packages_starship_check.rc != 0
           become: true
-          ansible.builtin.command: "/tmp/install_starship_{{ ansible_user_id }}.sh -y"
+          ansible.builtin.command: "/tmp/install_starship_{{ ansible_facts.user_id }}.sh -y"
           changed_when: true
 
     - name: Install nvm, node and pnpm
@@ -265,11 +279,11 @@
         - name: Download nvm install script
           ansible.builtin.get_url:
             url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
-            dest: "/tmp/install_nvm_{{ ansible_user_id }}.sh"
+            dest: "/tmp/install_nvm_{{ ansible_facts.user_id }}.sh"
             mode: "0755"
 
         - name: Run nvm install script
-          ansible.builtin.command: "/tmp/install_nvm_{{ ansible_user_id }}.sh"
+          ansible.builtin.command: "/tmp/install_nvm_{{ ansible_facts.user_id }}.sh"
           args:
             creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
@@ -311,7 +325,7 @@
           when: not install_base_packages_pnpm_preinstalled
           ansible.builtin.get_url:
             url: https://get.pnpm.io/install.sh
-            dest: "/tmp/install_pnpm_{{ ansible_user_id }}.sh"
+            dest: "/tmp/install_pnpm_{{ ansible_facts.user_id }}.sh"
             mode: "0755"
 
         - name: Run pnpm install script
@@ -321,7 +335,7 @@
             export PNPM_HOME="{{ ansible_facts.env.HOME }}/.local/share/pnpm" &&
             export SHELL="/bin/bash" &&
             export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH" &&
-            bash /tmp/install_pnpm_{{ ansible_user_id }}.sh
+            bash /tmp/install_pnpm_{{ ansible_facts.user_id }}.sh
           args:
             executable: /bin/bash
           changed_when: true
