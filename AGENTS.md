@@ -287,6 +287,11 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 ### Scoop's pnpm leaves config behind
 - Scoop's pnpm manifest writes `storeDir`/`cacheDir`/`stateDir` (pointing into `scoop/apps/pnpm`) into pnpm's global `config.yaml`. Removing Scoop's pnpm does not remove them, so the next pnpm recreates the directory and Scoop lists a phantom `Install failed` app. The playbook deletes those keys. Windows-only.
 
+### Windows PowerShell 5.1 couldn't find `Get-FileHash` under Ansible
+- **Symptom:** `Run Claude Code installer` failed with `The term 'Get-FileHash' is not recognized`.
+- **Cause:** when the run starts from PowerShell 7, its `PSModulePath` (PowerShell 7's module directories first) is inherited through MSYS2, which renames it to `PSMODULEPATH`. `powershell.exe` (5.1) then can't autoload its own built-in modules. Overriding `PSModulePath` from bash has no effect: it's a second variable.
+- **Fix:** `run-playbook.sh` unsets `PSMODULEPATH` on MSYS2, so `powershell.exe` rebuilds its default path. Verified on Windows from PowerShell 7: reproduced in MSYS2 bash, then both AI CLI installers succeeded, and a re-run reported no changes.
+
 ### Debugging Windows runs
 - `Start-Transcript` in Windows PowerShell 5.1 does not capture native executables' output, so `install.ps1` sets `ANSIBLE_LOG_PATH`. Don't pipe the playbook through `Out-Host` to work around it: that line-buffers output and hides prompts that don't end in a newline (passphrases).
 - When an agent drives PowerShell, native-argument quoting in 5.1 mangles embedded double quotes (`gh --jq '...'`, `bash -lc "..."`). Write scripts to a file and run the file instead.
