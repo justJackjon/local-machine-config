@@ -49,20 +49,22 @@ $LOCAL_REPO_PATH = "$REPO_DIR\local-machine-config"
 
 function Install-Dependencies {
   try {
+    # NOTE: Attempt to set the execution policy to RemoteSigned for the current user, so Scoop and local
+    # scripts such as run-playbook.ps1 can run in later sessions. Checked on every run (not only when
+    # installing Scoop): the bootstrap runs with a process-scoped Bypass, which says nothing about the
+    # user's own policy. We wrap this in a try-catch because Group Policy may prevent changing this
+    # setting, but the script may still work if the current session is already bypassed.
+    try {
+      $userPolicy = Get-ExecutionPolicy -Scope CurrentUser
+      if ($userPolicy -notmatch 'RemoteSigned|Unrestricted|Bypass') {
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction SilentlyContinue
+      }
+    } catch {
+      Write-WarningMsg "Unable to set ExecutionPolicy to RemoteSigned. This is usually due to Group Policy restrictions. Attempting to continue..."
+    }
+
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
       Write-Info "Installing Scoop..."
-      
-      # NOTE: Attempt to set the execution policy to RemoteSigned for the current user.
-      # We wrap this in a try-catch because Group Policy may prevent changing this setting,
-      # but the script may still work if the current session is already bypassed.
-      try {
-        $effectivePolicy = Get-ExecutionPolicy
-        if ($effectivePolicy -notmatch 'RemoteSigned|Unrestricted|Bypass') {
-          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction SilentlyContinue
-        }
-      } catch {
-        Write-WarningMsg "Unable to set ExecutionPolicy to RemoteSigned. This is usually due to Group Policy restrictions. Attempting to continue..."
-      }
 
       # NOTE: Install Scoop using the most compatible method available (Invoke-RestMethod with WebClient fallback).
       # NOTE: Use Out-Host to ensure output goes to console and is not captured by function return.
