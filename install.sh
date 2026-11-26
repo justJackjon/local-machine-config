@@ -104,7 +104,32 @@ if [ "$os" == "Linux" ]; then
   pipx ensurepath
   # NOTE: Only install Python packages uploaded at least 7 days ago (pip >= 26 reads this; older pip ignores
   #       it). The playbook sets the same supply-chain cooldown for its own pip, npm and pnpm installs.
-  PIP_UPLOADED_PRIOR_TO=P7D pipx install ansible ansible-core
+  export PIP_UPLOADED_PRIOR_TO=P7D
+  # NOTE: Ansible is one pipx venv, `ansible` with --include-deps, so `ansible-playbook` (from its ansible-core
+  #       dependency) sees the collections bundled with `ansible`. Earlier versions installed `ansible` and
+  #       `ansible-core` as separate venvs: `ansible-playbook` came from the ansible-core venv, which can't see
+  #       the bundled collections, so they were installed from Ansible Galaxy instead (newest release, no
+  #       cooldown, never updated). The bundled collections come from PyPI through pip's cooldown, and update
+  #       with `pipx upgrade ansible`, which runs on every install.sh run.
+  if pipx list --json 2>/dev/null | python3 -c 'import json, sys; v = json.load(sys.stdin)["venvs"].get("ansible"); sys.exit(0 if v and v["metadata"]["main_package"]["include_dependencies"] else 1)'; then
+    info "Upgrading Ansible (packages at least 7 days old)..."
+    pipx upgrade ansible
+  else
+    info "Installing Ansible (packages at least 7 days old)..."
+    if pipx list --short 2>/dev/null | grep -q '^ansible-core '; then
+      pipx uninstall ansible-core
+    fi
+    pipx install --force --include-deps ansible
+  fi
+  # NOTE: Remove the Galaxy copies of the collections earlier versions of this script installed. Ansible
+  #       searches ~/.ansible/collections before the bundled ones, so these would shadow them and never update.
+  for collection in community/general ansible/windows community/crypto community/windows; do
+    if [ -d "$HOME/.ansible/collections/ansible_collections/$collection" ]; then
+      info "Removing the Ansible Galaxy copy of ${collection/\//.} (Ansible now uses the bundled one)..."
+      rm -rf "$HOME/.ansible/collections/ansible_collections/$collection" \
+        "$HOME/.ansible/collections/ansible_collections/${collection/\//.}"-*.info
+    fi
+  done
 
   # NOTE: Ubuntu 25.10+ and 26.04+ default to sudo-rs which breaks Ansible become prompt regex.
   # If sudo.ws is available, set the system alternative so sudo points to sudo.ws.
@@ -130,9 +155,6 @@ if [ "$os" == "Linux" ]; then
 	&& sudo apt update \
 	&& sudo apt install gh -y
   fi
-
-  info "Installing Ansible collections..."
-  "$HOME/.local/bin/ansible-galaxy" collection install community.general ansible.windows community.crypto community.windows
 
   # NOTE: Check gh version for conditional flags
   GH_VERSION=$(gh --version | head -n 1 | cut -d ' ' -f 3)
@@ -172,8 +194,9 @@ elif [ "$os" == "macOS" ]; then
   brew update
 
   info "Installing dependencies (git, ansible)..."
+  # NOTE: Homebrew's ansible bundles the collections the playbook uses, so they aren't installed from
+  #       Ansible Galaxy (newest release, no cooldown). Applied by analogy with Linux; not yet run on macOS.
   brew install git ansible gh
-  ansible-galaxy collection install community.general ansible.windows community.crypto community.windows
 
   if gh_has_required_auth; then
     info "gh CLI is already authenticated with the required scopes. Skipping login."
