@@ -2,6 +2,10 @@
 # This is for users running an XFCE desktop environment inside WSL2.
 configure_keyboard_enable_windows_xfce_mode: true
 
+# Kinto keyboard type on Windows: 'win' when the key left of the spacebar sends Alt (Windows layouts,
+# and multi-OS keyboards such as Logitech's in Windows mode), 'mac' when it sends Win (Apple layouts).
+configure_keyboard_windows_kinto_kbtype: win
+
 configure_keyboard_linux_kinto_config_path: "/home/{{ ansible_facts.user_id }}/.config/kinto/kinto.py"
 # NOTE: The following path is an assumption based on common application behavior on Windows.
 #       The actual path will be determined by Kinto's setup.py and Python's installation location.

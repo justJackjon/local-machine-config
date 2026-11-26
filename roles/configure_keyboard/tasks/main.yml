@@ -299,23 +299,51 @@
                     - "{{ configure_keyboard_windows_home_posix }}/.kinto"
                     - "{{ configure_keyboard_windows_home_posix }}/.kinto/assets"
 
-                - name: Copy base kinto.ahk
+                - name: Check Kinto keyboard type
+                  ansible.builtin.assert:
+                    that: configure_keyboard_windows_kinto_kbtype in ['win', 'mac']
+                    fail_msg: "configure_keyboard_windows_kinto_kbtype must be 'win' or 'mac'"
+                    quiet: true
+
+                # NOTE: Upstream kinto.ahk is a template: every remap ships commented out, and Kinto's
+                #       setup.py uncomments the lines tagged '; Default' and '; WinModifiers' (or
+                #       '; MacModifiers') with perl. Copying it unrendered gives a running Kinto that
+                #       remaps nothing. These regexes are setup.py's, applied to the freshly extracted
+                #       copy so that the installed file only changes when the result does.
+                - name: Enable Kinto's default remaps in kinto.ahk
+                  ansible.builtin.replace:
+                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    regexp: '(; )(.*)(; Default)(?!( - ST2CODE))(.*)'
+                    replace: '\2\3\5'
+
+                - name: Enable Kinto's modifier remaps for the keyboard type in kinto.ahk
+                  ansible.builtin.replace:
+                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    regexp: "(; )(.*)(; {{ 'MacModifiers' if configure_keyboard_windows_kinto_kbtype == 'mac' else 'WinModifiers' }})"
+                    replace: '\2\3'
+
+                - name: Copy rendered kinto.ahk
                   ansible.builtin.copy:
                     src: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
                     dest: "{{ configure_keyboard_windows_home_posix }}/.kinto/kinto.ahk"
                     remote_src: true
                     mode: "0644"
+                  register: configure_keyboard_kinto_ahk_result
 
                 - name: Define Windows path for downloads directory
                   ansible.builtin.command: cygpath -w "{{ configure_keyboard_windows_downloads_path }}"
                   register: configure_keyboard_windows_downloads_path_win
                   changed_when: false
 
+                # NOTE: regedit.exe always asks for elevation (UAC), which blocks or fails an unattended
+                #       run. theme_ubuntu.reg only writes HKEY_CURRENT_USER\Console, which `reg import`
+                #       can do without elevation.
                 - name: Import Ubuntu theme registry file
-                  ansible.builtin.shell: >
-                    powershell.exe -Command "Start-Process -FilePath regedit.exe
-                    -ArgumentList '/s \"{{ configure_keyboard_windows_downloads_path_win.stdout }}\kinto-master\windows\theme_ubuntu.reg\"'
-                    -Wait"
+                  ansible.builtin.command:
+                    argv:
+                      - reg.exe
+                      - import
+                      - "{{ configure_keyboard_windows_downloads_path_win.stdout }}\\kinto-master\\windows\\theme_ubuntu.reg"
                   changed_when: true
 
                 - name: Copy assets
@@ -355,7 +383,7 @@
                   ansible.builtin.replace:
                     path: "{{ configure_keyboard_windows_home_posix }}/.kinto/kinto-start.vbs"
                     regexp: "{kbtype}"
-                    replace: "win"
+                    replace: "{{ configure_keyboard_windows_kinto_kbtype }}"
 
                 - name: Remove runas from kinto-start.vbs to avoid UAC prompt
                   ansible.builtin.replace:
@@ -411,6 +439,20 @@
                         $s.Save()
                     expand_argument_vars: false
                   register: configure_keyboard_kinto_install_result_win
+                  changed_when: true
+
+                - name: Stop Kinto so it reloads the changed kinto.ahk
+                  when: configure_keyboard_kinto_ahk_result is changed
+                  ansible.builtin.command:
+                    argv:
+                      - powershell.exe
+                      - -NoProfile
+                      - -Command
+                      - >-
+                        Get-CimInstance Win32_Process -Filter "Name LIKE 'AutoHotkey%'" |
+                        Where-Object { $_.CommandLine -match 'kinto\.ahk|detectUSB\.ahk' } |
+                        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+                    expand_argument_vars: false
                   changed_when: true
 
                 - name: Check whether Kinto is running
