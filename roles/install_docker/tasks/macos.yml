@@ -1,9 +1,18 @@
 - name: Install Docker Desktop
   when: is_mac
   block:
+    # NOTE: Docker Desktop may already be installed outside Homebrew (e.g. from Docker's DMG). The cask then
+    #       fails with "It seems there is already an App at '/Applications/Docker.app'", so skip it when the app
+    #       exists. Docker Desktop updates itself, so a non-cask install stays current without Homebrew.
+    - name: Check if Docker Desktop is installed
+      ansible.builtin.stat:
+        path: /Applications/Docker.app
+      register: install_docker_app
+
     # NOTE: Docker Desktop is installed as a Homebrew cask. Its first launch requires manual
     #       license acceptance, so the role installs it but deliberately does not start it.
     - name: Install Docker Desktop via Homebrew
+      when: not install_docker_app.stat.exists
       community.general.homebrew_cask:
         name: docker
         state: present
