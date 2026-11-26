@@ -5,18 +5,36 @@
       become: true
       when: is_debian_family and not is_arm64
       block:
+        # NOTE: The .deb is only needed for the first install. It also adds Google's apt repository
+        #       (/etc/apt/sources.list.d/google-chrome.sources), so apt upgrades keep Chrome current.
+        #       Previously every run downloaded (and deleted) the .deb again.
+        - name: Check if Google Chrome is installed
+          ansible.builtin.command:
+            argv: [dpkg-query, -W, "-f=${Status}", google-chrome-stable]
+            expand_argument_vars: false
+          register: install_browser_chrome_status
+          changed_when: false
+          failed_when: false
+
+        - name: Set whether Google Chrome needs installing
+          ansible.builtin.set_fact:
+            install_browser_chrome_needs_install: "{{ 'install ok installed' not in install_browser_chrome_status.stdout }}"
+
         - name: Download Google Chrome
+          when: install_browser_chrome_needs_install
           ansible.builtin.get_url:
             url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
             dest: /tmp/google-chrome-stable_current_amd64.deb
             mode: '0644'
 
         - name: Install Google Chrome
+          when: install_browser_chrome_needs_install
           ansible.builtin.apt:
             deb: /tmp/google-chrome-stable_current_amd64.deb
             state: present
 
         - name: Clean up downloaded file
+          when: install_browser_chrome_needs_install
           ansible.builtin.file:
             path: /tmp/google-chrome-stable_current_amd64.deb
             state: absent
