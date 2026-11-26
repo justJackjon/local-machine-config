@@ -170,9 +170,10 @@
     #       Its third level (# on 3, € on 2) is on Right Alt, as xkb's Mac layouts do; the Option key
     #       arrives as Super, which XFCE's Super+Ctrl workspace shortcuts need.
     #       XkbDisable is set last so xfsettingsd applies the layout and variant together.
+    #       In WSL2 the layout comes from XRDP instead (below): xfsettingsd would replace XRDP's xkb options.
     - name: Configure XFCE keyboard layout
       tags: configure_keyboard
-      when: is_inside_xfce
+      when: is_inside_xfce and not is_wsl
       block:
         - name: Get current XFCE keyboard layout settings
           ansible.builtin.command:
@@ -207,6 +208,82 @@
           loop: "{{ configure_keyboard_xfce_layout_current.results }}"
           loop_control:
             label: "{{ item.item.property }}"
+          changed_when: true
+
+    # NOTE: Kinto can't work inside WSL2's XFCE session: Windows' Kinto ignores Remote Desktop windows,
+    #       and Linux's Kinto (xkeysnail) grabs a physical keyboard device, which an XRDP session lacks
+    #       (keys arrive through xorgxrdp). Instead, XRDP applies the British - Mac layout and xkb's
+    #       version of Kinto's modifier swap on every connection, and Alacritty's bindings do what
+    #       Kinto does for terminals. XRDP reads xrdp_keyboard.ini per connection: reconnect to apply.
+    - name: Configure Mac-style keys for WSL2's XFCE session
+      tags: configure_keyboard
+      when: is_wsl
+      block:
+        - name: Set the XRDP keyboard layout for UK clients
+          community.general.ini_file:
+            path: /etc/xrdp/xrdp_keyboard.ini
+            section: default_layouts_map
+            option: rdp_layout_gb
+            value: "{{ configure_keyboard_xfce_xkb_layout }}({{ configure_keyboard_xfce_xkb_variant }})"
+            no_extra_spaces: true
+            mode: "0644"
+          become: true
+
+        - name: Set the XRDP keyboard xkb options
+          community.general.ini_file:
+            path: /etc/xrdp/xrdp_keyboard.ini
+            section: default
+            option: options
+            value: "{{ configure_keyboard_xrdp_xkb_options }}"
+            no_extra_spaces: true
+            mode: "0644"
+          become: true
+
+        - name: Ensure local config directory exists
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.config/local-machine-config"
+            state: directory
+            mode: "0700"
+
+        # NOTE: Imported by the dotfiles' alacritty.toml, which skips it when missing.
+        - name: Install Mac-style Alacritty key bindings
+          ansible.builtin.copy:
+            src: alacritty/wsl_xfce_mac_keys.toml
+            dest: "{{ ansible_facts.env.HOME }}/.config/local-machine-config/alacritty.toml"
+            mode: "0644"
+
+        # NOTE: With Ctrl acting as Super, XFCE's default Super+R/P/E shortcuts would swallow
+        #       Ctrl+R (reverse search), Ctrl+P and Ctrl+E (end of line) before the terminal sees them.
+        - name: Check XFCE Super shortcuts that would take Ctrl keys
+          when: is_inside_xfce
+          ansible.builtin.command:
+            argv:
+              - xfconf-query
+              - --channel
+              - xfce4-keyboard-shortcuts
+              - --property
+              - "{{ item }}"
+          loop:
+            - /commands/custom/<Super>r
+            - /commands/custom/<Super>p
+            - /commands/custom/<Super>e
+          register: configure_keyboard_super_shortcuts
+          failed_when: false
+          changed_when: false
+
+        - name: Remove XFCE Super shortcuts that would take Ctrl keys
+          when: is_inside_xfce and item.rc == 0
+          ansible.builtin.command:
+            argv:
+              - xfconf-query
+              - --channel
+              - xfce4-keyboard-shortcuts
+              - --property
+              - "{{ item.item }}"
+              - --reset
+          loop: "{{ configure_keyboard_super_shortcuts.results | default([]) }}"
+          loop_control:
+            label: "{{ item.item }}"
           changed_when: true
 
     - name: Configure Workspace Switching Shortcuts
@@ -370,6 +447,18 @@
                 #       keys sent by other AutoHotkey scripts, so a separate script would never see the
                 #       Alt that Kinto sends for the Option key. Inserted before Kinto's optional
                 #       Option-character scheme (US Mac), so these take precedence when both are on.
+                # NOTE: Upstream Kinto doesn't know Alacritty, so it got GUI mappings: Cmd+C sent Ctrl+C
+                #       (interrupt) and physical Ctrl+key sent Win+key. In these groups, Cmd+C/V copy and
+                #       paste (Ctrl+Shift+C/V) and physical Ctrl+key is sent as Ctrl+key.
+                - name: Treat Alacritty as a terminal in kinto.ahk
+                  ansible.builtin.lineinfile:
+                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    line: "GroupAdd, {{ item }}, ahk_exe alacritty.exe"
+                    insertafter: '^GroupAdd, {{ item }}, ahk_exe WindowsTerminal\.exe'
+                  loop:
+                    - terminals
+                    - posix
+
                 - name: Add British - Mac layout remaps to kinto.ahk
                   when: configure_keyboard_windows_mac_gb_layout
                   ansible.builtin.blockinfile:

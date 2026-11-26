@@ -1,0 +1,62 @@
+# Mac-style keys in Alacritty inside WSL's XFCE session (written by local-machine-config).
+#
+# XRDP applies xkb's ctrl:swap_lalt_lctl_lwin, as Kinto does on Windows and Linux:
+#   physical Cmd -> Control, physical Ctrl -> Super, physical Opt -> Alt.
+# Kinto then treats terminals specially; xkb can't, so these bindings do it here:
+#   - physical Ctrl+key (Super) sends the real control character: Ctrl+C interrupts, Ctrl+R searches.
+#   - Cmd+C / Cmd+V copy and paste, Cmd+N opens a window, Cmd+W / Cmd+Q close, Cmd+F finds.
+#   - Opt/Cmd + Left, Right and Backspace move and delete like macOS Terminal.
+# Other Cmd+key presses arrive as Ctrl+key, as with Kinto on Windows.
+
+[keyboard]
+bindings = [
+  { key = "A", mods = "Super", chars = "\u0001" },
+  { key = "B", mods = "Super", chars = "\u0002" },
+  { key = "C", mods = "Super", chars = "\u0003" },
+  { key = "D", mods = "Super", chars = "\u0004" },
+  { key = "E", mods = "Super", chars = "\u0005" },
+  { key = "F", mods = "Super", chars = "\u0006" },
+  { key = "G", mods = "Super", chars = "\u0007" },
+  { key = "H", mods = "Super", chars = "\u0008" },
+  { key = "I", mods = "Super", chars = "\u0009" },
+  { key = "J", mods = "Super", chars = "\u000A" },
+  { key = "K", mods = "Super", chars = "\u000B" },
+  { key = "L", mods = "Super", chars = "\u000C" },
+  { key = "M", mods = "Super", chars = "\u000D" },
+  { key = "N", mods = "Super", chars = "\u000E" },
+  { key = "O", mods = "Super", chars = "\u000F" },
+  { key = "P", mods = "Super", chars = "\u0010" },
+  { key = "Q", mods = "Super", chars = "\u0011" },
+  { key = "R", mods = "Super", chars = "\u0012" },
+  { key = "S", mods = "Super", chars = "\u0013" },
+  { key = "T", mods = "Super", chars = "\u0014" },
+  { key = "U", mods = "Super", chars = "\u0015" },
+  { key = "V", mods = "Super", chars = "\u0016" },
+  { key = "W", mods = "Super", chars = "\u0017" },
+  { key = "X", mods = "Super", chars = "\u0018" },
+  { key = "Y", mods = "Super", chars = "\u0019" },
+  { key = "Z", mods = "Super", chars = "\u001A" },
+  { key = "Space", mods = "Super", chars = "\u0000" },
+  { key = "[", mods = "Super", chars = "\u001B" },
+  { key = "\\", mods = "Super", chars = "\u001C" },
+  { key = "]", mods = "Super", chars = "\u001D" },
+  { key = "Left", mods = "Super", chars = "\u001B[1;5D" },
+  { key = "Right", mods = "Super", chars = "\u001B[1;5C" },
+  { key = "Up", mods = "Super", chars = "\u001B[1;5A" },
+  { key = "Down", mods = "Super", chars = "\u001B[1;5B" },
+
+  { key = "C", mods = "Control", action = "Copy" },
+  { key = "V", mods = "Control", action = "Paste" },
+  { key = "N", mods = "Control", action = "SpawnNewInstance" },
+  { key = "W", mods = "Control", action = "Quit" },
+  { key = "Q", mods = "Control", action = "Quit" },
+  { key = "F", mods = "Control", action = "SearchForward" },
+  { key = "K", mods = "Control", action = "ClearHistory" },
+
+  { key = "Left", mods = "Alt", chars = "\u001Bb" },
+  { key = "Right", mods = "Alt", chars = "\u001Bf" },
+  { key = "Back", mods = "Alt", chars = "\u0017" },
+  { key = "Left", mods = "Control", chars = "\u001B[H" },
+  { key = "Right", mods = "Control", chars = "\u001B[F" },
+  { key = "Back", mods = "Control", chars = "\u0015" },
+]

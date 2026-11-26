@@ -11,6 +11,9 @@ configure_keyboard_windows_kinto_kbtype: win
 configure_keyboard_windows_mac_gb_layout: true
 configure_keyboard_xfce_xkb_layout: gb
 configure_keyboard_xfce_xkb_variant: mac
+# WSL2 XFCE (over XRDP): Kinto's Windows-keyboard modifier swap, done by xkb.
+# Left Alt (Cmd) -> Ctrl, Left Ctrl -> Super, Left Win (Opt) -> Alt.
+configure_keyboard_xrdp_xkb_options: ctrl:swap_lalt_lctl_lwin
 
 configure_keyboard_linux_kinto_config_path: "/home/{{ ansible_facts.user_id }}/.config/kinto/kinto.py"
 # NOTE: The following path is an assumption based on common application behavior on Windows.
