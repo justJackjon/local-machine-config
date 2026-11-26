@@ -1,0 +1,50 @@
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# NOTE: Read-only token. The workflow only checks out and lints the code.
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # NOTE: Ansible ignores an ansible.cfg in a world-writable directory; naming it explicitly avoids that
+    #       (run-playbook.sh does the same).
+    env:
+      ANSIBLE_CONFIG: ansible.cfg
+    steps:
+      # NOTE: Actions are pinned by commit SHA (tags can be moved), and Dependabot proposes updates once a
+      #       release is at least 7 days old (.github/dependabot.yml).
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+
+      - name: Install Ansible and ansible-lint
+        env:
+          PIP_UPLOADED_PRIOR_TO: P7D
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r .github/ci/requirements.txt
+
+      - name: Check playbook syntax
+        run: ansible-playbook -i hosts playbooks/setup_ansible_controller.yml --syntax-check
+
+      # NOTE: Findings that predate this workflow are listed in .ansible-lint-ignore, so only new ones fail.
+      #       Fix one and delete its line there.
+      - name: Run ansible-lint
+        run: ansible-lint --offline

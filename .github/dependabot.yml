@@ -1,0 +1,22 @@
+# Proposes updates to the CI workflow's pinned actions and Python tools, only once a release is at least
+# 7 days old, matching the playbook's supply-chain cooldown. The playbook's own dependencies are age-gated at
+# install time instead (see "Supply-Chain Safety" in README.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":arrow_up:   (ci):"
+
+  - package-ecosystem: pip
+    directory: /.github/ci
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ":arrow_up:   (ci):"

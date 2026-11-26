@@ -12,9 +12,11 @@
 ansible.cfg text eol=lf
 hosts text eol=lf
 .ansible-lint text eol=lf
+.ansible-lint-ignore text eol=lf
 
 # Scripts
 *.sh text eol=lf
+*.py text eol=lf
 *.ps1 text eol=crlf
 # Installed and run on Linux; a CRLF shebang line fails ("python3\r: No such file").
 roles/configure_keyboard/files/xkb/* text eol=lf
