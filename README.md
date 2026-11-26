@@ -71,17 +71,18 @@ You can also pass extra arguments to the `ansible-playbook` command, such as `--
 
 This repository installs a lot of third-party software, so it limits how much a single malicious or broken release can reach:
 
-- **Release-age cooldown:** packages and releases are installed only once they are at least **7 days** old, giving the community time to find and pull a bad release. This covers pip, pipx, npm, pnpm (including `pnpm self-update`), GitHub release downloads (Neovim, lazygit, fzf, Starship, nvm-windows) and the Alacritty crate. To take an urgent fix sooner, override it for one run:
+- **Release-age cooldown:** packages and releases are installed only once they are at least **7 days** old, giving the community time to find and pull a bad release. This covers pip, pipx, npm, pnpm (including `pnpm self-update`), Ansible and its collections, Node.js LTS, Scoop apps (their buckets are held at the cutoff), GitHub release downloads (Neovim, lazygit, fzf, Starship, nvm-windows) and the Alacritty crate. Re-running the playbook upgrades these to the newest version that is old enough, and never downgrades something newer that is already installed. To take an urgent fix sooner, override it for one run:
 
   ```bash
   ./run-playbook.sh -e supply_chain_min_release_age_days=0
   ```
 
 - **Pinned, checksummed downloads:** files that used to come from a branch (`master`, `HEAD`) are fetched by commit or release tag, with a SHA-256 kept in this repository or published by GitHub for the release asset.
-- **Downloaded, then run:** vendor install scripts are saved to a file and run from there, never piped from the network straight into a shell. Claude Code is installed from its `stable` channel.
+- **Downloaded, then run:** vendor install scripts are saved to a file and run from there, never piped from the network straight into a shell. Claude Code is installed from, and set to auto-update on, its `stable` channel (about a week behind `latest`).
 - **Locked builds:** Alacritty is built with `cargo install --locked`, so its dependencies are the versions Alacritty published, not whatever is newest at build time.
+- **Repository checks:** GitHub secret scanning with push protection blocks pushes that contain credentials, and a lint workflow (`.github/workflows/lint.yml`) runs a syntax check and ansible-lint on every pull request. Its actions are pinned by commit SHA, and Dependabot proposes updates to them once a release is 7 days old.
 
-Not covered by the cooldown: apt, Homebrew, Scoop and MSYS2's pacman (signed or checksummed by their maintainers, with no release-age setting), Node.js LTS from nvm, the Rust toolchain from rustup, and Google Chrome's `.deb` (later updates come from Google's signed apt repository). See `AGENTS.md` for the details.
+Not covered by the cooldown: apt, Homebrew and MSYS2's pacman (signed or checksummed by their maintainers, with no release-age setting), Scoop's own code, the Rust toolchain from rustup, nvm itself (pinned to a version in the repo), and Google Chrome's `.deb` (later updates come from Google's signed apt repository). Claude Code and agy update themselves. See `AGENTS.md` for the details.
 
 ### Contributing
 
@@ -180,6 +181,5 @@ The playbooks in this repository will install and configure the following softwa
 - Install tmux
 - On XFCE desktop, add 'Workspace Switcher' plugin to top panel
 - Create a common clipboard API (e.g., `pbcopy`/`pbpaste` wrappers) to abstract away platform-specific commands like `xclip`, `pbcopy`, and `/dev/clipboard`.
-- Apply the supply-chain cooldown to the remaining sources: Ansible Galaxy collections (`install.sh` installs the newest from Galaxy, though the `ansible` package already bundles them), Scoop, and the fzf binary that fzf's installer downloads.
-- Add CI (ansible-lint and a secret scanner such as gitleaks, with actions pinned by commit SHA).
+- Fix the findings listed in `.ansible-lint-ignore` (pre-existing when CI was added), deleting each line as it is fixed.
 - Refactor to set fully qualified executable paths (e.g., for scoop, nvm, pnpm) as global facts in an early `pre_tasks` block. This will provide a central, commented location to manage paths and solve the "first-run PATH issue" more cleanly than repeating logic in each role.
