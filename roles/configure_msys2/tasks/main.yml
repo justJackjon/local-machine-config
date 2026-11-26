@@ -94,6 +94,9 @@
         path: '{{ configure_msys2_win_home_dir }}/.minttyrc'
         state: touch
         mode: '0644'
+        # NOTE: Preserving the timestamps makes `touch` a no-op (not `changed`) when the file exists.
+        access_time: preserve
+        modification_time: preserve
 
     - name: Update .minttyrc to use Dracula theme
       ansible.builtin.lineinfile:

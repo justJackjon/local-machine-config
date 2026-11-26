@@ -179,6 +179,8 @@
                 path: "{{ install_spacevim_minttyrc_file }}"
                 state: touch
                 mode: '0644'
+                access_time: preserve
+                modification_time: preserve
 
             - name: Update .minttyrc to use Nerd Font
               ansible.builtin.lineinfile:
