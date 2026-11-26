@@ -351,7 +351,7 @@
 
     # NOTE: `nvm install lts` took the newest LTS release, however new. The version is now the newest LTS
     #       release older than the supply-chain cutoff (see the playbook), or the active version if that is
-    #       newer. A newer LTS is installed next to the old one and made active; old versions stay installed.
+    #       newer. A newer LTS is installed and made active, then the old versions are uninstalled (below).
     - name: Find the newest Node.js LTS release older than the supply-chain cutoff
       ansible.builtin.include_tasks: ../../../common/tasks/resolve_node_lts.yml
 
@@ -399,6 +399,30 @@
         - install_base_packages_nvm_node_version != ""
       changed_when: false
       failed_when: false
+
+    # NOTE: Old Node.js versions are uninstalled once the playbook has moved to a newer LTS release, unless
+    #       install_base_packages_remove_old_node_versions is false (see defaults/main.yml). Each version
+    #       has its own pnpm (nvm's auto_installed_modules), so nothing else depends on the old ones.
+    - name: Find installed Node.js versions
+      when:
+        - install_base_packages_remove_old_node_versions | bool
+        - install_base_packages_nvm_node_version | default('') != ''
+      ansible.builtin.find:
+        paths: "{{ install_base_packages_nvm_home }}/installs"
+        file_type: directory
+        patterns: "v*"
+      register: install_base_packages_nvm_installed_versions
+
+    - name: Uninstall other Node.js versions
+      when:
+        - install_base_packages_remove_old_node_versions | bool
+        - install_base_packages_nvm_node_version | default('') != ''
+      ansible.builtin.command:
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" uninstall {{ item }}"
+      loop: >-
+        {{ install_base_packages_nvm_installed_versions.files | default([]) | map(attribute='path') | map('basename')
+           | map('regex_replace', '^v', '') | reject('equalto', install_base_packages_nvm_node_version) | list }}
+      changed_when: true
 
     # NOTE: nvm-windows 2.x (shim mode) exposes node/npm/pnpm/yarn through proxy shims in
     #       '%LOCALAPPDATA%\Author Software\nvm\.nodejs'. Its installer does not reliably add that directory to the

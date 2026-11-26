@@ -1,4 +1,9 @@
 ---
+# Uninstall every Node.js version except the one the playbook installs (the newest LTS release older than the
+# supply-chain cutoff), after it upgrades Node.js. Set to false to keep old versions, e.g. for projects that
+# pin one with .nvmrc.
+install_base_packages_remove_old_node_versions: true
+
 # pnpm global packages installed (and kept up to date) on every platform.
 # See common/tasks/install_pnpm_global_packages.yml for the item format.
 install_base_packages_pnpm_global_packages:

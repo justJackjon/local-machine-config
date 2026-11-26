@@ -4,8 +4,9 @@
 #
 # NOTE: This used to be `nvm install --lts` with `creates: ~/.nvm/versions/node`, so Node.js was installed once
 #       and never updated, and the newest LTS was taken regardless of age. Now a newer LTS release is installed
-#       next to the old one once it is old enough, and becomes the default. Older versions stay installed
-#       (remove them with `nvm uninstall <version>`). A default that is already newer is kept.
+#       next to the old one once it is old enough, and becomes the default. A default that is already newer is
+#       kept. Every other installed version is then uninstalled, unless `install_base_packages_remove_old_node_versions`
+#       is false. Global npm packages go with their version; pnpm's globals live in PNPM_HOME and are unaffected.
 # NOTE: The bin directory used to be found with `find ~/.nvm/versions/node ... | head -n 1`, which picks an
 #       arbitrary version once several are installed. It now comes from nvm's default.
 - name: Find the newest Node.js LTS release older than the supply-chain cutoff
@@ -40,6 +41,21 @@
   args:
     executable: /bin/bash
   changed_when: true
+
+- name: Uninstall other Node.js versions
+  when: install_base_packages_remove_old_node_versions | default(true) | bool
+  ansible.builtin.shell: |
+    source "$HOME/.nvm/nvm.sh"
+    nvm use --silent {{ install_node_lts_version }} >/dev/null
+    for dir in "$HOME"/.nvm/versions/node/v*; do
+      version=$(basename "$dir")
+      [ "$version" = "{{ install_node_lts_version }}" ] && continue
+      nvm uninstall "$version" >/dev/null && echo "removed $version"
+    done
+  args:
+    executable: /bin/bash
+  register: install_node_lts_uninstall
+  changed_when: "'removed ' in install_node_lts_uninstall.stdout"
 
 - name: Set the Node.js bin directory fact
   ansible.builtin.set_fact:
