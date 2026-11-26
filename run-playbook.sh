@@ -37,6 +37,12 @@ Linux* | Darwin*)
 *)
   # On other systems (like MSYS2 on Windows), assume standard path.
   ANSIBLE_EXECUTABLE="ansible-playbook"
+
+  # NOTE: When launched from PowerShell 7, the inherited module path (which MSYS2 renames to PSMODULEPATH)
+  #       lists PowerShell 7's modules first. Windows PowerShell 5.1 (powershell.exe, used by the playbook
+  #       and vendors' installers) then can't load its own built-in modules, so cmdlets such as Get-FileHash
+  #       are "not recognized". Unset, powershell.exe rebuilds its default module path.
+  unset PSMODULEPATH PSModulePath
   ;;
 esac
 
