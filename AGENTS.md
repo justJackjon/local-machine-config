@@ -358,6 +358,11 @@ These passed on a fresh machine but failed on one the playbook had set up before
 - **`Unknown metadata version 0.5`:** a pipx venv created by a newer pipx (here `semgrep`, installed by the playbook before 7f9be32 removed Semgrep, through `~/.venvs/local-machine-config/bin/pipx` 1.8) makes every command of Ubuntu 24.04's apt pipx (1.4.3) fail, including `pipx list`. Removed by hand with the newer pipx: `~/.venvs/local-machine-config/bin/pipx uninstall semgrep`.
 - **`The pipx tool must be at least at version 1.7.0`:** `community.general.pipx` in Ansible 14 requires it, and Ubuntu 24.04 has 1.4.3. **Fix:** `install_base_packages` calls `/usr/bin/pipx install` and `pipx upgrade` with `command` (changes detected from `installed package`/`upgraded package`). Don't switch to a newer pipx for these venvs: it rewrites their metadata, and apt's pipx (used by `install.sh`) can then no longer read them. Verified in WSL2 with the tasks in a playbook without `become`: an install, then a re-run with no changes.
 
+### `sudo.ws: not found` on Ubuntu 24.04
+- **Symptom:** `Install python3-venv package on Debian-like systems` failed with `/bin/sh: 1: /usr/bin/sudo.ws: not found`.
+- **Cause:** `set_python_interpreter.yml` chose `sudo.ws` when `'found' in sudo_ws_check.stdout`, which is also true for `not_found`. Only Ubuntu releases without sudo-rs (24.04 and earlier) lack `sudo.ws`, so it passed on 26.04.
+- **Fix:** compare the trimmed output exactly. Verified in WSL2 Ubuntu 24.04: the check runs and `ansible_become_exe` stays unset.
+
 ### Claude Code's update channel
 - `configure_mcp_servers` merges `configure_mcp_servers_claude_settings` (`autoUpdatesChannel: stable`) into `~/.claude/settings.json`, keeping the other settings and their order. A settings file that isn't valid JSON fails the run instead of being overwritten. Verified in WSL2 and on Windows (where it was `latest`).
 
