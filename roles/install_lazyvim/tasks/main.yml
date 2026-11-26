@@ -97,11 +97,12 @@
             # NOTE: Neovim is only (re)installed when the installed version differs from the latest
             #       release. Previously every run deleted /opt/nvim-* and re-extracted it, and because the
             #       `latest` archive was cached in /tmp, it never actually upgraded once downloaded.
-            - name: Get latest Neovim release
-              ansible.builtin.uri:
-                url: https://api.github.com/repos/neovim/neovim/releases/latest
-                return_content: true
-              register: install_lazyvim_nvim_release
+            # NOTE: "Latest" is the newest release older than the supply-chain cutoff (see the playbook). The
+            #       helper skips Neovim's `stable` and `nightly` releases, which aren't version tags.
+            - name: Find the newest Neovim release older than the supply-chain cutoff
+              ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
+              vars:
+                resolve_github_release_repo: neovim/neovim
 
             - name: Check installed Neovim version
               ansible.builtin.command:
@@ -112,16 +113,19 @@
 
             - name: Set whether Neovim needs (re)installing
               ansible.builtin.set_fact:
-                install_lazyvim_nvim_version: "{{ install_lazyvim_nvim_release.json.tag_name }}"
+                install_lazyvim_nvim_version: "{{ resolved_github_release.tag_name }}"
+                install_lazyvim_nvim_asset: >-
+                  {{ resolved_github_release.assets | selectattr('name', 'equalto', install_lazyvim_nvim_archive_name) | first }}
                 install_lazyvim_nvim_needs_install: >-
                   {{ (install_lazyvim_nvim_installed_version.stdout_lines | default([]) | first | default(''))
-                     != 'NVIM ' ~ install_lazyvim_nvim_release.json.tag_name }}
+                     != 'NVIM ' ~ resolved_github_release.tag_name }}
 
             - name: Download Neovim archive
               when: install_lazyvim_nvim_needs_install
               ansible.builtin.get_url:
-                url: "https://github.com/neovim/neovim/releases/download/{{ install_lazyvim_nvim_version }}/{{ install_lazyvim_nvim_archive_name }}"
+                url: "{{ install_lazyvim_nvim_asset.browser_download_url }}"
                 dest: "/tmp/{{ install_lazyvim_nvim_archive_name }}"
+                checksum: "{{ install_lazyvim_nvim_asset.digest }}"
                 mode: "0644"
                 force: true
 
@@ -393,6 +397,8 @@
               ansible.builtin.get_url:
                 url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
                 dest: "/tmp/CascadiaCode.tar.gz"
+                # NOTE: This release predates GitHub's asset digests, so its checksum is kept here.
+                checksum: sha256:d21d11c3703287663d5c5e72b3f75269fd8adc9f87f03c091b6c71805094bf2e
                 mode: "0644"
               register: install_lazyvim_download
               notify:
