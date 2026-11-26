@@ -35,9 +35,8 @@ jobs:
           python-version: "3.14"
 
       - name: Install Ansible and ansible-lint
-        env:
-          PIP_UPLOADED_PRIOR_TO: P7D
         run: |
+          export PIP_UPLOADED_PRIOR_TO="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)"
           python -m pip install --upgrade pip
           python -m pip install -r .github/ci/requirements.txt
 
