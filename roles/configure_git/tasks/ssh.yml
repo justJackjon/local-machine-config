@@ -78,9 +78,14 @@
   register: configure_git_remote_ssh_keys
   changed_when: false
 
+# NOTE: GitHub returns keys as '<type> <base64>' without the comment, while the local .pub file ends
+#       with a comment (the email), so the whole line never matched and every run re-added the key.
+#       Compare only the first two fields.
 - name: Set fact if SSH key is already on GitHub
   ansible.builtin.set_fact:
-    configure_git_is_ssh_key_already_on_github: "{{ (configure_git_ssh_public_key.content | b64decode) in configure_git_remote_ssh_keys.stdout_lines }}"
+    configure_git_is_ssh_key_already_on_github: >-
+      {{ ((configure_git_ssh_public_key.content | b64decode).split()[:2] | join(' '))
+         in (configure_git_remote_ssh_keys.stdout_lines | map('trim') | list) }}
 
 - name: Add SSH key to GitHub
   ansible.builtin.shell: |
@@ -90,7 +95,9 @@
     executable: /bin/bash
   register: configure_git_add_ssh_key_result
   when: not configure_git_is_ssh_key_already_on_github
-  changed_when: configure_git_add_ssh_key_result.rc == 0
+  changed_when:
+    - configure_git_add_ssh_key_result.rc == 0
+    - "'already exist' not in (configure_git_add_ssh_key_result.stdout ~ configure_git_add_ssh_key_result.stderr)"
   failed_when:
     - configure_git_add_ssh_key_result.rc != 0
     - "'already exist' not in configure_git_add_ssh_key_result.stderr"
