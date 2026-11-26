@@ -173,7 +173,6 @@
           ansible.builtin.apt:
             name: gh
             state: latest
-            update_cache: "{{ install_base_packages_gh_repository is changed }}"
             update_cache: true
 
     - name: Install lazygit
