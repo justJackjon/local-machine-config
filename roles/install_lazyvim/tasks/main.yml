@@ -94,23 +94,55 @@
                 install_lazyvim_nvim_archive_name: "nvim-linux-{{ install_lazyvim_nvim_arch }}.tar.gz"
                 install_lazyvim_nvim_dir_name: "nvim-linux-{{ install_lazyvim_nvim_arch }}"
 
+            # NOTE: Neovim is only (re)installed when the installed version differs from the latest
+            #       release. Previously every run deleted /opt/nvim-* and re-extracted it, and because the
+            #       `latest` archive was cached in /tmp, it never actually upgraded once downloaded.
+            - name: Get latest Neovim release
+              ansible.builtin.uri:
+                url: https://api.github.com/repos/neovim/neovim/releases/latest
+                return_content: true
+              register: install_lazyvim_nvim_release
+
+            - name: Check installed Neovim version
+              ansible.builtin.command:
+                argv: ["/opt/{{ install_lazyvim_nvim_dir_name }}/bin/nvim", --version]
+              register: install_lazyvim_nvim_installed_version
+              changed_when: false
+              failed_when: false
+
+            - name: Set whether Neovim needs (re)installing
+              ansible.builtin.set_fact:
+                install_lazyvim_nvim_version: "{{ install_lazyvim_nvim_release.json.tag_name }}"
+                install_lazyvim_nvim_needs_install: >-
+                  {{ (install_lazyvim_nvim_installed_version.stdout_lines | default([]) | first | default(''))
+                     != 'NVIM ' ~ install_lazyvim_nvim_release.json.tag_name }}
+
             - name: Download Neovim archive
+              when: install_lazyvim_nvim_needs_install
               ansible.builtin.get_url:
-                url: "https://github.com/neovim/neovim/releases/latest/download/{{ install_lazyvim_nvim_archive_name }}"
+                url: "https://github.com/neovim/neovim/releases/download/{{ install_lazyvim_nvim_version }}/{{ install_lazyvim_nvim_archive_name }}"
                 dest: "/tmp/{{ install_lazyvim_nvim_archive_name }}"
                 mode: "0644"
+                force: true
 
             - name: Remove existing Neovim directory
+              when: install_lazyvim_nvim_needs_install
               ansible.builtin.file:
                 path: "/opt/{{ install_lazyvim_nvim_dir_name }}"
                 state: absent
 
             - name: Unarchive Neovim
+              when: install_lazyvim_nvim_needs_install
               ansible.builtin.unarchive:
                 src: "/tmp/{{ install_lazyvim_nvim_archive_name }}"
                 dest: /opt
                 remote_src: true
-                creates: "/opt/{{ install_lazyvim_nvim_dir_name }}/bin/nvim"
+
+            - name: Remove Neovim archive
+              when: install_lazyvim_nvim_needs_install
+              ansible.builtin.file:
+                path: "/tmp/{{ install_lazyvim_nvim_archive_name }}"
+                state: absent
 
             - name: Create symbolic link
               ansible.builtin.file:
@@ -148,9 +180,12 @@
         - name: Install pynvim for Python provider (Debian)
           when: is_debian_family
           become: true
+          # NOTE: python3-pynvim *recommends* the apt `neovim` package. Installing recommends pulled it in,
+          #       and the "Remove existing neovim package" task removed it again on the next run.
           ansible.builtin.apt:
             name: python3-pynvim
             state: latest
+            install_recommends: false
 
         - name: Install pynvim for Python provider (Mac)
           when: is_mac
@@ -170,11 +205,14 @@
             quiet: true
 
         - name: Install neovim for Node.js provider (Unix)
-          ansible.builtin.command: "{{ resolved_pnpm_executable_path }} add -g neovim"
-          changed_when: false
-          environment:
-            PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
-            PATH: "{{ install_lazyvim_pnpm_home_dir }}:{{ install_lazyvim_pnpm_home_dir }}/bin:{{ install_lazyvim_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
+          ansible.builtin.include_tasks: ../../../common/tasks/install_pnpm_global_packages.yml
+          vars:
+            pnpm_global_executable: "{{ resolved_pnpm_executable_path }}"
+            pnpm_global_environment:
+              PNPM_HOME: "{{ install_lazyvim_pnpm_home_dir }}"
+              PATH: "{{ install_lazyvim_pnpm_home_dir }}/bin:{{ install_lazyvim_pnpm_home_dir }}:{{ install_lazyvim_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
+            pnpm_global_packages:
+              - name: neovim
 
     - name: Set pnpm executable path fact (Windows)
       when: is_windows
@@ -186,14 +224,16 @@
 
     - name: Install neovim for Node.js provider (Windows)
       when: is_windows
-      ansible.builtin.command:
-        cmd: "\"{{ install_lazyvim_pnpm_executable_path }}\" add -g neovim"
-      changed_when: false
-      environment:
-        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
-        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
-        PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
-        PATH: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm:{{ ansible_facts.env.PATH }}"
+      ansible.builtin.include_tasks: ../../../common/tasks/install_pnpm_global_packages.yml
+      vars:
+        pnpm_global_executable: "{{ install_lazyvim_pnpm_executable_path }}"
+        pnpm_global_environment:
+          HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+          USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+          PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
+          PATH: "{{ install_lazyvim_win_home_dir }}/AppData/Local/pnpm:{{ ansible_facts.env.PATH }}"
+        pnpm_global_packages:
+          - name: neovim
 
     # NOTE: The LazyVim starter is only installed when the Neovim config is not already a LazyVim config
     #       (identified by the starter's 'lua/config/lazy.lua'). A missing config gets the starter; a non-LazyVim
@@ -340,7 +380,15 @@
         - name: Install Nerd Font on Debian
           when: is_debian_family
           block:
+            # NOTE: The archive is deleted by a handler after unpacking, so without this check every run
+            #       downloaded it again (and re-ran both handlers).
+            - name: Check if the Nerd Font is installed (Debian)
+              ansible.builtin.stat:
+                path: "{{ ansible_facts.env.HOME }}/.local/share/fonts/CaskaydiaCoveNerdFont-Regular.ttf"
+              register: install_lazyvim_nerd_font_stat
+
             - name: Install Nerd Font (Debian)
+              when: not install_lazyvim_nerd_font_stat.stat.exists
               check_mode: false
               ansible.builtin.get_url:
                 url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/CascadiaCode.tar.xz
@@ -358,6 +406,7 @@
                 mode: "0755"
 
             - name: Unarchive font
+              when: not install_lazyvim_nerd_font_stat.stat.exists
               ansible.builtin.unarchive:
                 src: "/tmp/CascadiaCode.tar.gz"
                 dest: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
@@ -397,7 +446,7 @@
               return true
             end tell'
           register: install_lazyvim_terminal_font_check
-          changed_when: install_lazyvim_terminal_font_check.stdout != "true"
+          changed_when: false
 
         - name: Set font for all Terminal profiles
           when: install_lazyvim_terminal_font_check.stdout != "true"
@@ -408,19 +457,23 @@
                   set font size of profileName to 14
               end repeat
             end tell'
-          changed_when: install_lazyvim_terminal_font_check.stdout != "true"
+          changed_when: true
 
-        - name: Configure MINTTY to use Nerd Font on Windows
-          when: is_windows
-          block:
-            - name: Ensure .minttyrc file exists
-              ansible.builtin.file:
-                path: "{{ install_lazyvim_minttyrc_file }}"
-                state: touch
-                mode: "0644"
+    # NOTE: This block used to be nested inside the macOS-only block above, so it never ran on Windows.
+    - name: Configure MINTTY to use Nerd Font on Windows
+      when: is_windows
+      block:
+        # NOTE: Preserving the timestamps makes `touch` a no-op (not `changed`) when the file exists.
+        - name: Ensure .minttyrc file exists
+          ansible.builtin.file:
+            path: "{{ install_lazyvim_minttyrc_file }}"
+            state: touch
+            mode: "0644"
+            access_time: preserve
+            modification_time: preserve
 
-            - name: Update .minttyrc to use Nerd Font
-              ansible.builtin.lineinfile:
-                path: "{{ install_lazyvim_minttyrc_file }}"
-                regexp: "^Font="
-                line: "Font=CaskaydiaCove Nerd Font"
+        - name: Update .minttyrc to use Nerd Font
+          ansible.builtin.lineinfile:
+            path: "{{ install_lazyvim_minttyrc_file }}"
+            regexp: "^Font="
+            line: "Font=CaskaydiaCove Nerd Font"
