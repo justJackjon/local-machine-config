@@ -121,6 +121,23 @@
             create: true
             mode: "0644"
 
+        # NOTE: keychain alone is not enough. An XFCE session (e.g. WSL2 over XRDP) starts its own, empty
+        #       ssh-agent, and every terminal in the session inherits its SSH_AUTH_SOCK. Without an IdentityFile,
+        #       ssh then only tries the default key names (~/.ssh/id_ed25519, ...), never the ansible-managed
+        #       key, and GitHub denies it (`Permission denied (publickey)`). With this block ssh always offers
+        #       the right key; if the current agent lacks it, ssh asks for the passphrase once and adds it
+        #       (AddKeysToAgent). Found and verified in WSL2 Ubuntu (Nov 2026).
+        - name: Configure SSH config for GitHub to use ansible-managed key on Linux
+          ansible.builtin.include_tasks: ../../../common/tasks/manage_ssh_config_entry.yml
+          vars:
+            ssh_config_host: "github.com"
+            ssh_config_marker: "# {mark} ANSIBLE MANAGED BLOCK FOR GITHUB"
+            ssh_config_block: |
+              Host github.com
+                AddKeysToAgent yes
+                IdentitiesOnly yes
+                IdentityFile {{ configure_git_ssh_key_path }}
+
     - name: MacOS-specific ssh_config setup
       when: is_mac
       block:
