@@ -99,11 +99,14 @@
       #       repository. Immediately after, 'git restore .' is used to revert these changes
       #       in the .dotfiles repository, ensuring that the repository remains clean and
       #       reflects only the intended dotfiles from the origin.
-      stow */ --adopt
+      # NOTE: -v makes stow print an `MV:`/`LINK:`/`UNLINK:` line (on stderr) for every action it takes,
+      #       and nothing when everything is already stowed, which drives `changed_when` below.
+      stow -v */ --adopt
       "{{ stow_dotfiles_git_executable | default('git') }}" restore .
   args:
     chdir: "{{ stow_dotfiles_repo_path }}"
-  changed_when: true
+  register: stow_dotfiles_stow_result
+  changed_when: (stow_dotfiles_stow_result.stdout ~ '\n' ~ stow_dotfiles_stow_result.stderr) is search('(?m)^(MV|LINK|UNLINK):')
 
 - name: Unstash local changes # noqa: command-instead-of-module
   # NOTE: The ansible.builtin.git module does not support `git stash pop`,
