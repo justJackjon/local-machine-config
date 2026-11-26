@@ -38,6 +38,7 @@ local-machine-config/
 │       ├── backup_directory.yml         # Safe file/folder backup helper (.bak)
 │       ├── install_scoop_package.yml    # Robust Windows Scoop installer & soft-repair
 │       ├── manage_ssh_config_entry.yml  # Idempotent ~/.ssh/config blockinfile manager
+│       ├── install_pnpm_global_packages.yml # Idempotent pnpm global installs/updates (all platforms)
 │       ├── resolve_pnpm_executable.yml  # Finds a working pnpm on Linux/macOS (layout varies by version)
 │       ├── set_os_facts.yml             # Discovers is_debian_family, is_mac, is_windows, is_wsl
 │       ├── set_python_interpreter.yml   # Resolves Python interpreter & venv per platform
@@ -152,7 +153,7 @@ The playbook does **not** install WSL itself; it only configures a WSL distro wh
 - **Windows:** Pacman packages in MSYS2, Scoop packages (`gh`, `neovim`, `lazygit`, `alacritty`, `cascadiacode-nf`, `fzf`, `ripgrep`, `fd`, `luarocks`, `sqlite`, `tealdeer`, `perl`, `starship`), removes conflicting Node installations from `C:\Program Files\nodejs`, installs AutoHotkey v1.1 via GitHub releases.
   - **nvm-windows:** Installed per-user from the official GitHub release installer (checksum-verified) into `%LOCALAPPDATA%\Author Software\nvm`, not via Scoop: nvm 2.x reports running from any other location as unsupported (`NVM4101`). Node.js versions live under `...\nvm\installs`. The path contains a space, so quote it in `command` tasks.
   - **Node.js & pnpm:** nvm-windows 2.x runs in shim mode. Its proxy shims (`%LOCALAPPDATA%\Author Software\nvm\.nodejs`) are added to the user PATH by the playbook, along with pnpm's global bin directory (`%LOCALAPPDATA%\pnpm`). pnpm is installed into the active Node.js version via npm (and listed in nvm's `auto_installed_modules`) rather than via Scoop. Roles invoke pnpm via the absolute, quoted shim path `.../nvm/.nodejs/pnpm.exe`, never `scoop which pnpm`.
-- **All platforms:** Installs the Rafter CLI (`@rafter-security/cli`, exposing `rafter`) globally via pnpm — the local command-safety layer invoked by AI agent guard hooks.
+- **All platforms:** Installs pnpm global packages listed in `defaults/main.yml` (`install_base_packages_pnpm_global_packages`: `neovim`, `tree-sitter-cli` with its build script allowed, and the Rafter CLI (`@rafter-security/cli`, exposing `rafter`), the local command-safety layer invoked by AI agent guard hooks) via `common/tasks/install_pnpm_global_packages.yml`, which installs missing packages and updates outdated ones.
 
 ### `configure_mcp_servers`
 - Installs the Claude Code CLI (`claude`) and Antigravity CLI (`agy`) with their vendors' official install scripts if missing. On Windows they live in `%USERPROFILE%\.local\bin` and `%LOCALAPPDATA%\agy\bin`, which `install_base_packages` adds to the user PATH; the role always calls them by absolute path.
@@ -277,5 +278,14 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 ### `install_lazyvim` used to replace the Neovim config on every run
 - It backed up and re-cloned the starter unconditionally. On Linux/macOS the shared `backup_directory.yml` also deleted the previous fixed-name `.bak` first, and passed `~` paths to `ansible.builtin.command` (no shell, so `~` was never expanded and `mv` failed silently). Now gated on `lua/config/lazy.lua`, with timestamped backups and expanded paths. Verified on Windows (existing config untouched; fresh install clones the starter). The Linux/macOS backup path is fixed *by analogy* and not yet run there.
 
-### Not yet idempotent (pre-existing)
-- `configure_msys2 : Ensure .minttyrc file exists`, `Install AutoHotkey v1.1 silently` and `configure_git : Add SSH key to GitHub` report `changed` on every run without changing anything.
+### Tasks that reported `changed` on every run (fixed)
+A second run should report only real changes (apt upgrades, new package versions, and so on). These used to report `changed` on every run, and are worth knowing as patterns to avoid:
+- **`community.general.pnpm` with `global: true`** reinstalled everything, because pnpm >= 11 has no global `pnpm-lock.yaml`. Use `common/tasks/install_pnpm_global_packages.yml`, which compares `pnpm list -g --json` and `pnpm outdated -g --format json` (exits 1 when anything is outdated). Verified in WSL2 and on Windows.
+- **Download → install → delete the download** (Chrome `.deb`, Nerd Font archive) re-downloads on every run. Check the installed state first (`dpkg-query`, a stat of an installed file). Verified in WSL2.
+- **"Remove, then unpack"** (`/opt/nvim-*`) rebuilds every run. Compare the installed version with the release tag instead. Verified in WSL2. A `get_url` of a `latest` URL to a fixed `dest` also never re-downloads, so it never upgraded.
+- **apt recommends:** `python3-pynvim` recommends apt `neovim`, which `install_lazyvim` removes in favour of the release tarball. So the two tasks undid each other across runs. Install it with `install_recommends: false`. Verified in WSL2.
+- **`creates:` with `changed_when: rc == 0`** (AutoHotkey): a `creates` skip still has rc 0. Gate with a stat and `when:` instead. Windows, applied by reading the code.
+- **`file: state=touch`** (`.minttyrc`) always updates timestamps. Add `access_time: preserve` and `modification_time: preserve`. Verified on Windows.
+- **SSH key comparison:** GitHub's `user/keys` returns `<type> <base64>` without the comment, so compare only the first two fields of the local `.pub`. Verified the comparison in WSL2.
+- **`stow --adopt`** had `changed_when: true`. `stow -v` prints `MV:`/`LINK:`/`UNLINK:` lines (stderr) only when it acts. Verified in a sandbox in WSL2.
+- **`install_lazyvim`'s Windows MINTTY font block** was nested inside the macOS-only block, so it never ran. It now runs on Windows.
