@@ -310,6 +310,13 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - **Verified:** the ini edits are idempotent (tested on a copy), and Alacritty 0.17 loads the bindings with no config errors (a bad key name is reported, so the check works). **Not yet verified over an RDP connection**: the `options` key and the bindings need a real session.
 - **Windows:** `alacritty.exe` is added to Kinto's `terminals` and `posix` groups. Upstream Kinto doesn't list it, so Alacritty got GUI mappings (Cmd+C interrupted).
 
+### `gh` logins on one machine revoked the other's token
+- **Symptom:** Windows and WSL took turns failing pre-flight with `gh CLI is not authenticated` (`gh auth status`: HTTP 401, token invalid). Each failed after the other one logged in.
+- **Likely cause (not confirmed):** GitHub keeps at most 10 OAuth tokens per user, app and scope set, and revokes the oldest. `install.sh` and `install.ps1` ran `gh auth login` on every run, creating a new token each time.
+- **Fix:** both installers skip the login when `gh auth status -h github.com` succeeds and lists `admin:public_key` and `admin:gpg_key` (the same test as `pre_flight_checks`). `install.sh` also no longer kills Chrome when it skips the login. Verified in bash and PowerShell with a logged-in config and an empty `GH_CONFIG_DIR`.
+- **Reusing a token in WSL:** `/mnt/c/Users/<user>/scoop/shims/gh.exe auth token </dev/null | gh auth login -h github.com --with-token`. Without `</dev/null`, the Windows `gh.exe` waits on the terminal and the pipeline hangs.
+- **`install.sh` and the gh apt source:** once the playbook has written `github-cli.sources`, `install.sh` only upgrades gh instead of adding `github-cli.list` again (which apt reports as a duplicate source).
+
 ### Prompts appeared only after typing the answer (`install.sh`, Linux/macOS)
 - **Symptom:** the Home Assistant URL prompt waited for input before its question was shown.
 - **Cause:** `install.sh` sends all output through `tee` to its log, so Ansible's stdout was a pipe and a `pause` prompt without a trailing newline stayed buffered.

@@ -164,13 +164,24 @@ function Install-Dependencies {
       Write-Host "GitHub CLI is already installed."
     }
 
-    Write-Info "Authenticating gh CLI (user interaction required)..."
-    gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key | Out-Host
+    # NOTE: Every `gh auth login` creates a new OAuth token. GitHub keeps at most 10 per user, app and
+    #       scope set and revokes the oldest, so logging in on every run eventually revoked the token
+    #       on another machine (Windows and WSL took turns failing with HTTP 401). Skip the login when
+    #       gh already has the scopes the playbook's pre-flight checks require.
+    $ghStatus = (& gh auth status -h github.com 2>&1 | Out-String)
+    $ghStatusExitCode = $LASTEXITCODE
 
-    if ($LASTEXITCODE -eq 0) {
-      Write-Info "gh CLI authentication complete."
+    if ($ghStatusExitCode -eq 0 -and $ghStatus -match 'admin:public_key' -and $ghStatus -match 'admin:gpg_key') {
+      Write-Info "gh CLI is already authenticated with the required scopes. Skipping login."
     } else {
-      Write-WarningMsg "gh CLI authentication failed. You may need to run 'gh auth login' manually."
+      Write-Info "Authenticating gh CLI (user interaction required)..."
+      gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key | Out-Host
+
+      if ($LASTEXITCODE -eq 0) {
+        Write-Info "gh CLI authentication complete."
+      } else {
+        Write-WarningMsg "gh CLI authentication failed. You may need to run 'gh auth login' manually."
+      }
     }
 
     try {

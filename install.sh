@@ -61,6 +61,16 @@ pause_and_exit() {
 
 trap pause_and_exit EXIT
 
+# Succeeds when gh is logged in with the scopes the playbook's pre-flight checks require.
+# NOTE: Every `gh auth login` creates a new OAuth token. GitHub keeps at most 10 per user, app and
+#       scope set and revokes the oldest, so logging in on every run eventually revoked the token
+#       on another machine (Windows and WSL took turns failing with HTTP 401).
+gh_has_required_auth() {
+  local status
+  status=$(gh auth status -h github.com 2>&1) || return 1
+  [[ "$status" == *"admin:public_key"* && "$status" == *"admin:gpg_key"* ]]
+}
+
 # Run the playbook on the original terminal rather than through tee.
 # NOTE: When Ansible's stdout is a pipe, a prompt without a trailing newline (the `pause` prompts for
 #       the Home Assistant URL and token) stays buffered, so the playbook waits for input before the
@@ -101,6 +111,12 @@ if [ "$os" == "Linux" ]; then
     sudo update-alternatives --set sudo /usr/bin/sudo.ws || true
   fi
 
+  # NOTE: The playbook manages the gh repository as /etc/apt/sources.list.d/github-cli.sources (deb822)
+  #       and removes github-cli.list. Once that exists, adding the .list again would duplicate the source.
+  if [ -f /etc/apt/sources.list.d/github-cli.sources ]; then
+    info "GitHub CLI apt repository already configured by the playbook. Upgrading gh..."
+    sudo apt-get install -y --only-upgrade gh || sudo apt-get install -y gh
+  else
   info "Installing latest gh cli..."
   (type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
 	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
@@ -111,20 +127,25 @@ if [ "$os" == "Linux" ]; then
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
 	&& sudo apt update \
 	&& sudo apt install gh -y
+  fi
 
   info "Installing Ansible collections..."
   "$HOME/.local/bin/ansible-galaxy" collection install community.general ansible.windows community.crypto community.windows
 
-  info "Killing any running Chrome processes to ensure a clean browser session for authentication..."
-  pkill -f "[c]hrome" || true
-
-  info "Authenticating gh CLI (user interaction required)..."
   # NOTE: Check gh version for conditional flags
   GH_VERSION=$(gh --version | head -n 1 | cut -d ' ' -f 3)
-  if printf '%s\n' "2.48.0" "$GH_VERSION" | sort -V -C; then
+  if gh_has_required_auth; then
+    info "gh CLI is already authenticated with the required scopes. Skipping login."
+  elif printf '%s\n' "2.48.0" "$GH_VERSION" | sort -V -C; then
+    info "Killing any running Chrome processes to ensure a clean browser session for authentication..."
+    pkill -f "[c]hrome" || true
+    info "Authenticating gh CLI (user interaction required)..."
     # NOTE: The gh version is 2.48.0 or higher, use --skip-ssh-key...
     gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
   else
+    info "Killing any running Chrome processes to ensure a clean browser session for authentication..."
+    pkill -f "[c]hrome" || true
+    info "Authenticating gh CLI (user interaction required)..."
     # NOTE: The gh version is older, --git-protocol and --skip-ssh-key flags not available.
     #       The --clipboard flag is also only available in gh 2.79.0 or higher, see: https://github.com/cli/cli/releases/tag/v2.79.0
     warning "When prompted to 'Generate a new SSH key to add to your GitHub account?', please answer 'n'. Ansible will handle SSH key generation."
@@ -147,8 +168,12 @@ elif [ "$os" == "macOS" ]; then
   brew install git ansible gh
   ansible-galaxy collection install community.general ansible.windows community.crypto community.windows
 
-  info "Authenticating gh CLI (user interaction required)..."
-  gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
+  if gh_has_required_auth; then
+    info "gh CLI is already authenticated with the required scopes. Skipping login."
+  else
+    info "Authenticating gh CLI (user interaction required)..."
+    gh auth login --web --clipboard --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key
+  fi
 
 elif [ "$os" == "Windows" ]; then
   if [ -n "$MSYSTEM" ]; then
@@ -164,7 +189,9 @@ elif [ "$os" == "Windows" ]; then
     exit 1
   fi
 
-  if command -v gh &>/dev/null; then
+  if command -v gh &>/dev/null && gh_has_required_auth; then
+    info "gh CLI is already authenticated with the required scopes. Skipping login."
+  elif command -v gh &>/dev/null; then
     info "Authenticating gh CLI..."
     gh auth login --web --git-protocol ssh -h github.com -s public_repo,admin:public_key,admin:gpg_key --skip-ssh-key || true
   fi
