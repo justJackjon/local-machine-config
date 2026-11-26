@@ -36,6 +36,7 @@ local-machine-config/
 ├── common/                   # Shared tasks included across roles and playbooks
 │   └── tasks/
 │       ├── backup_directory.yml         # Safe file/folder backup helper (.bak)
+│       ├── check_apt_sources.yml        # Runs apt-get update, fails with the broken repos and how to fix them
 │       ├── install_scoop_package.yml    # Robust Windows Scoop installer & soft-repair
 │       ├── manage_ssh_config_entry.yml  # Idempotent ~/.ssh/config blockinfile manager
 │       ├── install_pnpm_global_packages.yml # Idempotent pnpm global installs/updates (all platforms)
@@ -362,6 +363,11 @@ These passed on a fresh machine but failed on one the playbook had set up before
 - **Symptom:** `Install python3-venv package on Debian-like systems` failed with `/bin/sh: 1: /usr/bin/sudo.ws: not found`.
 - **Cause:** `set_python_interpreter.yml` chose `sudo.ws` when `'found' in sudo_ws_check.stdout`, which is also true for `not_found`. Only Ubuntu releases without sudo-rs (24.04 and earlier) lack `sudo.ws`, so it passed on 26.04.
 - **Fix:** compare the trimmed output exactly. Verified in WSL2 Ubuntu 24.04: the check runs and `ansible_become_exe` stays unset.
+
+### `Failed to update apt cache after 5 retries: ` with no reason
+- **Symptom:** `Install python3-venv package on Debian-like systems` retried five times and failed with an empty reason.
+- **Cause:** a repository the playbook doesn't manage (HashiCorp's, added by hand) had rotated its signing key (`NO_PUBKEY`). `apt-get update` only warns about it, but the apt module's cache update (python-apt) fails outright and drops the message.
+- **Fix:** `set_python_interpreter.yml` includes `common/tasks/check_apt_sources.yml` before its first apt task, which no longer updates the cache itself. It runs `apt-get update` once and, on any error or failed repository, stops with the errors, the sources files of the failing hosts, and how to fix them (re-download the vendor's key to its `signed-by` keyring, or delete the sources file). Fixing the repository is a one-off; the check costs one `apt-get update`. Verified in WSL2 Ubuntu 24.04 as root: a clean run, a `NO_PUBKEY` repository, a `Signed-By` conflict, and `--check` mode.
 
 ### Claude Code's update channel
 - `configure_mcp_servers` merges `configure_mcp_servers_claude_settings` (`autoUpdatesChannel: stable`) into `~/.claude/settings.json`, keeping the other settings and their order. A settings file that isn't valid JSON fails the run instead of being overwritten. Verified in WSL2 and on Windows (where it was `latest`).
