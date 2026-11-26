@@ -171,15 +171,19 @@
         # NOTE: This role used to delete `$PNPM_HOME/bin/pnpm` as a "circular shim" (a pnpm 10-era
         #       workaround). From pnpm 11 that file is pnpm's real launcher, so deleting it removed pnpm.
         #       The executable is now resolved instead (see common/tasks/resolve_pnpm_executable.yml).
+        # NOTE: nvm's default Node.js, not the first directory `find` lists: several versions are installed
+        #       once install_base_packages upgrades Node.js (see common/tasks/install_node_lts_nvm_sh.yml).
         - name: Find NVM Node bin directory (Unix)
-          ansible.builtin.shell: |
-            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
+          ansible.builtin.shell: source "$HOME/.nvm/nvm.sh" && dirname "$(nvm which default)"
+          args:
+            executable: /bin/bash
           register: install_lazyvim_nvm_node_bin_raw
           changed_when: false
+          failed_when: false
 
         - name: Set NVM Node bin fact (Unix)
           ansible.builtin.set_fact:
-            install_lazyvim_node_bin_dir: "{{ install_lazyvim_nvm_node_bin_raw.stdout | trim }}"
+            install_lazyvim_node_bin_dir: "{{ install_lazyvim_nvm_node_bin_raw.stdout | trim if install_lazyvim_nvm_node_bin_raw.rc == 0 else '' }}"
 
         - name: Install pynvim for Python provider (Debian)
           when: is_debian_family

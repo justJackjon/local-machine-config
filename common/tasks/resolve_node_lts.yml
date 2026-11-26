@@ -1,0 +1,27 @@
+---
+# Resolves the newest Node.js LTS release published before `supply_chain_release_cutoff` (see the
+# playbook's supply-chain NOTE) and sets `resolved_node_lts_version` (e.g. `v26.13.1`).
+#
+# NOTE: `nvm install --lts` would take the newest LTS release, however new. nodejs.org's release index lists
+#       every release with its date (`YYYY-MM-DD`) and LTS codename (`false` for Current releases), newest
+#       version first. nvm (nvm-sh and nvm-windows) checks the download against nodejs.org's SHASUMS256.txt.
+- name: Get the Node.js release index
+  ansible.builtin.uri:
+    url: https://nodejs.org/dist/index.json
+    return_content: true
+  register: resolve_node_lts_index
+
+- name: Select the newest Node.js LTS release older than the supply-chain cutoff
+  ansible.builtin.set_fact:
+    resolved_node_lts_version: >-
+      {{ resolve_node_lts_index.json
+         | selectattr('lts')
+         | selectattr('date', 'le', supply_chain_release_cutoff[:10])
+         | map(attribute='version')
+         | first | default('') }}
+
+- name: Fail if no Node.js LTS release is old enough
+  ansible.builtin.assert:
+    that: resolved_node_lts_version is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: No Node.js LTS release is older than the supply-chain cutoff ({{ supply_chain_release_cutoff }}).
+    quiet: true

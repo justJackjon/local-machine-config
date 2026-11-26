@@ -281,41 +281,84 @@
             version: "{{ install_base_packages_fzf_version }}"
             depth: 1
 
+        # NOTE: fzf's installer downloads the release binary itself, without checking it. It skips the
+        #       download when ~/.fzf/bin/fzf already reports the right version, so the binary is put there
+        #       first, downloaded with GitHub's digest for the asset.
+        - name: Set fzf binary asset fact
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.set_fact:
+            install_base_packages_fzf_asset: >-
+              {{ resolved_github_release.assets
+                 | selectattr('name', 'equalto', 'fzf-' ~ (install_base_packages_fzf_version | regex_replace('^v', ''))
+                              ~ '-linux_' ~ ('arm64' if (is_arm64 | default(false)) else 'amd64') ~ '.tar.gz')
+                 | first }}
+
+        - name: Download the fzf binary
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.get_url:
+            url: "{{ install_base_packages_fzf_asset.browser_download_url }}"
+            dest: /tmp/fzf.tar.gz
+            checksum: "{{ install_base_packages_fzf_asset.digest }}"
+            mode: "0644"
+
+        - name: Ensure the fzf bin directory exists
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.fzf/bin"
+            state: directory
+            mode: "0755"
+
+        - name: Unarchive the fzf binary
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.unarchive:
+            src: /tmp/fzf.tar.gz
+            dest: "{{ ansible_facts.env.HOME }}/.fzf/bin"
+            remote_src: true
+
+        # NOTE: The binary above makes this stat pass for a fresh clone, so the installer is run whenever fzf
+        #       was (re)cloned, too: it also writes the shell integration (~/.fzf.bash).
         - name: Check if the fzf binary is installed
           ansible.builtin.stat:
             path: "{{ ansible_facts.env.HOME }}/.fzf/bin/fzf"
           register: install_base_packages_fzf_binary_stat
 
         - name: Run fzf install script
-          when: not install_base_packages_fzf_binary_stat.stat.exists
+          when: install_base_packages_fzf_needs_install or not install_base_packages_fzf_binary_stat.stat.exists
           ansible.builtin.command: "{{ ansible_facts.env.HOME }}/.fzf/install --all"
           changed_when: true
 
     - name: Install Starship
       block:
-        - name: Check if starship is installed
-          ansible.builtin.command: which starship
+        - name: Check the installed Starship version
+          ansible.builtin.command: starship --version
           register: install_base_packages_starship_check
           failed_when: false
           changed_when: false
 
         # NOTE: The installer would fetch the newest release; `--version` gives it the newest one older than
-        #       the supply-chain cutoff instead (see the playbook).
+        #       the supply-chain cutoff instead (see the playbook). An older installed Starship is upgraded
+        #       to it; a newer one is left alone.
         - name: Find the newest Starship release older than the supply-chain cutoff
-          when: install_base_packages_starship_check.rc != 0
           ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
           vars:
             resolve_github_release_repo: starship/starship
 
+        - name: Set whether Starship needs installing or upgrading
+          ansible.builtin.set_fact:
+            install_base_packages_starship_needs_install: >-
+              {{ install_base_packages_starship_check.rc != 0 or
+                 (install_base_packages_starship_check.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+') | default('0.0.0', true))
+                 is version(resolved_github_release.tag_name | regex_replace('^v', ''), '<') }}
+
         - name: Download Starship install script
-          when: install_base_packages_starship_check.rc != 0
+          when: install_base_packages_starship_needs_install
           ansible.builtin.get_url:
             url: https://starship.rs/install.sh
             dest: "/tmp/install_starship_{{ ansible_facts.user_id }}.sh"
             mode: "0755"
 
         - name: Run Starship install script
-          when: install_base_packages_starship_check.rc != 0
+          when: install_base_packages_starship_needs_install
           become: true
           ansible.builtin.command:
             argv:
@@ -328,8 +371,7 @@
     - name: Install nvm, node and pnpm
       block:
         # NOTE: Pinned to a release, and checked against a checksum kept in this repo, because tags can be moved.
-        # NOTE: Node.js itself is not age-gated: `nvm install --lts` takes the current LTS release from
-        #       nodejs.org and checks it against nodejs.org's SHASUMS256.txt.
+        #       nvm itself is never upgraded; bump the version and checksum here to update it.
         - name: Download nvm install script
           ansible.builtin.get_url:
             url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
@@ -342,22 +384,12 @@
           args:
             creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
-        - name: Install Node.js LTS
-          ansible.builtin.shell: >
-            set -o pipefail && source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh && nvm install --lts
-          args:
-            executable: /bin/bash
-            creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
-
-        - name: Find NVM Node bin directory
-          ansible.builtin.shell: |
-            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
-          register: install_base_packages_nvm_node_bin_raw
-          changed_when: false
+        - name: Install Node.js LTS and make it nvm's default
+          ansible.builtin.include_tasks: ../../../common/tasks/install_node_lts_nvm_sh.yml
 
         - name: Set NVM Node bin fact
           ansible.builtin.set_fact:
-            install_base_packages_node_bin_dir: "{{ install_base_packages_nvm_node_bin_raw.stdout | trim }}"
+            install_base_packages_node_bin_dir: "{{ installed_node_lts_bin_dir }}"
 
         # NOTE: The pnpm executable is resolved rather than hard-coded, because its location depends
         #       on the pnpm version (see common/tasks/resolve_pnpm_executable.yml).
@@ -482,12 +514,16 @@
         cmd: /usr/bin/pipx ensurepath
       changed_when: false
 
-    - name: Install pipx packages
-      ansible.builtin.command:
-        cmd: /usr/bin/pipx install {{ item }}
+    # NOTE: `pipx install` (used before) never upgrades an installed package. `state: latest` installs or
+    #       upgrades to the newest release pip's cooldown allows (PIP_UPLOADED_PRIOR_TO, set by the playbook).
+    #       Ansible itself is upgraded by install.sh, not here: replacing its venv mid-run could break the run.
+    - name: Install or upgrade pipx packages
+      community.general.pipx:
+        name: "{{ item }}"
+        state: latest
+        executable: /usr/bin/pipx
       environment:
         PATH: "{{ ansible_facts.env.HOME }}/.local/bin:{{ ansible_facts.env.PATH }}"
-      with_items:
+      loop:
         - ansible-lint
         - pynvim
-      changed_when: false

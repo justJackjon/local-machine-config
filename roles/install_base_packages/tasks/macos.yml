@@ -61,22 +61,12 @@
           args:
             creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
-        - name: Install Node.js LTS
-          ansible.builtin.shell: >
-            set -o pipefail && source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh && nvm install --lts
-          args:
-            executable: /bin/bash
-            creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
-
-        - name: Find NVM Node bin directory
-          ansible.builtin.shell: |
-            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
-          register: install_base_packages_nvm_node_bin_raw
-          changed_when: false
+        - name: Install Node.js LTS and make it nvm's default
+          ansible.builtin.include_tasks: ../../../common/tasks/install_node_lts_nvm_sh.yml
 
         - name: Set NVM Node bin fact
           ansible.builtin.set_fact:
-            install_base_packages_node_bin_dir: "{{ install_base_packages_nvm_node_bin_raw.stdout | trim }}"
+            install_base_packages_node_bin_dir: "{{ installed_node_lts_bin_dir }}"
 
     - name: Ensure pnpm global directory exists
       ansible.builtin.file:
