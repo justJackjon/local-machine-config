@@ -104,7 +104,15 @@ Always execute playbooks via `./run-playbook.sh`. The script inspects the runnin
 
 ### Running on Windows from PowerShell
 
-On Windows, Ansible runs inside MSYS2. To run commands from PowerShell:
+On Windows, Ansible runs inside MSYS2. From PowerShell, use the wrapper, which finds MSYS2's bash, sets up the same environment as `install.ps1` (inherited PATH, Ansible log in `%TEMP%`) and passes all arguments through:
+
+```powershell
+.\run-playbook.ps1
+.\run-playbook.ps1 --tags configure_keyboard
+.\run-playbook.ps1 --syntax-check
+```
+
+Running a local `.ps1` needs an execution policy that allows it (`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`). Without the wrapper:
 
 ```powershell
 # Using the Scoop-installed MSYS2 bash:
