@@ -121,7 +121,9 @@
               - --property
               - "/commands/custom/<Super>l"
           register: configure_keyboard_current_super_l_key_check
-          ignore_errors: true
+          # NOTE: xfconf-query exits non-zero when the property doesn't exist, which is the usual case once it
+          #       has been reset. `ignore_errors` printed that as a red `fatal: ... ...ignoring` on every run.
+          failed_when: false
           changed_when: false
 
         - name: Reset /commands/custom/<Super>l if it exists
@@ -400,19 +402,16 @@
               when: configure_keyboard_current_workspace_count.rc != 0 or configure_keyboard_current_workspace_count.stdout != "10"
               changed_when: true
 
-            - name: Execute XFCE4 workspace switching shortcut deletion script # noqa: line-length
-              ansible.builtin.command: bash "{{ role_path }}/files/{{ configure_keyboard_xfce4_shortcut_deletion_script_path }}"
-              register: configure_keyboard_xfce4_deletion_script_result
-              changed_when: >
-                configure_keyboard_xfce4_deletion_script_result.stdout | length > 0 or
-                configure_keyboard_xfce4_deletion_script_result.stderr | length > 0
-
-            - name: Execute XFCE4 workspace switching shortcut creation script # noqa: line-length
-              ansible.builtin.command: bash "{{ role_path }}/files/{{ configure_keyboard_xfce4_shortcut_creation_script_path }}"
-              register: configure_keyboard_xfce4_creation_script_result
-              changed_when: >
-                configure_keyboard_xfce4_creation_script_result.stdout | length > 0 or
-                configure_keyboard_xfce4_creation_script_result.stderr | length > 0
+            # NOTE: The script prints one line per shortcut it removes or sets, and nothing when they already
+            #       match, so `changed` is reported only for real changes. In check mode it only reports them.
+            - name: Sync XFCE4 workspace switching shortcuts
+              ansible.builtin.command:
+                argv: >-
+                  {{ ['bash', role_path ~ '/files/' ~ configure_keyboard_xfce4_shortcut_sync_script_path]
+                     + (['--check'] if ansible_check_mode else []) }}
+              check_mode: false
+              register: configure_keyboard_xfce4_shortcut_sync_result
+              changed_when: configure_keyboard_xfce4_shortcut_sync_result.stdout | length > 0
 
         - name: Configure MacOS workspace shortcuts
           when: is_mac
