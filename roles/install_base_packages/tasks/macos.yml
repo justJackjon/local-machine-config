@@ -81,32 +81,21 @@
         state: directory
         mode: "0755"
 
-    - name: Install pnpm packages
-      community.general.pnpm:
-        name: "{{ item }}"
-        global: true
-        state: latest
-      with_items:
-        - neovim
-        # NOTE: Rafter is the local command-safety layer used by AI agents (opencode/Claude
-        #       Code). Installing it globally puts `rafter` on PATH, which is what the agent
-        #       guard hooks invoke.
-        - "@rafter-security/cli"
-      environment:
-        PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
+    # NOTE: Applied by analogy from Linux/Windows; not yet run on macOS. pnpm itself comes from Homebrew,
+    #       which the resolver finds on PATH.
+    - name: Find the pnpm executable
+      ansible.builtin.include_tasks: ../../../common/tasks/resolve_pnpm_executable.yml
+      vars:
+        resolve_pnpm_node_bin_dir: "{{ install_base_packages_node_bin_dir }}"
 
-    # NOTE: pnpm >= 10 ignores lifecycle scripts by default, so tree-sitter-cli's install script
-    #       (which downloads the native `tree-sitter` binary) is skipped unless explicitly allowed
-    #       via `--allow-build`. Without this, nvim-treesitter fails with a `spawn ... ENOENT` error
-    #       when it tries to run the missing binary. The `community.general.pnpm` module has no
-    #       equivalent option, so we install it directly via the pnpm CLI instead.
-    - name: Install tree-sitter-cli with its build script allowed
-      ansible.builtin.command: pnpm add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest
-      environment:
-        PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
-        PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
-      changed_when: false
+    - name: Install pnpm packages
+      ansible.builtin.include_tasks: ../../../common/tasks/install_pnpm_global_packages.yml
+      vars:
+        pnpm_global_executable: "{{ resolved_pnpm_executable_path | default('pnpm', true) }}"
+        pnpm_global_environment:
+          PNPM_HOME: "{{ ansible_facts.env.HOME }}/.local/share/pnpm"
+          PATH: "{{ ansible_facts.env.HOME }}/.local/share/pnpm/bin:{{ ansible_facts.env.HOME }}/.local/share/pnpm:{{ install_base_packages_node_bin_dir | default('') }}:{{ ansible_facts.env.PATH }}"
+        pnpm_global_packages: "{{ install_base_packages_pnpm_global_packages }}"
 
     - name: Install pipx packages
       community.general.pipx:

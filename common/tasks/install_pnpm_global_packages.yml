@@ -1,0 +1,53 @@
+---
+# Installs pnpm global packages and updates any that are outdated. It reports `changed` only when
+# something was actually installed or updated. Works on Linux, macOS and Windows (MSYS2).
+#
+# Inputs:
+#   pnpm_global_executable  - path to the pnpm executable
+#   pnpm_global_packages    - list of {name: <package>, allow_build: <bool, optional>}
+#   pnpm_global_environment - environment for pnpm (e.g. PNPM_HOME, PATH); optional
+#
+# NOTE: community.general.pnpm is deliberately not used. With `global: true` its missing() check looks
+#       for a pnpm-lock.yaml in the global directory, which pnpm >= 11 no longer has (each global
+#       package gets its own directory). So it reinstalled every package and reported `changed` on
+#       every run. It also has no equivalent of `--allow-build`. Verified with pnpm 12.23.0 in WSL2
+#       Ubuntu and on Windows. Windows previously ran `pnpm add -g` on every run with `changed_when: false`.
+# NOTE: `allow_build` passes `--allow-build=<name>`. pnpm >= 10 skips lifecycle scripts by default, and
+#       some packages need theirs: tree-sitter-cli's downloads the native `tree-sitter` binary, and
+#       without it nvim-treesitter fails with `spawn ... ENOENT`.
+- name: List installed pnpm global packages
+  ansible.builtin.command:
+    argv: ["{{ pnpm_global_executable }}", list, -g, --json]
+  environment: "{{ pnpm_global_environment | default({}) }}"
+  register: pnpm_global_list_result
+  changed_when: false
+
+# NOTE: `pnpm outdated` exits 1 when it finds outdated packages.
+- name: List outdated pnpm global packages
+  ansible.builtin.command:
+    argv: ["{{ pnpm_global_executable }}", outdated, -g, --format, json]
+  environment: "{{ pnpm_global_environment | default({}) }}"
+  register: pnpm_global_outdated_result
+  changed_when: false
+  failed_when: pnpm_global_outdated_result.rc not in [0, 1]
+
+- name: Set installed and outdated pnpm global package facts
+  ansible.builtin.set_fact:
+    pnpm_global_installed_names: >-
+      {{ pnpm_global_list_result.stdout | default('[]', true) | from_json
+         | map(attribute='dependencies', default={}) | map('dict2items') | flatten(levels=1)
+         | map(attribute='key') | list }}
+    pnpm_global_outdated_names: "{{ pnpm_global_outdated_result.stdout | default('{}', true) | from_json | list }}"
+
+- name: Install or update pnpm global packages
+  when: item.name not in pnpm_global_installed_names or item.name in pnpm_global_outdated_names
+  ansible.builtin.command:
+    argv: >-
+      {{ [pnpm_global_executable, 'add', '-g']
+         + (['--allow-build=' ~ item.name] if item.allow_build | default(false) else [])
+         + [item.name ~ '@latest'] }}
+  environment: "{{ pnpm_global_environment | default({}) }}"
+  loop: "{{ pnpm_global_packages }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true

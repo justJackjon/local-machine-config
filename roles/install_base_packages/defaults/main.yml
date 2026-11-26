@@ -1,0 +1,12 @@
+---
+# pnpm global packages installed (and kept up to date) on every platform.
+# See common/tasks/install_pnpm_global_packages.yml for the item format.
+install_base_packages_pnpm_global_packages:
+  - name: neovim
+  # NOTE: Rafter is the local command-safety layer used by AI agents (opencode/Claude Code).
+  #       Installing it globally puts `rafter` on PATH, which is what the agent guard hooks invoke.
+  - name: "@rafter-security/cli"
+  # NOTE: tree-sitter-cli's install script downloads the native `tree-sitter` binary, which
+  #       nvim-treesitter needs; pnpm >= 10 only runs it when allowed.
+  - name: tree-sitter-cli
+    allow_build: true
