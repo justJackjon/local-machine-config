@@ -140,9 +140,31 @@ function Install-Dependencies {
     # NOTE: Disable download timeout in pacman to avoid timeouts on large packages or slow mirrors.
     & $msys2Shell -lc "grep -q '^DisableDownloadTimeout' /etc/pacman.conf || sed -i '/^\[options\]/a DisableDownloadTimeout' /etc/pacman.conf"
 
+    # NOTE: MSYS2 doesn't support partial upgrades. The playbook installs its pacman packages with
+    #       `state: latest`, which upgrades only those packages, so once MSYS2 had moved on (e.g. gcc-libs
+    #       split into libstdc++/cc-libs, gdb-multiarch pinned to the old gdb) the playbook failed with
+    #       "could not satisfy dependencies". So the whole system is upgraded here, on every run. It can't be
+    #       done by the playbook: Ansible itself is a pacman package, and a core update (msys2-runtime,
+    #       pacman) ends every MSYS2 process. The first run may only update the core, so it runs again, with
+    #       retries: MSYS2's mirrors rate-limit large upgrades (HTTP 429), and pacman then rolls the whole
+    #       transaction back. Downloaded packages stay cached, so each retry has less to fetch. The upgrade
+    #       uses a copy of pacman.conf without DisableDownloadTimeout (set above): with it, a stalled download
+    #       hung pacman indefinitely; without it, the download fails and the next attempt resumes it.
+    Write-Info "Upgrading MSYS2 packages..."
+    $pacmanSyu = "sed '/^DisableDownloadTimeout/d' /etc/pacman.conf > /tmp/pacman-syu.conf && pacman --config /tmp/pacman-syu.conf -Syu --noconfirm"
+    & $msys2Shell -lc $pacmanSyu | Out-Host
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+      & $msys2Shell -lc $pacmanSyu | Out-Host
+      if ($LASTEXITCODE -eq 0 -or $attempt -eq 5) { break }
+      Write-Host "pacman -Syu failed (attempt $attempt of 5); retrying in 30 seconds..."
+      Start-Sleep -Seconds 30
+    }
+    if ($LASTEXITCODE -ne 0) {
+      Write-ErrorMsg "Failed to upgrade MSYS2 packages (pacman -Syu)."
+    }
+
     if (-not $ansibleCheck) {
       Write-Info "Installing Ansible in MSYS2..."
-      & $msys2Shell -lc "pacman -Syu --noconfirm" | Out-Host
       & $msys2Shell -lc "pacman -S --noconfirm base-devel ansible" | Out-Host
     } else {
       Write-Host "Ansible is already installed in MSYS2."
