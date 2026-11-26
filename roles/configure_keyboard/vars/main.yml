@@ -15,6 +15,13 @@ configure_keyboard_xfce_xkb_variant: mac
 # Left Alt (Cmd) -> Ctrl, Left Ctrl -> Super, Left Win (Opt) -> Alt.
 configure_keyboard_xrdp_xkb_options: ctrl:swap_lalt_lctl_lwin
 
+# Kinto is downloaded at this upstream commit (master as of Jan 2024), not from the branch, so a push to
+# rbreaves/kinto can't change what runs here. To update, review the upstream changes and bump the commit
+# and the checksum of the Linux installer (`sha256sum` of install/linux.sh at that commit).
+configure_keyboard_kinto_commit: 4a3bfe79e2578dd85cb6ff2ebc5505f758c64ab6
+configure_keyboard_kinto_extracted_dir: "kinto-{{ configure_keyboard_kinto_commit }}"
+configure_keyboard_kinto_linux_installer_checksum: sha256:f2049ad3132fb016ca184db5f516523958ba35fa5be319872eea283f6613d795
+
 configure_keyboard_linux_kinto_config_path: "/home/{{ ansible_facts.user_id }}/.config/kinto/kinto.py"
 # NOTE: The following path is an assumption based on common application behavior on Windows.
 #       The actual path will be determined by Kinto's setup.py and Python's installation location.
