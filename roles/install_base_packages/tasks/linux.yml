@@ -514,16 +514,26 @@
         cmd: /usr/bin/pipx ensurepath
       changed_when: false
 
-    # NOTE: `pipx install` (used before) never upgrades an installed package. `state: latest` installs or
-    #       upgrades to the newest release pip's cooldown allows (PIP_UPLOADED_PRIOR_TO, set by the playbook).
+    # NOTE: `pipx install` alone never upgrades an installed package, so each package is installed if missing,
+    #       then upgraded to the newest release pip's cooldown allows (PIP_UPLOADED_PRIOR_TO, set by the playbook).
     #       Ansible itself is upgraded by install.sh, not here: replacing its venv mid-run could break the run.
-    - name: Install or upgrade pipx packages
-      community.general.pipx:
-        name: "{{ item }}"
-        state: latest
-        executable: /usr/bin/pipx
+    # NOTE: Not community.general.pipx: the version bundled with Ansible 14 requires pipx >= 1.7, but Ubuntu
+    #       24.04's apt pipx is 1.4.3. A newer pipx (e.g. `pipx install pipx`) would rewrite the venvs' metadata
+    #       in a format apt's pipx (used by install.sh) can't read, which breaks every pipx command.
+    - name: Install pipx packages
+      ansible.builtin.command:
+        argv: [/usr/bin/pipx, install, "{{ item }}"]
       environment:
         PATH: "{{ ansible_facts.env.HOME }}/.local/bin:{{ ansible_facts.env.PATH }}"
-      loop:
-        - ansible-lint
-        - pynvim
+      register: install_base_packages_pipx_install
+      changed_when: "'installed package' in install_base_packages_pipx_install.stdout"
+      loop: "{{ install_base_packages_pipx_packages }}"
+
+    - name: Upgrade pipx packages
+      ansible.builtin.command:
+        argv: [/usr/bin/pipx, upgrade, "{{ item }}"]
+      environment:
+        PATH: "{{ ansible_facts.env.HOME }}/.local/bin:{{ ansible_facts.env.PATH }}"
+      register: install_base_packages_pipx_upgrade
+      changed_when: "'upgraded package' in install_base_packages_pipx_upgrade.stdout"
+      loop: "{{ install_base_packages_pipx_packages }}"
