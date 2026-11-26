@@ -3,6 +3,27 @@
   connection: local
   gather_facts: false
 
+  # NOTE: Supply-chain cooldown. Packages and releases are only installed once they are at least
+  #       this many days old, which gives the community time to spot and pull a malicious or broken
+  #       release before it reaches this machine. Override it for a single run, e.g. to take an urgent
+  #       security fix: ./run-playbook.sh -e supply_chain_min_release_age_days=0
+  #       pip, pipx, npm and pnpm read the environment variables below (pip >= 26, npm >= 11.10,
+  #       pnpm >= 10.16; older versions ignore them). GitHub releases, crates and the pnpm installer are
+  #       resolved with the same cutoff (see common/tasks/resolve_github_release.yml). The variables are
+  #       set for the whole play, so tasks that pass their own `environment` still inherit them.
+  vars:
+    supply_chain_min_release_age_days: 7
+    # NOTE: The cutoff as a UTC ISO 8601 timestamp, which compares correctly as a string with GitHub's and
+    #       crates.io's timestamps. `now()` is local time, which `.timestamp()` converts correctly
+    #       (`now(utc=true)` would not). It is templated when used, so a `-e` override of the days applies.
+    supply_chain_release_cutoff: >-
+      {{ '%Y-%m-%dT%H:%M:%SZ' | strftime(second=(now().timestamp() - (supply_chain_min_release_age_days | int) * 86400) | int, utc=true) }}
+
+  environment:
+    PIP_UPLOADED_PRIOR_TO: "P{{ supply_chain_min_release_age_days | int }}D"
+    npm_config_min_release_age: "{{ supply_chain_min_release_age_days | int }}"
+    pnpm_config_minimum_release_age: "{{ (supply_chain_min_release_age_days | int) * 1440 }}"
+
   pre_tasks:
     - name: Set python interpreter
       ansible.builtin.include_tasks: ../common/tasks/set_python_interpreter.yml

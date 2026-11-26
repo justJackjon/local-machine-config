@@ -1,0 +1,43 @@
+---
+# Resolves the newest GitHub release of a repository published before `supply_chain_release_cutoff`
+# (`supply_chain_min_release_age_days` ago; both are set in the playbook, see its supply-chain NOTE),
+# and sets `resolved_github_release` to that release
+# (the GitHub API object: `tag_name`, `published_at`, `assets[]` with `name`, `browser_download_url`
+# and `digest`). Fails if no release is old enough.
+#
+# Inputs:
+#   resolve_github_release_repo      - "<owner>/<repo>"
+#   resolve_github_release_tag_regex - optional; tags to consider. The default skips non-version tags such
+#                                      as Neovim's `stable` and `nightly` releases.
+#
+# NOTE: `releases/latest` was used before. It returns a release the moment it is published, which is
+#       exactly the window in which a compromised release does its damage.
+# NOTE: GitHub has published a `sha256:<hex>` `digest` for every newly uploaded release asset since 2025.
+#       Pass it to get_url's `checksum` so a swapped asset fails the download. Older releases have no digest
+#       (`null`), so for those pin the checksum in the repo instead.
+- name: List releases of {{ resolve_github_release_repo }}
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ resolve_github_release_repo }}/releases?per_page=50"
+    headers:
+      Accept: application/vnd.github+json
+    return_content: true
+  register: resolve_github_release_list
+
+- name: Select the newest release old enough to install for {{ resolve_github_release_repo }}
+  ansible.builtin.set_fact:
+    resolved_github_release: >-
+      {{ resolve_github_release_list.json
+         | rejectattr('draft') | rejectattr('prerelease')
+         | selectattr('published_at', 'string')
+         | selectattr('tag_name', 'match', resolve_github_release_tag_regex | default('^v?[0-9]+(\.[0-9]+)*$'))
+         | selectattr('published_at', 'le', supply_chain_release_cutoff)
+         | sort(attribute='published_at', reverse=true)
+         | first | default({}) }}
+
+- name: Fail if no release is old enough for {{ resolve_github_release_repo }}
+  ansible.builtin.assert:
+    that: resolved_github_release.tag_name is defined
+    fail_msg: >-
+      No release of {{ resolve_github_release_repo }} is at least {{ supply_chain_min_release_age_days | default(7) }} days old
+      among the latest 50. Pass -e supply_chain_min_release_age_days=0 to install the newest release anyway.
+    quiet: true
