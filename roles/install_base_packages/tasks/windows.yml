@@ -453,17 +453,24 @@
         #       points to the official website, which is protected by Cloudflare and
         #       returns a 403 Forbidden error. Instead, we download the installer
         #       from the official GitHub releases.
+        # NOTE: An explicit check replaces `creates:`. A `creates` skip still returns rc 0, so with
+        #       `changed_when: rc == 0` the task reported `changed` on every run.
+        - name: Check if AutoHotkey v1.1 is installed
+          ansible.builtin.stat:
+            path: /c/Program Files/AutoHotkey/AutoHotkey.exe
+          register: install_base_packages_ahk_stat
+
         - name: Download AutoHotkey v1.1 installer
+          when: not install_base_packages_ahk_stat.stat.exists
           ansible.builtin.get_url:
             url: https://github.com/AutoHotkey/AutoHotkey/releases/download/v1.1.37.02/AutoHotkey_1.1.37.02_setup.exe
             dest: /tmp/autohotkey_setup.exe
             mode: '0755'
 
         - name: Install AutoHotkey v1.1 silently
+          when: not install_base_packages_ahk_stat.stat.exists
           ansible.builtin.command:
             cmd: powershell.exe -Command "/tmp/autohotkey_setup.exe /S"
-          args:
-            creates: /c/Program Files/AutoHotkey/AutoHotkey.exe
           register: install_base_packages_install_ahk
           changed_when: install_base_packages_install_ahk.rc == 0
           ignore_errors: true
@@ -477,7 +484,7 @@
                   'failed to start' in install_base_packages_install_ahk.stderr or
                   'denied' in install_base_packages_install_ahk.stdout or
                   'failed' in install_base_packages_install_ahk.stdout) }}
-          when: install_base_packages_install_ahk.failed
+          when: install_base_packages_install_ahk.failed | default(false)
 
         - name: Adjust has_admin_privileges fact if AutoHotkey installation failed due to permissions
           ansible.builtin.set_fact:
@@ -514,29 +521,14 @@
         install_base_packages_pnpm_install_path: >-
           {{ install_base_packages_win_home_posix }}/AppData/Local/pnpm:{{ install_base_packages_nvm_shim_dir }}:{{ ansible_facts.env.PATH }}
 
+    # NOTE: We use the absolute path to nvm's pnpm proxy shim to ensure we are using the
+    #       nvm-managed pnpm for the active Node.js version. It is passed as an argv element,
+    #       so the space in 'Author Software' needs no quoting.
     - name: Install pnpm packages
-      # NOTE: We use the absolute path to nvm's pnpm proxy shim to ensure we are using the
-      #       nvm-managed pnpm for the active Node.js version.
-      ansible.builtin.command:
-        cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" add -g {{ item }}"
-      environment:
-        PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
-        PATH: "{{ install_base_packages_pnpm_install_path }}"
-      with_items:
-        - neovim
-        # NOTE: Rafter is the local command-safety layer used by AI agents. Installing it
-        #       globally puts `rafter` on PATH, which is what the agent guard hooks invoke.
-        - "@rafter-security/cli"
-      changed_when: false
-
-    # NOTE: pnpm >= 10 ignores lifecycle scripts by default, so tree-sitter-cli's install script
-    #       (which downloads the native `tree-sitter` binary) is skipped unless explicitly allowed
-    #       via `--allow-build`. Without this, nvim-treesitter fails with a `spawn ... ENOENT` error
-    #       when it tries to run the missing binary.
-    - name: Install tree-sitter-cli with its build script allowed
-      ansible.builtin.command:
-        cmd: "\"{{ install_base_packages_pnpm_executable_path }}\" add -g --allow-build=tree-sitter-cli tree-sitter-cli@latest"
-      environment:
-        PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
-        PATH: "{{ install_base_packages_pnpm_install_path }}"
-      changed_when: false
+      ansible.builtin.include_tasks: ../../../common/tasks/install_pnpm_global_packages.yml
+      vars:
+        pnpm_global_executable: "{{ install_base_packages_pnpm_executable_path }}"
+        pnpm_global_environment:
+          PNPM_HOME: "{{ ansible_facts['env']['USERPROFILE'] }}\\AppData\\Local\\pnpm"
+          PATH: "{{ install_base_packages_pnpm_install_path }}"
+        pnpm_global_packages: "{{ install_base_packages_pnpm_global_packages }}"
