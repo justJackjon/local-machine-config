@@ -102,7 +102,9 @@ if [ "$os" == "Linux" ]; then
   info "Installing dependencies (git, python3, ansible)..."
   sudo apt-get install -y git python3 python3-pip python3-venv pipx
   pipx ensurepath
-  pipx install ansible ansible-core
+  # NOTE: Only install Python packages uploaded at least 7 days ago (pip >= 26 reads this; older pip ignores
+  #       it). The playbook sets the same supply-chain cooldown for its own pip, npm and pnpm installs.
+  PIP_UPLOADED_PRIOR_TO=P7D pipx install ansible ansible-core
 
   # NOTE: Ubuntu 25.10+ and 26.04+ default to sudo-rs which breaks Ansible become prompt regex.
   # If sudo.ws is available, set the system alternative so sudo points to sudo.ws.
@@ -158,7 +160,12 @@ elif [ "$os" == "macOS" ]; then
 
   if ! command -v brew &>/dev/null; then
     info "Homebrew not found. Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # NOTE: Downloaded to a file and run only if the download succeeded. With `bash -c "$(curl ...)"`, a
+    #       download that fails part-way still runs whatever arrived.
+    homebrew_installer="$(mktemp)"
+    curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$homebrew_installer"
+    /bin/bash "$homebrew_installer"
+    rm -f "$homebrew_installer"
   fi
 
   info "Updating Homebrew..."
