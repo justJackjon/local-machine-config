@@ -9,20 +9,74 @@
     configure_mcp_servers_user_home: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}"
     configure_mcp_servers_claude_executable_path: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}/.local/bin/claude.exe"
     configure_mcp_servers_agy_executable_path: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}/AppData/Local/agy/bin/agy.exe"
+    configure_mcp_servers_installer_dir: "{{ configure_mcp_servers_win_home_raw.stdout | trim }}/Downloads"
+    configure_mcp_servers_installer_dir_win: "{{ ansible_facts['env']['USERPROFILE'] }}\\Downloads"
 
 # NOTE: Both CLIs are installed with their vendors' official PowerShell installers. Neither reliably adds its
 #       bin directory to the user PATH, so install_base_packages manages '%USERPROFILE%\.local\bin' (Claude Code)
 #       and '%LOCALAPPDATA%\agy\bin' (agy) on the user PATH. This role always calls them by absolute path.
-# NOTE: expand_argument_vars must be false for command tasks that embed PowerShell; see the NOTE on the
-#       user PATH task in install_base_packages.
+# NOTE: The installers verify the binary they download against a checksum from their vendor's release manifest.
+#       They are downloaded to a file and run with -File, rather than piped into Invoke-Expression, and only
+#       when the CLI is missing. Claude Code comes from its `stable` channel (see install_clis_unix.yml).
+- name: Check for Claude Code CLI
+  ansible.builtin.stat:
+    path: "{{ configure_mcp_servers_claude_executable_path }}"
+  register: configure_mcp_servers_claude_stat
+
 - name: Install Claude Code CLI
-  ansible.builtin.command:
-    cmd: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"
-    creates: "{{ configure_mcp_servers_claude_executable_path }}"
-    expand_argument_vars: false
+  when: not configure_mcp_servers_claude_stat.stat.exists
+  block:
+    - name: Download Claude Code installer
+      ansible.builtin.get_url:
+        url: https://claude.ai/install.ps1
+        dest: "{{ configure_mcp_servers_installer_dir }}/install-claude.ps1"
+        mode: "0644"
+
+    - name: Run Claude Code installer
+      ansible.builtin.command:
+        argv:
+          - powershell.exe
+          - -NoProfile
+          - -ExecutionPolicy
+          - Bypass
+          - -File
+          - "{{ configure_mcp_servers_installer_dir_win }}\\install-claude.ps1"
+          - stable
+      changed_when: true
+
+  always:
+    - name: Remove Claude Code installer
+      ansible.builtin.file:
+        path: "{{ configure_mcp_servers_installer_dir }}/install-claude.ps1"
+        state: absent
+
+- name: Check for Antigravity CLI (agy)
+  ansible.builtin.stat:
+    path: "{{ configure_mcp_servers_agy_executable_path }}"
+  register: configure_mcp_servers_agy_stat
 
 - name: Install Antigravity CLI (agy)
-  ansible.builtin.command:
-    cmd: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "irm https://antigravity.google/cli/install.ps1 | iex"
-    creates: "{{ configure_mcp_servers_agy_executable_path }}"
-    expand_argument_vars: false
+  when: not configure_mcp_servers_agy_stat.stat.exists
+  block:
+    - name: Download Antigravity CLI (agy) installer
+      ansible.builtin.get_url:
+        url: https://antigravity.google/cli/install.ps1
+        dest: "{{ configure_mcp_servers_installer_dir }}/install-agy.ps1"
+        mode: "0644"
+
+    - name: Run Antigravity CLI (agy) installer
+      ansible.builtin.command:
+        argv:
+          - powershell.exe
+          - -NoProfile
+          - -ExecutionPolicy
+          - Bypass
+          - -File
+          - "{{ configure_mcp_servers_installer_dir_win }}\\install-agy.ps1"
+      changed_when: true
+
+  always:
+    - name: Remove Antigravity CLI (agy) installer
+      ansible.builtin.file:
+        path: "{{ configure_mcp_servers_installer_dir }}/install-agy.ps1"
+        state: absent

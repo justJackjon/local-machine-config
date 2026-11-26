@@ -148,8 +148,10 @@ function Install-Dependencies {
       Write-Host "Ansible is already installed in MSYS2."
     }
 
-    Write-Info "Installing Ansible collections..."
-    & $msys2Shell -lc "ansible-galaxy collection install community.general ansible.windows community.crypto community.windows" | Out-Host
+    # NOTE: MSYS2's ansible package bundles the collections the playbook uses (community.general,
+    #       ansible.windows, community.crypto, community.windows), so they aren't installed from Ansible Galaxy
+    #       (newest release, no cooldown). Verified: `ansible-galaxy collection list` in MSYS2 shows them under
+    #       site-packages, and the old Galaxy install found them already installed.
 
     # NOTE: MSYS2 no longer publishes 'mingw-w64-x86_64-github-cli' (the mingw64 repo is being
     #       wound down in favour of ucrt64). Install gh via Scoop instead, which is also how the

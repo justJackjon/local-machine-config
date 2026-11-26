@@ -452,10 +452,13 @@
                 suffix: _install_kinto
               register: configure_keyboard_tempdir
 
+            # NOTE: The script is pinned and checksummed, but it downloads Kinto's master.zip itself, so what it
+            #       installs isn't pinned. Not changed, because this path only runs on native Linux desktops.
             - name: Download Kinto install script
               ansible.builtin.get_url:
-                url: https://raw.githubusercontent.com/rbreaves/kinto/HEAD/install/linux.sh
+                url: "https://raw.githubusercontent.com/rbreaves/kinto/{{ configure_keyboard_kinto_commit }}/install/linux.sh"
                 dest: "{{ configure_keyboard_tempdir.path }}/install_kinto.sh"
+                checksum: "{{ configure_keyboard_kinto_linux_installer_checksum }}"
                 mode: "0755"
               register: configure_keyboard_kinto_download_result
 
@@ -479,9 +482,11 @@
                 state: directory
                 mode: "0755"
 
+            # NOTE: The archive is fetched by commit, which fixes its contents. There's no checksum, because
+            #       GitHub doesn't guarantee byte-identical archives for a commit (only the files inside).
             - name: Download Kinto zip
               ansible.builtin.get_url:
-                url: https://github.com/rbreaves/kinto/archive/refs/heads/master.zip
+                url: "https://github.com/rbreaves/kinto/archive/{{ configure_keyboard_kinto_commit }}.zip"
                 dest: "{{ configure_keyboard_windows_downloads_path }}/kinto.zip"
                 mode: "0644"
 
@@ -490,7 +495,7 @@
                 src: "{{ configure_keyboard_windows_downloads_path }}/kinto.zip"
                 dest: "{{ configure_keyboard_windows_downloads_path }}"
                 remote_src: true
-                creates: "{{ configure_keyboard_windows_downloads_path }}/kinto-master"
+                creates: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}"
 
             - name: Re-implement Kinto setup script with native Ansible tasks
               block:
@@ -516,13 +521,13 @@
                 #       copy so that the installed file only changes when the result does.
                 - name: Enable Kinto's default remaps in kinto.ahk
                   ansible.builtin.replace:
-                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    path: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/windows/kinto.ahk"
                     regexp: '(; )(.*)(; Default)(?!( - ST2CODE))(.*)'
                     replace: '\2\3\5'
 
                 - name: Enable Kinto's modifier remaps for the keyboard type in kinto.ahk
                   ansible.builtin.replace:
-                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    path: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/windows/kinto.ahk"
                     regexp: "(; )(.*)(; {{ 'MacModifiers' if configure_keyboard_windows_kinto_kbtype == 'mac' else 'WinModifiers' }})"
                     replace: '\2\3'
 
@@ -535,7 +540,7 @@
                 #       paste (Ctrl+Shift+C/V) and physical Ctrl+key is sent as Ctrl+key.
                 - name: Treat Alacritty as a terminal in kinto.ahk
                   ansible.builtin.lineinfile:
-                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    path: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/windows/kinto.ahk"
                     line: "GroupAdd, {{ item }}, ahk_exe alacritty.exe"
                     insertafter: '^GroupAdd, {{ item }}, ahk_exe WindowsTerminal\.exe'
                   loop:
@@ -545,14 +550,14 @@
                 - name: Add British - Mac layout remaps to kinto.ahk
                   when: configure_keyboard_windows_mac_gb_layout
                   ansible.builtin.blockinfile:
-                    path: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    path: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/windows/kinto.ahk"
                     block: "{{ lookup('file', 'snippets/kinto/windows_mac_gb_layout.ahk') }}"
                     marker: "; {mark} ANSIBLE MANAGED BLOCK: British - Mac layout"
                     insertbefore: '^; ###   Special character insertion'
 
                 - name: Copy rendered kinto.ahk
                   ansible.builtin.copy:
-                    src: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/kinto.ahk"
+                    src: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/windows/kinto.ahk"
                     dest: "{{ configure_keyboard_windows_home_posix }}/.kinto/kinto.ahk"
                     remote_src: true
                     mode: "0644"
@@ -571,19 +576,19 @@
                     argv:
                       - reg.exe
                       - import
-                      - "{{ configure_keyboard_windows_downloads_path_win.stdout }}\\kinto-master\\windows\\theme_ubuntu.reg"
+                      - "{{ configure_keyboard_windows_downloads_path_win.stdout }}\\{{ configure_keyboard_kinto_extracted_dir }}\\windows\\theme_ubuntu.reg"
                   changed_when: true
 
                 - name: Copy assets
                   ansible.builtin.copy:
-                    src: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/assets/"
+                    src: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/assets/"
                     dest: "{{ configure_keyboard_windows_home_posix }}/.kinto/assets/"
                     remote_src: true
                     mode: "0644"
 
                 - name: Copy other Kinto Windows scripts
                   ansible.builtin.copy:
-                    src: "{{ configure_keyboard_windows_downloads_path }}/kinto-master/windows/{{ item }}"
+                    src: "{{ configure_keyboard_windows_downloads_path }}/{{ configure_keyboard_kinto_extracted_dir }}/windows/{{ item }}"
                     dest: "{{ configure_keyboard_windows_home_posix }}/.kinto/{{ item }}"
                     remote_src: true
                     mode: "0644"
@@ -729,7 +734,8 @@
             path: "{{ configure_keyboard_windows_downloads_path }}/{{ item }}"
             state: absent
           loop:
-            - kinto-master
+            - "{{ configure_keyboard_kinto_extracted_dir }}"
+            - kinto-master # NOTE: Left by runs before Kinto was pinned to a commit.
             - kinto.zip
 
     - name: Configure Kinto

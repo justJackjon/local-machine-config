@@ -85,8 +85,10 @@
       when: not configure_msys2_dracula_installed.stat.exists
       ansible.builtin.get_url:
         # NOTE: Potentially brittle, and whilst we could use git, we don't really expect any changes to the remote.
-        url: https://raw.githubusercontent.com/dracula/mintty/master/dracula.minttyrc
+        # NOTE: Pinned to a commit (master as of Mar 2022) and checksummed, so a push to the repo can't change it.
+        url: https://raw.githubusercontent.com/dracula/mintty/fe86fcb32e64ace469c51195bdf25a0c5c674c5a/dracula.minttyrc
         dest: '/usr/share/mintty/themes/dracula'
+        checksum: sha256:749354c975167fe222025ac79e41c030a04a01237daddd954af157078b8f76f5
         mode: '0644'
 
     - name: Ensure .minttyrc file exists

@@ -1,0 +1,62 @@
+---
+# Installs the newest Node.js LTS release older than the supply-chain cutoff with nvm-sh (Linux/macOS),
+# makes it nvm's `default`, and sets `installed_node_lts_bin_dir` to the default version's bin directory.
+#
+# NOTE: This used to be `nvm install --lts` with `creates: ~/.nvm/versions/node`, so Node.js was installed once
+#       and never updated, and the newest LTS was taken regardless of age. Now a newer LTS release is installed
+#       next to the old one once it is old enough, and becomes the default. A default that is already newer is
+#       kept. Every other installed version is then uninstalled, unless `install_base_packages_remove_old_node_versions`
+#       is false. Global npm packages go with their version; pnpm's globals live in PNPM_HOME and are unaffected.
+# NOTE: The bin directory used to be found with `find ~/.nvm/versions/node ... | head -n 1`, which picks an
+#       arbitrary version once several are installed. It now comes from nvm's default.
+- name: Find the newest Node.js LTS release older than the supply-chain cutoff
+  ansible.builtin.include_tasks: resolve_node_lts.yml
+
+- name: Get nvm's default Node.js version
+  ansible.builtin.shell: source "$HOME/.nvm/nvm.sh" && nvm version default
+  args:
+    executable: /bin/bash
+  register: install_node_lts_default_raw
+  changed_when: false
+  failed_when: false
+
+- name: Set the Node.js version to use
+  ansible.builtin.set_fact:
+    install_node_lts_version: >-
+      {{ install_node_lts_default_raw.stdout | trim
+         if (install_node_lts_default_raw.stdout | trim) is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+            and (install_node_lts_default_raw.stdout | trim | regex_replace('^v', ''))
+                is version(resolved_node_lts_version | regex_replace('^v', ''), '>=')
+         else resolved_node_lts_version }}
+
+- name: Install Node.js {{ install_node_lts_version }}
+  ansible.builtin.shell: source "$HOME/.nvm/nvm.sh" && nvm install {{ install_node_lts_version }}
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node/{{ install_node_lts_version }}/bin/node"
+
+- name: Set nvm's default Node.js version to {{ install_node_lts_version }}
+  when: install_node_lts_default_raw.stdout | trim != install_node_lts_version
+  ansible.builtin.shell: source "$HOME/.nvm/nvm.sh" && nvm alias default {{ install_node_lts_version }}
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Uninstall other Node.js versions
+  when: install_base_packages_remove_old_node_versions | default(true) | bool
+  ansible.builtin.shell: |
+    source "$HOME/.nvm/nvm.sh"
+    nvm use --silent {{ install_node_lts_version }} >/dev/null
+    for dir in "$HOME"/.nvm/versions/node/v*; do
+      version=$(basename "$dir")
+      [ "$version" = "{{ install_node_lts_version }}" ] && continue
+      nvm uninstall "$version" >/dev/null && echo "removed $version"
+    done
+  args:
+    executable: /bin/bash
+  register: install_node_lts_uninstall
+  changed_when: "'removed ' in install_node_lts_uninstall.stdout"
+
+- name: Set the Node.js bin directory fact
+  ansible.builtin.set_fact:
+    installed_node_lts_bin_dir: "{{ ansible_facts.env.HOME }}/.nvm/versions/node/{{ install_node_lts_version }}/bin"

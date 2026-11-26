@@ -39,6 +39,9 @@ local-machine-config/
 │       ├── install_scoop_package.yml    # Robust Windows Scoop installer & soft-repair
 │       ├── manage_ssh_config_entry.yml  # Idempotent ~/.ssh/config blockinfile manager
 │       ├── install_pnpm_global_packages.yml # Idempotent pnpm global installs/updates (all platforms)
+│       ├── install_node_lts_nvm_sh.yml  # Installs/upgrades Node.js LTS with nvm-sh, sets nvm's default
+│       ├── resolve_github_release.yml   # Newest GitHub release older than the supply-chain cutoff
+│       ├── resolve_node_lts.yml         # Newest Node.js LTS release older than the supply-chain cutoff
 │       ├── resolve_pnpm_executable.yml  # Finds a working pnpm on Linux/macOS (layout varies by version)
 │       ├── set_os_facts.yml             # Discovers is_debian_family, is_mac, is_windows, is_wsl
 │       ├── set_python_interpreter.yml   # Resolves Python interpreter & venv per platform
@@ -175,7 +178,7 @@ The playbook does **not** install WSL itself; it only configures a WSL distro wh
 - **Windows:** Not installed — Docker runs inside WSL2 instead.
 
 ### `install_lazyvim`
-- Installs latest Neovim release.
+- Installs the newest Neovim release older than the supply-chain cutoff (Linux; Homebrew on macOS, Scoop on Windows).
 - Installs the LazyVim starter (`https://github.com/LazyVim/starter`, `.git` removed) **only when the Neovim config (`~/.config/nvim` or `%LOCALAPPDATA%\nvim`) is not already a LazyVim config**, detected by `lua/config/lazy.lua`. An existing LazyVim config, including customisations, is never touched.
 - A non-LazyVim config (e.g. SpaceVim) is first moved to a timestamped `<path>.bak-<timestamp>` (plus Neovim's data/state/cache dirs); backups never overwrite each other.
 - Installs Cascadia Code Nerd Font and configures the relevant terminal emulator.
@@ -220,11 +223,25 @@ Commit messages in this repository adhere to the **Gitmoji + Scope** format:
 - `:wrench:   (playbooks): Update python interpreter facts`
 - `:memo:   (docs): Update AGENTS.md with execution guidelines`
 
-### 4. Preserving Comments & Rationale
+**Branches:** don't commit to `main` directly. Use a short-lived branch named `<type>/<short-kebab-description>` (`feat/…`, `fix/…`, as in PRs #15–#34), and merge it with a pull request. `main`'s branch protection requires a pull request and signed commits, but it isn't enforced for admins, so a direct push from the owner's account still goes through: following this rule is up to us. Merged branches are deleted automatically.
+
+### 4. Supply-Chain Rules
+New installs must follow these rules (see the README's "Supply-Chain Safety" for the user-facing summary):
+- **Never install a release younger than the cooldown.** The playbook sets `supply_chain_min_release_age_days` (default 7) and derives `supply_chain_release_cutoff` (UTC ISO 8601) and play-level environment variables from it: `PIP_UPLOADED_PRIOR_TO=P7D` (pip >= 26, so pipx too), `npm_config_min_release_age=7` (days) and `pnpm_config_minimum_release_age=10080` (minutes). Task-level `environment:` merges with them, so tasks don't need to repeat them. Every run prints one `raw module does not support the environment keyword` warning, from the `raw` tasks that run before Python is set up. It's harmless; avoiding it would mean splitting the playbook into two plays. Like any Ansible warning it goes to stderr, so redirecting `.\run-playbook.ps1`'s stderr (`*>`, `2>&1`) makes PowerShell 5.1 report a failure, because the wrapper sets `$ErrorActionPreference = 'Stop'`, even when the play succeeded. Verified in WSL2 Ubuntu (Nov 2026, pip 26.3, npm 11.20, pnpm 12.23): each tool skipped the too-new version, including pnpm for `@latest`, `pnpm outdated` and `pnpm self-update`. `npm view` ignores the gate; use `npm pack <pkg> --dry-run --json` to see what it resolves to.
+- **GitHub releases:** use `common/tasks/resolve_github_release.yml`, never `releases/latest`, and pass the asset's `digest` to `get_url`'s `checksum`. Its default tag regex skips non-version releases such as Neovim's `stable` and `nightly`.
+- **Never download from a branch** (`master`, `HEAD`, `main` of someone else's repo). Pin a commit or release tag and keep a `sha256:` checksum in the repo (GitHub's digest where it exists; older assets have none). GitHub source archives (`archive/<sha>.zip`) are pinned by commit without a checksum, because their bytes aren't guaranteed stable.
+- **Never pipe a download into a shell** (`curl | bash`, `irm | iex`). Download to a file with `get_url`, run it, then remove it. Prefer an installer's version or channel option (Claude Code: `stable`; Starship: `--version`; pnpm: `PNPM_VERSION`).
+- **Build with lockfiles:** `cargo install` with `locked: true`.
+- **Upgrade, don't just install.** Re-running the playbook must move each tool to the newest version the cooldown allows, and must never downgrade a newer one (compare with the `version` test first; installers and `scoop update` will happily downgrade). `creates:`, `pipx install` and `scoop install` alone never upgrade. Node.js LTS: `common/tasks/resolve_node_lts.yml` (nodejs.org's `index.json`), installed by `install_node_lts_nvm_sh.yml` (Linux/macOS) or nvm-windows, which then uninstall every other Node.js version (`install_base_packages_remove_old_node_versions`, default true; verified in WSL2 and on Windows by installing v24.21.0 next to v26.13.1). While several versions are installed, find Node's bin directory from nvm's `default`, never `find ... | head -n 1`. Scoop: buckets and Scoop core are reset to their last commit before the cutoff after `scoop update`, and apps are updated only when `files/scoop_versions.py` reports the bucket version newer than the installed one.
+- **Ansible itself** is upgraded by `install.sh` (`pipx upgrade ansible`), never by the playbook (replacing its venv mid-run could break the run). It's one pipx venv, `ansible --include-deps`, so `ansible-playbook` uses the collections bundled with the `ansible` package, which come through pip's cooldown. Don't add `ansible-galaxy collection install`: Galaxy has no cooldown, and `~/.ansible/collections` shadows the bundled collections, so those copies never update. MSYS2's and Homebrew's `ansible` packages bundle the collections too.
+- **Accepted exceptions** (no release-age setting exists): apt, Homebrew, pacman, Scoop core's own code before the reset, rustup's toolchain, Google Chrome's `.deb`. nvm (nvm-sh) is pinned in the repo and never upgraded; nvm-windows is installed once. Claude Code (stable channel) and agy update themselves. Mark each exception with a `# NOTE:` explaining why it isn't gated.
+- **CI:** `.github/workflows/lint.yml` (syntax check + `ansible-lint --offline`), tools pinned in `.github/ci/requirements.txt`, actions pinned by SHA, updates proposed by Dependabot with a 7-day cooldown. Pre-existing findings are baselined in `.ansible-lint-ignore` (by file and rule); don't add to it, fix new findings instead. GitHub secret scanning and push protection are enabled on the repository.
+
+### 5. Preserving Comments & Rationale
 - Existing tasks contain critical `# NOTE:` comments explaining why certain workarounds exist (e.g., WSL world-writable mounts, Cloudflare blocks on AutoHotkey Scoop manifests, nvm-windows 2.x proxy shims shadowing Scoop's on PATH).
 - **Never remove or overwrite `# NOTE:` comments** unless the workaround is being intentionally retired.
 
-### 5. Verification Checklist for Agents
+### 6. Verification Checklist for Agents
 Before finishing any modification in this repository:
 1. Run `./run-playbook.sh --syntax-check` to verify YAML validity and syntax.
 2. If working on a specific role, verify changes with the corresponding tag (e.g. `--tags "configure_git"`).
@@ -324,6 +341,17 @@ Hard-won findings from debugging real runs. Read this before changing the Window
 - **Symptom:** the Home Assistant URL prompt waited for input before its question was shown.
 - **Cause:** `install.sh` sends all output through `tee` to its log, so Ansible's stdout was a pipe and a `pause` prompt without a trailing newline stayed buffered.
 - **Fix:** `install.sh` runs the playbook on the original terminal (`1>&3 2>&4`). The playbook's output goes to `run-playbook.sh`'s Ansible log, not the install log. Verified in WSL2 under a pseudo-terminal: before the fix, the typed reply appeared before the question, and after it, the question came first. The same rule is why `install.ps1` doesn't pipe the playbook through `Out-Host`.
+
+### Re-runs didn't upgrade most tools
+- **Found while adding the supply-chain cooldown (Nov 2026):** a re-run upgraded apt/Homebrew/pacman packages, pnpm and its global packages, pip packages, Neovim (Linux), lazygit and fzf, but nothing else. Node.js (`creates:` on Linux/macOS), Starship (only if missing), Linux pipx packages (`pipx install`), Windows pnpm (`creates:`), every Scoop app (`scoop install` only) and Ansible's collections (Galaxy, installed once) stayed at the version first installed.
+- **Fix:** each now upgrades to the newest version the cooldown allows (see "Supply-Chain Rules" above). Verified in WSL2 Ubuntu (Node.js, Starship, fzf, pipx, the Ansible venv migration) and on Windows (Scoop, Node.js, pnpm). The Linux source-built tools that need sudo (Alacritty, lazygit's tarball) were checked only up to the download.
+
+### Claude Code's update channel
+- `configure_mcp_servers` merges `configure_mcp_servers_claude_settings` (`autoUpdatesChannel: stable`) into `~/.claude/settings.json`, keeping the other settings and their order. A settings file that isn't valid JSON fails the run instead of being overwritten. Verified in WSL2 and on Windows (where it was `latest`).
+
+### lazygit's release assets were renamed
+- **Symptom (found while age-gating it):** the source install of lazygit (Debian < 13, Ubuntu < 25.10) built `lazygit_<ver>_Linux_x86_64.tar.gz`, but v0.66.3's asset is `lazygit_0.66.3_linux_x86_64.tar.gz`, so the download would 404.
+- **Fix:** the asset is chosen from the release's asset list, matched case-insensitively and by architecture (`x86_64` or `arm64`), and downloaded with its GitHub digest. Verified the selection and download in WSL2 Ubuntu; the install itself runs only on older releases.
 
 ### Debugging WSL runs from the Windows host
 - An agent on the Windows host can read and run things in WSL directly, without being installed there: `wsl -d Ubuntu -- bash -lc "..."`. `run-playbook.sh` always appends Ansible's output to `${TMPDIR:-/tmp}/local-machine-config-ansible.log` (override with `ANSIBLE_LOG_PATH`), so `tail -200 /tmp/local-machine-config-ansible.log` shows the latest run. `/tmp/local-machine-config-install.log` is written only by `install.sh`. WSL can see the Windows checkout at `/mnt/c/Users/<user>/Repos/local-machine-config`, so you can test edits before pushing them.

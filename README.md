@@ -67,6 +67,27 @@ You can also pass extra arguments to the `ansible-playbook` command, such as `--
 > **Why is this script needed?**
 > When running inside WSL, Ansible may ignore the local `ansible.cfg` file due to the "world-writable" permissions of mounted Windows drives. This causes Ansible to fail when it cannot find the roles defined in `roles_path`. The `run-playbook.sh` script automatically detects this WSL environment and forces Ansible to use the correct configuration file, ensuring the playbook runs correctly everywhere.
 
+## Supply-Chain Safety
+
+This repository installs a lot of third-party software, so it limits how much a single malicious or broken release can reach:
+
+- **Release-age cooldown:** packages and releases are installed only once they are at least **7 days** old, giving the community time to find and pull a bad release. This covers pip, pipx, npm, pnpm (including `pnpm self-update`), Ansible and its collections, Node.js LTS, Scoop apps (their buckets are held at the cutoff), GitHub release downloads (Neovim, lazygit, fzf, Starship, nvm-windows) and the Alacritty crate. Re-running the playbook upgrades these to the newest version that is old enough, and never downgrades something newer that is already installed. To take an urgent fix sooner, override it for one run:
+
+  ```bash
+  ./run-playbook.sh -e supply_chain_min_release_age_days=0
+  ```
+
+- **Pinned, checksummed downloads:** files that used to come from a branch (`master`, `HEAD`) are fetched by commit or release tag, with a SHA-256 kept in this repository or published by GitHub for the release asset.
+- **Downloaded, then run:** vendor install scripts are saved to a file and run from there, never piped from the network straight into a shell. Claude Code is installed from, and set to auto-update on, its `stable` channel (about a week behind `latest`).
+- **Locked builds:** Alacritty is built with `cargo install --locked`, so its dependencies are the versions Alacritty published, not whatever is newest at build time.
+- **Repository checks:** GitHub secret scanning with push protection blocks pushes that contain credentials, and a lint workflow (`.github/workflows/lint.yml`) runs a syntax check and ansible-lint on every pull request. Its actions are pinned by commit SHA, and Dependabot proposes updates to them once a release is 7 days old.
+
+Not covered by the cooldown: apt, Homebrew and MSYS2's pacman (signed or checksummed by their maintainers, with no release-age setting), Scoop's own code, the Rust toolchain from rustup, nvm itself (pinned to a version in the repo), and Google Chrome's `.deb` (later updates come from Google's signed apt repository). Claude Code and agy update themselves. See `AGENTS.md` for the details.
+
+### Contributing
+
+Work on a short-lived branch named `<type>/<short-kebab-description>` (for example `feat/supply-chain-hardening` or `fix/wsl-installation`), and merge it into `main` with a pull request. `main` requires pull requests and signed commits. Commit messages follow the Gitmoji + scope format described in `AGENTS.md`.
+
 ## Post-Installation
 
 After the main playbook has finished, you will need to start a new shell session (or run `source ~/.bashrc`) for all changes to take effect. This is especially important for interacting with services like GitHub, as the `ssh-agent` will only be started in new shell sessions.
@@ -160,4 +181,5 @@ The playbooks in this repository will install and configure the following softwa
 - Install tmux
 - On XFCE desktop, add 'Workspace Switcher' plugin to top panel
 - Create a common clipboard API (e.g., `pbcopy`/`pbpaste` wrappers) to abstract away platform-specific commands like `xclip`, `pbcopy`, and `/dev/clipboard`.
+- Fix the findings listed in `.ansible-lint-ignore` (pre-existing when CI was added), deleting each line as it is fixed.
 - Refactor to set fully qualified executable paths (e.g., for scoop, nvm, pnpm) as global facts in an early `pre_tasks` block. This will provide a central, commented location to manage paths and solve the "first-run PATH issue" more cleanly than repeating logic in each role.

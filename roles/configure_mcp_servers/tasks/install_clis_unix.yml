@@ -3,11 +3,36 @@
     configure_mcp_servers_user_home: "{{ ansible_facts['env']['HOME'] }}"
     configure_mcp_servers_claude_executable_path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/claude"
 
+# NOTE: Both vendors' installers verify the binary they download against a checksum from their own release
+#       manifest. They are downloaded to a file and run from there rather than piped into bash, so a download
+#       that fails part-way is never run. They are only fetched when the CLI is missing.
+# NOTE: Claude Code is installed from its `stable` channel, which trails `latest` by about a week and skips
+#       releases with major regressions: the closest it offers to the supply-chain cutoff. agy's installer has
+#       no version or channel option.
+- name: Check for Claude Code CLI
+  ansible.builtin.stat:
+    path: "{{ configure_mcp_servers_claude_executable_path }}"
+  register: configure_mcp_servers_claude_stat
+
 - name: Install Claude Code CLI
-  ansible.builtin.shell:
-    cmd: set -o pipefail && curl -fsSL https://claude.ai/install.sh | bash
-    executable: /bin/bash
-    creates: "{{ configure_mcp_servers_claude_executable_path }}"
+  when: not configure_mcp_servers_claude_stat.stat.exists
+  block:
+    - name: Download Claude Code installer
+      ansible.builtin.get_url:
+        url: https://claude.ai/install.sh
+        dest: "/tmp/install_claude_{{ ansible_facts.user_id }}.sh"
+        mode: "0700"
+
+    - name: Run Claude Code installer
+      ansible.builtin.command:
+        argv: [bash, "/tmp/install_claude_{{ ansible_facts.user_id }}.sh", stable]
+      changed_when: true
+
+  always:
+    - name: Remove Claude Code installer
+      ansible.builtin.file:
+        path: "/tmp/install_claude_{{ ansible_facts.user_id }}.sh"
+        state: absent
 
 # NOTE: The agy installer's install location on Linux/macOS is not documented, so we detect an existing
 #       install via a login shell's PATH rather than a fixed path.
@@ -20,7 +45,20 @@
 
 - name: Install Antigravity CLI (agy)
   when: configure_mcp_servers_agy_check.rc != 0
-  ansible.builtin.shell:
-    cmd: set -o pipefail && curl -fsSL https://antigravity.google/cli/install.sh | bash
-    executable: /bin/bash
-  changed_when: true
+  block:
+    - name: Download Antigravity CLI (agy) installer
+      ansible.builtin.get_url:
+        url: https://antigravity.google/cli/install.sh
+        dest: "/tmp/install_agy_{{ ansible_facts.user_id }}.sh"
+        mode: "0700"
+
+    - name: Run Antigravity CLI (agy) installer
+      ansible.builtin.command:
+        argv: [bash, "/tmp/install_agy_{{ ansible_facts.user_id }}.sh"]
+      changed_when: true
+
+  always:
+    - name: Remove Antigravity CLI (agy) installer
+      ansible.builtin.file:
+        path: "/tmp/install_agy_{{ ansible_facts.user_id }}.sh"
+        state: absent

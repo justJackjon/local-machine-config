@@ -92,11 +92,34 @@
         - "'already added' not in scoop_bucket_add.stdout"
       changed_when: "'Successfully added' in scoop_bucket_add.stdout"
 
-    - name: Update Scoop and buckets
-      ansible.builtin.command:
-        cmd: "{{ install_base_packages_scoop_executable_path }} update"
-      changed_when: false
-      ignore_errors: true
+    # NOTE: Supply-chain cooldown for Scoop, which has no release-age setting. Scoop core and every bucket are
+    #       git repositories; a bucket's manifests say which version of each app Scoop installs. After
+    #       `scoop update` pulls them, each is reset to its last commit before the cutoff (see the playbook), so
+    #       Scoop only sees versions published at least that long ago (a manifest is committed after its
+    #       release). `scoop update` also records the update time, so `scoop install` doesn't pull again for
+    #       3 hours. The next `scoop update` fast-forwards from the older commit as usual. Only reports
+    #       `changed` when a repository ends up on a different commit than before the run.
+    - name: Update Scoop and its buckets to the supply-chain cutoff
+      ansible.builtin.shell: |
+        set -o pipefail
+        repos=("{{ install_base_packages_scoop_root }}/apps/scoop/current" "{{ install_base_packages_scoop_root }}"/buckets/*)
+        declare -A before
+        for r in "${repos[@]}"; do [ -d "$r/.git" ] && before[$r]=$(git -C "$r" rev-parse HEAD); done
+        "{{ install_base_packages_scoop_executable_path }}" update >/dev/null || echo "WARN: scoop update failed" >&2
+        for r in "${repos[@]}"; do
+          [ -d "$r/.git" ] || continue
+          rev=$(git -C "$r" rev-list -1 --before="{{ supply_chain_release_cutoff }}" HEAD)
+          if [ -z "$rev" ]; then echo "No commit before the cutoff in $r" >&2; exit 1; fi
+          [ "$(git -C "$r" rev-parse HEAD)" = "$rev" ] || git -C "$r" reset -q --hard "$rev"
+          [ "${before[$r]}" = "$rev" ] || echo "moved $(basename "$r") to $rev"
+        done
+      args:
+        executable: /usr/bin/bash
+      register: install_base_packages_scoop_cutoff
+      changed_when: "'moved ' in install_base_packages_scoop_cutoff.stdout"
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
 
     - name: Define Scoop packages list
       ansible.builtin.set_fact:
@@ -147,6 +170,45 @@
       loop: "{{ install_base_packages_scoop_list }}"
       loop_control:
         loop_var: scoop_package
+
+    # NOTE: Scoop packages used to be installed once and never updated. They are now updated when the
+    #       buckets (reset to the supply-chain cutoff above) offer a newer version than the installed one.
+    #       Comparing first matters: `scoop update` installs whatever version the manifest names, so an app
+    #       installed within the cooldown would otherwise be downgraded.
+    - name: Get installed and available Scoop package versions
+      ansible.builtin.command:
+        argv: >-
+          {{ ['python3', role_path ~ '/files/scoop_versions.py', install_base_packages_scoop_root]
+             + (install_base_packages_scoop_list | map(attribute='name') | list) }}
+      register: install_base_packages_scoop_versions
+      changed_when: false
+
+    - name: Set outdated Scoop packages fact
+      ansible.builtin.set_fact:
+        install_base_packages_scoop_outdated: >-
+          {{ install_base_packages_scoop_versions.stdout | from_json | selectattr('outdated') | map(attribute='name') | list }}
+
+    # NOTE: Scoop refuses to update an app that is running (e.g. an open Alacritty or Neovim). That is reported
+    #       as a warning rather than failing the run; the update happens on a later run.
+    - name: Update outdated Scoop packages
+      when: install_base_packages_scoop_outdated | length > 0
+      ansible.builtin.command:
+        argv: "{{ [install_base_packages_scoop_executable_path, 'update'] + install_base_packages_scoop_outdated }}"
+      register: install_base_packages_scoop_update
+      changed_when: "'Updating ' in install_base_packages_scoop_update.stdout"
+      failed_when: false
+      environment:
+        HOME: "{{ ansible_facts['env']['USERPROFILE'] }}"
+        USERPROFILE: "{{ ansible_facts['env']['USERPROFILE'] }}"
+
+    - name: Warn about Scoop packages that could not be updated
+      when:
+        - install_base_packages_scoop_update is not skipped
+        - install_base_packages_scoop_update.rc != 0 or 'ERROR' in install_base_packages_scoop_update.stdout
+      ansible.builtin.debug:
+        msg:
+          - "Some Scoop packages could not be updated (close any running copies and re-run):"
+          - "{{ install_base_packages_scoop_update.stdout_lines | select('search', 'ERROR|running') | list }}"
 
     # NOTE: Earlier versions of this playbook installed GnuPG via Scoop (see the NOTE in the Scoop packages list).
     #       '--purge' also removes its separate, unused keyring.
@@ -236,18 +298,15 @@
     - name: Install nvm-windows from the official installer
       when: not install_base_packages_nvm_executable_stat.stat.exists
       block:
-        - name: Get latest nvm-windows release from GitHub
-          ansible.builtin.uri:
-            url: https://api.github.com/repos/nvm-windows/nvm/releases/latest
-            headers:
-              Accept: application/vnd.github+json
-            return_content: true
-          register: install_base_packages_nvm_release
+        - name: Find the newest nvm-windows release older than the supply-chain cutoff
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
+          vars:
+            resolve_github_release_repo: nvm-windows/nvm
 
         - name: Select nvm-windows installer asset
           ansible.builtin.set_fact:
             install_base_packages_nvm_installer_asset: >-
-              {{ install_base_packages_nvm_release.json.assets
+              {{ resolved_github_release.assets
                  | selectattr('name', 'search', '-' ~ ('arm64' if (is_arm64 | default(false)) else 'x64') ~ '-setup\.exe$')
                  | first }}
 
@@ -290,9 +349,31 @@
         cmd: "\"{{ install_base_packages_nvm_executable_path }}\" cfg reset root"
       changed_when: true
 
+    # NOTE: `nvm install lts` took the newest LTS release, however new. The version is now the newest LTS
+    #       release older than the supply-chain cutoff (see the playbook), or the active version if that is
+    #       newer. A newer LTS is installed and made active, then the old versions are uninstalled (below).
+    - name: Find the newest Node.js LTS release older than the supply-chain cutoff
+      ansible.builtin.include_tasks: ../../../common/tasks/resolve_node_lts.yml
+
+    - name: Get the active Node.js version from NVM
+      ansible.builtin.command:
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" current"
+      register: install_base_packages_nvm_current
+      changed_when: false
+      failed_when: false
+
+    - name: Set the Node.js version to install
+      ansible.builtin.set_fact:
+        install_base_packages_nvm_target_version: >-
+          {{ (install_base_packages_nvm_current.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+'))
+             if (install_base_packages_nvm_current.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+'))
+                and (install_base_packages_nvm_current.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+'))
+                    is version(resolved_node_lts_version | regex_replace('^v', ''), '>=')
+             else resolved_node_lts_version | regex_replace('^v', '') }}
+
     - name: Install Node.js LTS via NVM
       ansible.builtin.command:
-        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" install lts"
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" install {{ install_base_packages_nvm_target_version }}"
       register: install_base_packages_nvm_install
       changed_when: "'is already installed' not in install_base_packages_nvm_install.stdout"
       failed_when:
@@ -305,7 +386,10 @@
         #       nvm-windows 2.x instead prints e.g. "SKIPPED: vXX.XX.XX is already installed", so we also accept a bare
         #       'vXX.XX.XX'. Without a version, 'nvm use' and the pnpm setup below are skipped.
         #       We use regex_findall to extract the version following 'v' or 'Version ' and pick the first match.
-        install_base_packages_nvm_node_version: "{{ install_base_packages_nvm_install.stdout | regex_findall('(?:node\\.js v|Version |\\bv)(\\d+\\.\\d+\\.\\d+)') | first | default('') }}"
+        #       The requested version is the fallback.
+        install_base_packages_nvm_node_version: >-
+          {{ install_base_packages_nvm_install.stdout | regex_findall('(?:node\\.js v|Version |\\bv)(\\d+\\.\\d+\\.\\d+)')
+             | first | default(install_base_packages_nvm_target_version) }}
 
     - name: Use Node.js LTS via NVM
       ansible.builtin.command:
@@ -315,6 +399,30 @@
         - install_base_packages_nvm_node_version != ""
       changed_when: false
       failed_when: false
+
+    # NOTE: Old Node.js versions are uninstalled once the playbook has moved to a newer LTS release, unless
+    #       install_base_packages_remove_old_node_versions is false (see defaults/main.yml). Each version
+    #       has its own pnpm (nvm's auto_installed_modules), so nothing else depends on the old ones.
+    - name: Find installed Node.js versions
+      when:
+        - install_base_packages_remove_old_node_versions | bool
+        - install_base_packages_nvm_node_version | default('') != ''
+      ansible.builtin.find:
+        paths: "{{ install_base_packages_nvm_home }}/installs"
+        file_type: directory
+        patterns: "v*"
+      register: install_base_packages_nvm_installed_versions
+
+    - name: Uninstall other Node.js versions
+      when:
+        - install_base_packages_remove_old_node_versions | bool
+        - install_base_packages_nvm_node_version | default('') != ''
+      ansible.builtin.command:
+        cmd: "\"{{ install_base_packages_nvm_executable_path }}\" uninstall {{ item }}"
+      loop: >-
+        {{ install_base_packages_nvm_installed_versions.files | default([]) | map(attribute='path') | map('basename')
+           | map('regex_replace', '^v', '') | reject('equalto', install_base_packages_nvm_node_version) | list }}
+      changed_when: true
 
     # NOTE: nvm-windows 2.x (shim mode) exposes node/npm/pnpm/yarn through proxy shims in
     #       '%LOCALAPPDATA%\Author Software\nvm\.nodejs'. Its installer does not reliably add that directory to the
@@ -379,11 +487,46 @@
             cmd: "\"{{ install_base_packages_nvm_executable_path }}\" cfg set auto_installed_modules=pnpm"
           changed_when: true
 
+        # NOTE: pnpm used to be installed once (`creates:`) and never updated. `npm pack --dry-run` resolves the
+        #       newest pnpm that npm's release-age gate allows (npm_config_min_release_age, set by the playbook)
+        #       without installing anything; pnpm is installed when missing or older than that, never downgraded.
+        - name: Check the pnpm version installed in the active Node.js version
+          ansible.builtin.stat:
+            path: "{{ install_base_packages_nvm_home }}/installs/v{{ install_base_packages_nvm_node_version }}/node_modules/pnpm/package.json"
+          register: install_base_packages_nvm_pnpm_stat
+
+        - name: Read the installed pnpm package.json
+          when: install_base_packages_nvm_pnpm_stat.stat.exists
+          ansible.builtin.slurp:
+            path: "{{ install_base_packages_nvm_home }}/installs/v{{ install_base_packages_nvm_node_version }}/node_modules/pnpm/package.json"
+          register: install_base_packages_nvm_pnpm_package
+
+        - name: Resolve the pnpm version to install
+          ansible.builtin.command:
+            argv: ["{{ install_base_packages_nvm_shim_dir }}/npm.exe", pack, pnpm@latest, --dry-run, --json, --ignore-scripts]
+          register: install_base_packages_nvm_pnpm_pack
+          changed_when: false
+
+        - name: Set pnpm version facts
+          ansible.builtin.set_fact:
+            install_base_packages_nvm_pnpm_installed: >-
+              {{ (install_base_packages_nvm_pnpm_package.content | b64decode | from_json).version
+                 if install_base_packages_nvm_pnpm_stat.stat.exists else '' }}
+            install_base_packages_nvm_pnpm_wanted: "{{ (install_base_packages_nvm_pnpm_pack.stdout | from_json | first).version }}"
+
         # NOTE: npm 11.20+ skips install scripts that are not explicitly allowed, and pnpm uses them to set itself up.
         - name: Install pnpm into the active Node.js version
+          when: >-
+            install_base_packages_nvm_pnpm_installed == '' or
+            install_base_packages_nvm_pnpm_installed is version(install_base_packages_nvm_pnpm_wanted, '<')
           ansible.builtin.command:
-            cmd: "\"{{ install_base_packages_nvm_shim_dir }}/npm.exe\" install -g --allow-scripts=pnpm pnpm"
-            creates: "{{ install_base_packages_nvm_home }}/installs/v{{ install_base_packages_nvm_node_version }}/node_modules/pnpm/package.json"
+            argv:
+              - "{{ install_base_packages_nvm_shim_dir }}/npm.exe"
+              - install
+              - -g
+              - --allow-scripts=pnpm
+              - "pnpm@{{ install_base_packages_nvm_pnpm_wanted }}"
+          changed_when: true
 
         # NOTE: nvm prompts before running global modules it does not yet trust ('untrusted_module_handler_action'),
         #       which would hang a non-interactive run. 'nvm reshim' re-trusts package-manager entrypoints.
@@ -465,6 +608,8 @@
           ansible.builtin.get_url:
             url: https://github.com/AutoHotkey/AutoHotkey/releases/download/v1.1.37.02/AutoHotkey_1.1.37.02_setup.exe
             dest: /tmp/autohotkey_setup.exe
+            # NOTE: This release predates GitHub's asset digests, so its checksum is kept here.
+            checksum: sha256:49a48e879f7480238d2fe17520ac19afe83685aac0b886719f9e1eac818b75cc
             mode: '0755'
 
         - name: Install AutoHotkey v1.1 silently

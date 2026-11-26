@@ -1,0 +1,17 @@
+# This file contains ignores rule violations for ansible-lint
+common/tasks/install_scoop_package.yml name[template]
+common/tasks/install_scoop_package.yml yaml[line-length]
+common/tasks/resolve_pnpm_executable.yml yaml[line-length]
+common/tasks/set_python_interpreter.yml ignore-errors
+roles/configure_git/tasks/gpg.yml var-naming[no-role-prefix]
+roles/configure_keyboard/tasks/main.yml no-handler
+roles/configure_keyboard/tasks/main.yml risky-file-permissions
+roles/configure_keyboard/tasks/main.yml yaml[line-length]
+roles/configure_system/tasks/main.yml yaml[new-line-at-end-of-file]
+roles/install_base_packages/tasks/linux.yml yaml[line-length]
+roles/install_base_packages/tasks/macos.yml yaml[line-length]
+roles/install_base_packages/tasks/windows.yml var-naming[no-role-prefix]
+roles/install_base_packages/tasks/windows.yml yaml[line-length]
+roles/install_lazyvim/tasks/main.yml yaml[line-length]
+roles/pre_flight_checks/tasks/main.yml var-naming[no-role-prefix]
+roles/pre_flight_checks/tasks/main.yml yaml[line-length]

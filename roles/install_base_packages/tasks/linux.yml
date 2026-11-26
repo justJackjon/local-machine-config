@@ -51,6 +51,8 @@
             path: "/root/.cargo/bin/rustup"
           register: install_base_packages_rustup_stat_root
 
+        # NOTE: Not age-gated: rustup-init and the stable toolchain come from the Rust project's own servers,
+        #       and rustup checks each component's SHA-256 from the signed release manifest.
         - name: Download rustup installer
           when: not install_base_packages_rustup_stat_root.stat.exists
           ansible.builtin.get_url:
@@ -63,10 +65,33 @@
           ansible.builtin.command: /tmp/rustup-init.sh -y
           changed_when: true
 
+    # NOTE: The version is the newest crates.io release older than the supply-chain cutoff (see the playbook).
+    #       `locked` builds with the Cargo.lock that Alacritty published. Without it, cargo resolves every
+    #       dependency to its newest compatible version at build time, including ones released minutes ago.
+    #       crates.io asks API clients to send a descriptive User-Agent.
+    - name: List Alacritty releases on crates.io
+      ansible.builtin.uri:
+        url: https://crates.io/api/v1/crates/alacritty/versions
+        headers:
+          User-Agent: ansible-playbook (local machine provisioning)
+        return_content: true
+      register: install_base_packages_alacritty_versions
+
+    - name: Select the Alacritty release to install
+      ansible.builtin.set_fact:
+        install_base_packages_alacritty_version: >-
+          {{ install_base_packages_alacritty_versions.json.versions
+             | rejectattr('yanked') | rejectattr('num', 'search', '-')
+             | selectattr('created_at', 'le', supply_chain_release_cutoff)
+             | sort(attribute='created_at', reverse=true)
+             | map(attribute='num') | first }}
+
     - name: Install Alacritty via cargo for Debian based systems
       become: true
       community.general.cargo:
         name: alacritty
+        version: "{{ install_base_packages_alacritty_version }}"
+        locked: true
         state: present
       environment:
         PATH: "/root/.cargo/bin:{{ ansible_facts.env.PATH }}"
@@ -75,10 +100,13 @@
     - name: Install Alacritty desktop entry and icon
       become: true
       block:
+        # NOTE: Downloads from a branch (`master`) get whatever was pushed last, so fixed files are pinned to a
+        #       release tag or commit and checked against a checksum kept in this repo.
         - name: Download Alacritty icon
           ansible.builtin.get_url:
-            url: https://raw.githubusercontent.com/alacritty/alacritty/master/extra/logo/alacritty-term.svg
+            url: https://raw.githubusercontent.com/alacritty/alacritty/v0.17.0/extra/logo/alacritty-term.svg
             dest: /usr/share/pixmaps/Alacritty.svg
+            checksum: sha256:647f43a9c766f81a4f6805fcebdc2d6a8dcb989abcc50be625abf2b99b9afddb
             mode: "0644"
 
         - name: Install Alacritty desktop file
@@ -145,7 +173,6 @@
           ansible.builtin.apt:
             name: gh
             state: latest
-            update_cache: "{{ install_base_packages_gh_repository is changed }}"
             update_cache: true
 
     - name: Install lazygit
@@ -165,19 +192,31 @@
             (ansible_facts.distribution == 'Debian' and ansible_facts.distribution_version | float < 13) or
             (ansible_facts.distribution == 'Ubuntu' and ansible_facts.distribution_version | float < 25.10)
           block:
-            - name: Get latest lazygit version
-              ansible.builtin.uri:
-                url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
-                return_content: true
-              register: install_base_packages_lazygit_release
+            - name: Find the newest lazygit release older than the supply-chain cutoff
+              ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
+              vars:
+                resolve_github_release_repo: jesseduffield/lazygit
 
-            - name: Set lazygit version fact
+            # NOTE: lazygit's assets were renamed from `_Linux_x86_64` to `_linux_x86_64` (seen in v0.66.3),
+            #       which broke the old download URL. The name is matched case-insensitively, by architecture.
+            - name: Set lazygit asset fact
               ansible.builtin.set_fact:
-                install_base_packages_lazygit_version: "{{ install_base_packages_lazygit_release.json.tag_name | regex_replace('^v', '') }}"
+                install_base_packages_lazygit_asset: >-
+                  {{ resolved_github_release.assets
+                     | selectattr('name', 'search', '(?i)^lazygit_[0-9.]+_linux_' ~ ('arm64' if (is_arm64 | default(false)) else 'x86_64') ~ '\.tar\.gz$')
+                     | first }}
 
-            - name: Download and unarchive lazygit
+            # NOTE: Downloaded to a file first so get_url can verify GitHub's digest for the asset.
+            - name: Download lazygit
+              ansible.builtin.get_url:
+                url: "{{ install_base_packages_lazygit_asset.browser_download_url }}"
+                dest: /tmp/lazygit.tar.gz
+                checksum: "{{ install_base_packages_lazygit_asset.digest }}"
+                mode: "0644"
+
+            - name: Unarchive lazygit
               ansible.builtin.unarchive:
-                src: "https://github.com/jesseduffield/lazygit/releases/download/v{{ install_base_packages_lazygit_version }}/lazygit_{{ install_base_packages_lazygit_version }}_Linux_x86_64.tar.gz" # noqa yaml[line-length]
+                src: /tmp/lazygit.tar.gz
                 dest: /tmp
                 remote_src: true
 
@@ -201,16 +240,15 @@
       block:
         # NOTE: The apt package for fzf is often outdated, leading to compatibility issues with fzf-lua.
         #       Installing directly from source ensures the latest version with all features.
-        - name: Get latest fzf release tag
-          ansible.builtin.uri:
-            url: https://api.github.com/repos/junegunn/fzf/releases/latest
-            method: GET
-            return_content: true
-          register: install_base_packages_fzf_release_info
+        # NOTE: "Latest" here means the newest release older than the supply-chain cutoff (see the playbook).
+        - name: Find the newest fzf release older than the supply-chain cutoff
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
+          vars:
+            resolve_github_release_repo: junegunn/fzf
 
         - name: Set fzf_version fact
           ansible.builtin.set_fact:
-            install_base_packages_fzf_version: "{{ install_base_packages_fzf_release_info.json.tag_name }}"
+            install_base_packages_fzf_version: "{{ resolved_github_release.tag_name }}"
 
         # NOTE: The clone is only ever created fresh, never updated in place. ansible-core 2.22's `git`
         #       module crashes (`'NoneType' object has no attribute 'startswith'`, in get_head_branch)
@@ -243,43 +281,102 @@
             version: "{{ install_base_packages_fzf_version }}"
             depth: 1
 
+        # NOTE: fzf's installer downloads the release binary itself, without checking it. It skips the
+        #       download when ~/.fzf/bin/fzf already reports the right version, so the binary is put there
+        #       first, downloaded with GitHub's digest for the asset.
+        - name: Set fzf binary asset fact
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.set_fact:
+            install_base_packages_fzf_asset: >-
+              {{ resolved_github_release.assets
+                 | selectattr('name', 'equalto', 'fzf-' ~ (install_base_packages_fzf_version | regex_replace('^v', ''))
+                              ~ '-linux_' ~ ('arm64' if (is_arm64 | default(false)) else 'amd64') ~ '.tar.gz')
+                 | first }}
+
+        - name: Download the fzf binary
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.get_url:
+            url: "{{ install_base_packages_fzf_asset.browser_download_url }}"
+            dest: /tmp/fzf.tar.gz
+            checksum: "{{ install_base_packages_fzf_asset.digest }}"
+            mode: "0644"
+
+        - name: Ensure the fzf bin directory exists
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.file:
+            path: "{{ ansible_facts.env.HOME }}/.fzf/bin"
+            state: directory
+            mode: "0755"
+
+        - name: Unarchive the fzf binary
+          when: install_base_packages_fzf_needs_install
+          ansible.builtin.unarchive:
+            src: /tmp/fzf.tar.gz
+            dest: "{{ ansible_facts.env.HOME }}/.fzf/bin"
+            remote_src: true
+
+        # NOTE: The binary above makes this stat pass for a fresh clone, so the installer is run whenever fzf
+        #       was (re)cloned, too: it also writes the shell integration (~/.fzf.bash).
         - name: Check if the fzf binary is installed
           ansible.builtin.stat:
             path: "{{ ansible_facts.env.HOME }}/.fzf/bin/fzf"
           register: install_base_packages_fzf_binary_stat
 
         - name: Run fzf install script
-          when: not install_base_packages_fzf_binary_stat.stat.exists
+          when: install_base_packages_fzf_needs_install or not install_base_packages_fzf_binary_stat.stat.exists
           ansible.builtin.command: "{{ ansible_facts.env.HOME }}/.fzf/install --all"
           changed_when: true
 
     - name: Install Starship
       block:
-        - name: Check if starship is installed
-          ansible.builtin.command: which starship
+        - name: Check the installed Starship version
+          ansible.builtin.command: starship --version
           register: install_base_packages_starship_check
           failed_when: false
           changed_when: false
 
+        # NOTE: The installer would fetch the newest release; `--version` gives it the newest one older than
+        #       the supply-chain cutoff instead (see the playbook). An older installed Starship is upgraded
+        #       to it; a newer one is left alone.
+        - name: Find the newest Starship release older than the supply-chain cutoff
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
+          vars:
+            resolve_github_release_repo: starship/starship
+
+        - name: Set whether Starship needs installing or upgrading
+          ansible.builtin.set_fact:
+            install_base_packages_starship_needs_install: >-
+              {{ install_base_packages_starship_check.rc != 0 or
+                 (install_base_packages_starship_check.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+') | default('0.0.0', true))
+                 is version(resolved_github_release.tag_name | regex_replace('^v', ''), '<') }}
+
         - name: Download Starship install script
-          when: install_base_packages_starship_check.rc != 0
+          when: install_base_packages_starship_needs_install
           ansible.builtin.get_url:
             url: https://starship.rs/install.sh
             dest: "/tmp/install_starship_{{ ansible_facts.user_id }}.sh"
             mode: "0755"
 
         - name: Run Starship install script
-          when: install_base_packages_starship_check.rc != 0
+          when: install_base_packages_starship_needs_install
           become: true
-          ansible.builtin.command: "/tmp/install_starship_{{ ansible_facts.user_id }}.sh -y"
+          ansible.builtin.command:
+            argv:
+              - "/tmp/install_starship_{{ ansible_facts.user_id }}.sh"
+              - -y
+              - --version
+              - "{{ resolved_github_release.tag_name }}"
           changed_when: true
 
     - name: Install nvm, node and pnpm
       block:
+        # NOTE: Pinned to a release, and checked against a checksum kept in this repo, because tags can be moved.
+        #       nvm itself is never upgraded; bump the version and checksum here to update it.
         - name: Download nvm install script
           ansible.builtin.get_url:
             url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
             dest: "/tmp/install_nvm_{{ ansible_facts.user_id }}.sh"
+            checksum: sha256:8e45fa547f428e9196a5613efad3bfa4d4608b74ca870f930090598f5af5f643
             mode: "0755"
 
         - name: Run nvm install script
@@ -287,22 +384,12 @@
           args:
             creates: "{{ ansible_facts.env.HOME }}/.nvm/nvm.sh"
 
-        - name: Install Node.js LTS
-          ansible.builtin.shell: >
-            set -o pipefail && source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh && nvm install --lts
-          args:
-            executable: /bin/bash
-            creates: "{{ ansible_facts.env.HOME }}/.nvm/versions/node"
-
-        - name: Find NVM Node bin directory
-          ansible.builtin.shell: |
-            find {{ ansible_facts.env.HOME }}/.nvm/versions/node -maxdepth 2 -type d -name "bin" 2>/dev/null | head -n 1
-          register: install_base_packages_nvm_node_bin_raw
-          changed_when: false
+        - name: Install Node.js LTS and make it nvm's default
+          ansible.builtin.include_tasks: ../../../common/tasks/install_node_lts_nvm_sh.yml
 
         - name: Set NVM Node bin fact
           ansible.builtin.set_fact:
-            install_base_packages_node_bin_dir: "{{ install_base_packages_nvm_node_bin_raw.stdout | trim }}"
+            install_base_packages_node_bin_dir: "{{ installed_node_lts_bin_dir }}"
 
         # NOTE: The pnpm executable is resolved rather than hard-coded, because its location depends
         #       on the pnpm version (see common/tasks/resolve_pnpm_executable.yml).
@@ -321,6 +408,23 @@
             state: directory
             mode: "0755"
 
+        # NOTE: pnpm's installer would install the newest pnpm. `npm pack --dry-run` resolves the version that
+        #       npm's release-age gate allows (npm_config_min_release_age, set by the playbook) without
+        #       downloading or running anything, and PNPM_VERSION passes it to the installer. Verified in
+        #       WSL2 Ubuntu (Nov 2026): 12.22.0 instead of the 4-day-old 12.23.0. The installer itself checks
+        #       npm's registry signature and the tarball's integrity.
+        - name: Resolve the pnpm version to install
+          when: not install_base_packages_pnpm_preinstalled
+          ansible.builtin.shell: >
+            set -o pipefail &&
+            source {{ ansible_facts.env.HOME }}/.nvm/nvm.sh &&
+            npm pack pnpm@latest --dry-run --json --ignore-scripts
+          args:
+            executable: /bin/bash
+            chdir: /tmp
+          register: install_base_packages_pnpm_pack
+          changed_when: false
+
         - name: Download pnpm install script
           when: not install_base_packages_pnpm_preinstalled
           ansible.builtin.get_url:
@@ -336,11 +440,16 @@
             export SHELL="/bin/bash" &&
             export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH" &&
             bash /tmp/install_pnpm_{{ ansible_facts.user_id }}.sh
+          environment:
+            PNPM_VERSION: "{{ (install_base_packages_pnpm_pack.stdout | from_json | first).version }}"
           args:
             executable: /bin/bash
           changed_when: true
           failed_when: false
 
+        # NOTE: `pnpm self-update` honours pnpm_config_minimum_release_age (set by the playbook). Verified in
+        #       WSL2 Ubuntu (Nov 2026): from 12.21.0 it updated to 12.22.0, skipping the 4-day-old 12.23.0.
+        #       It doesn't downgrade a newer pnpm that is already installed.
         - name: Update pnpm
           when: install_base_packages_pnpm_preinstalled
           ansible.builtin.command:
@@ -405,12 +514,16 @@
         cmd: /usr/bin/pipx ensurepath
       changed_when: false
 
-    - name: Install pipx packages
-      ansible.builtin.command:
-        cmd: /usr/bin/pipx install {{ item }}
+    # NOTE: `pipx install` (used before) never upgrades an installed package. `state: latest` installs or
+    #       upgrades to the newest release pip's cooldown allows (PIP_UPLOADED_PRIOR_TO, set by the playbook).
+    #       Ansible itself is upgraded by install.sh, not here: replacing its venv mid-run could break the run.
+    - name: Install or upgrade pipx packages
+      community.general.pipx:
+        name: "{{ item }}"
+        state: latest
+        executable: /usr/bin/pipx
       environment:
         PATH: "{{ ansible_facts.env.HOME }}/.local/bin:{{ ansible_facts.env.PATH }}"
-      with_items:
+      loop:
         - ansible-lint
         - pynvim
-      changed_when: false
