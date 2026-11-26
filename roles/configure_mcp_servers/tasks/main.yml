@@ -6,6 +6,9 @@
   ansible.builtin.include_tasks: install_clis_unix.yml
   when: not is_windows
 
+- name: Configure Claude Code user settings
+  ansible.builtin.include_tasks: claude_settings.yml
+
 - name: Configure Home Assistant MCP server
   ansible.builtin.include_tasks: home_assistant.yml
   when: not (configure_mcp_servers_skip_home_assistant | bool)

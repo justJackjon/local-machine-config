@@ -1,0 +1,42 @@
+# NOTE: Merges configure_mcp_servers_claude_settings into Claude Code's user settings
+#       (~/.claude/settings.json), keeping every other setting and the existing key order. The file is only
+#       rewritten when a managed setting differs. A settings file that isn't valid JSON fails the run rather
+#       than being overwritten.
+- name: Set Claude Code settings path fact
+  ansible.builtin.set_fact:
+    configure_mcp_servers_claude_settings_path: "{{ configure_mcp_servers_user_home }}/.claude/settings.json"
+
+- name: Ensure Claude Code's config directory exists
+  ansible.builtin.file:
+    path: "{{ configure_mcp_servers_user_home }}/.claude"
+    state: directory
+    mode: "0700"
+
+- name: Check for Claude Code user settings
+  ansible.builtin.stat:
+    path: "{{ configure_mcp_servers_claude_settings_path }}"
+  register: configure_mcp_servers_claude_settings_stat
+
+- name: Read Claude Code user settings
+  when: configure_mcp_servers_claude_settings_stat.stat.exists
+  ansible.builtin.slurp:
+    path: "{{ configure_mcp_servers_claude_settings_path }}"
+  register: configure_mcp_servers_claude_settings_raw
+
+- name: Set current and wanted Claude Code settings facts
+  ansible.builtin.set_fact:
+    configure_mcp_servers_claude_settings_current: >-
+      {{ (configure_mcp_servers_claude_settings_raw.content | b64decode | from_json)
+         if configure_mcp_servers_claude_settings_stat.stat.exists else {} }}
+
+- name: Write Claude Code user settings
+  when: >-
+    not configure_mcp_servers_claude_settings_stat.stat.exists or
+    configure_mcp_servers_claude_settings_current | combine(configure_mcp_servers_claude_settings)
+    != configure_mcp_servers_claude_settings_current
+  ansible.builtin.copy:
+    dest: "{{ configure_mcp_servers_claude_settings_path }}"
+    content: >-
+      {{ configure_mcp_servers_claude_settings_current | combine(configure_mcp_servers_claude_settings)
+         | to_nice_json(indent=2, sort_keys=false) }}
+    mode: "0600"

@@ -1,5 +1,11 @@
 configure_mcp_servers_home_assistant_server_name: home-assistant
 
+# Settings merged into Claude Code's user settings (~/.claude/settings.json); other settings are kept.
+# NOTE: `stable` auto-updates trail `latest` by about a week and skip releases with major regressions,
+#       which matches the playbook's 7-day supply-chain cooldown. Use `latest` to get releases immediately.
+configure_mcp_servers_claude_settings:
+  autoUpdatesChannel: stable
+
 # NOTE: The Home Assistant URL and long-lived access token are deliberately not stored in this (public)
 #       repository. They are prompted for on first run and saved to this local, user-only file.
 configure_mcp_servers_local_config_dir: "{{ ansible_facts['env']['HOME'] }}/.config/local-machine-config"
