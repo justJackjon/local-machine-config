@@ -18,6 +18,8 @@
     #       - luarocks: Required by lazy and mason for Lua plugin management
     #       - - imagemagick: Required by snacks for image previews
     #       - sqlite: Required by snacks for history and frecency
+    # NOTE: Not age-gated: Homebrew has no release-age setting. Formulae are built from upstream releases by
+    #       Homebrew's CI, and their downloads are checked against the SHA-256 in each formula.
     - name: Install Homebrew packages
       community.general.homebrew:
         name:
@@ -51,6 +53,7 @@
           ansible.builtin.get_url:
             url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
             dest: "/tmp/install_nvm_{{ ansible_facts.user_id }}.sh"
+            checksum: sha256:8e45fa547f428e9196a5613efad3bfa4d4608b74ca870f930090598f5af5f643
             mode: "0755"
 
         - name: Run nvm install script

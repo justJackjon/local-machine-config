@@ -236,18 +236,15 @@
     - name: Install nvm-windows from the official installer
       when: not install_base_packages_nvm_executable_stat.stat.exists
       block:
-        - name: Get latest nvm-windows release from GitHub
-          ansible.builtin.uri:
-            url: https://api.github.com/repos/nvm-windows/nvm/releases/latest
-            headers:
-              Accept: application/vnd.github+json
-            return_content: true
-          register: install_base_packages_nvm_release
+        - name: Find the newest nvm-windows release older than the supply-chain cutoff
+          ansible.builtin.include_tasks: ../../../common/tasks/resolve_github_release.yml
+          vars:
+            resolve_github_release_repo: nvm-windows/nvm
 
         - name: Select nvm-windows installer asset
           ansible.builtin.set_fact:
             install_base_packages_nvm_installer_asset: >-
-              {{ install_base_packages_nvm_release.json.assets
+              {{ resolved_github_release.assets
                  | selectattr('name', 'search', '-' ~ ('arm64' if (is_arm64 | default(false)) else 'x64') ~ '-setup\.exe$')
                  | first }}
 
@@ -465,6 +462,8 @@
           ansible.builtin.get_url:
             url: https://github.com/AutoHotkey/AutoHotkey/releases/download/v1.1.37.02/AutoHotkey_1.1.37.02_setup.exe
             dest: /tmp/autohotkey_setup.exe
+            # NOTE: This release predates GitHub's asset digests, so its checksum is kept here.
+            checksum: sha256:49a48e879f7480238d2fe17520ac19afe83685aac0b886719f9e1eac818b75cc
             mode: '0755'
 
         - name: Install AutoHotkey v1.1 silently
