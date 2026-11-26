@@ -398,9 +398,16 @@
           vars:
             resolve_pnpm_node_bin_dir: "{{ install_base_packages_node_bin_dir }}"
 
+        # NOTE: Only the standalone installer's v11+ launcher (`$PNPM_HOME/bin/pnpm`) counts as installed.
+        #       Run by an older pnpm (the <= 10 layout, `$PNPM_HOME/pnpm`) with no Node.js on PATH,
+        #       `pnpm self-update` installed pnpm 12 without its native binary, exited 0, and left a
+        #       pnpm that fails with "pnpm's native binary was not installed, and there is no Node.js
+        #       to run pnpm without it". Any other pnpm is replaced by the standalone installer, which
+        #       also moves ~/.bashrc's PATH to `$PNPM_HOME/bin`. Verified in WSL2 Ubuntu (Nov 2026,
+        #       from 10.30.3).
         - name: Record whether pnpm was already installed
           ansible.builtin.set_fact:
-            install_base_packages_pnpm_preinstalled: "{{ resolved_pnpm_executable_path | length > 0 }}"
+            install_base_packages_pnpm_preinstalled: "{{ resolved_pnpm_executable_path == ansible_facts.env.HOME ~ '/.local/share/pnpm/bin/pnpm' }}"
 
         - name: Ensure pnpm home directory exists
           ansible.builtin.file:
