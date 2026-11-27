@@ -104,7 +104,10 @@ if [ "$os" == "Linux" ]; then
   pipx ensurepath
   # NOTE: Only install Python packages uploaded at least 7 days ago (pip >= 26 reads this; older pip ignores
   #       it). The playbook sets the same supply-chain cooldown for its own pip, npm and pnpm installs.
-  export PIP_UPLOADED_PRIOR_TO=P7D
+  #       It's an absolute UTC timestamp: pip 26.0 rejects durations such as P7D (added in a later
+  #       release), and an existing pipx shared venv can still hold pip 26.0 from an earlier run.
+  PIP_UPLOADED_PRIOR_TO="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+  export PIP_UPLOADED_PRIOR_TO
   # NOTE: Ansible is one pipx venv, `ansible` with --include-deps, so `ansible-playbook` (from its ansible-core
   #       dependency) sees the collections bundled with `ansible`. Earlier versions installed `ansible` and
   #       `ansible-core` as separate venvs: `ansible-playbook` came from the ansible-core venv, which can't see

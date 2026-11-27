@@ -15,3 +15,8 @@ install_base_packages_pnpm_global_packages:
   #       nvim-treesitter needs; pnpm >= 10 only runs it when allowed.
   - name: tree-sitter-cli
     allow_build: true
+
+# pipx packages installed (and kept up to date) on Linux.
+install_base_packages_pipx_packages:
+  - ansible-lint
+  - pynvim

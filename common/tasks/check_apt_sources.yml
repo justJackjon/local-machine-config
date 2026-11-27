@@ -1,0 +1,46 @@
+---
+# NOTE: Ansible's apt module fails the whole cache update when any repository fails (e.g. a vendor rotated its
+#       signing key), with only "Failed to update apt cache after 5 retries: ", while apt-get merely warns. This
+#       runs apt-get update once, before any apt task, and stops with the failing repositories, their sources
+#       files and how to fix them. Repositories this playbook doesn't manage (added by hand or by other
+#       installers) are the usual cause.
+- name: Update apt package lists
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      output="$(apt-get update 2>&1)"
+      rc=$?
+      problems="$(printf '%s\n' "$output" | grep -E '^E:|^W: .*(Failed to fetch|GPG error|NO_PUBKEY|EXPKEYSIG|is not signed)' || true)"
+      if [ "$rc" -ne 0 ] || [ -n "$problems" ]; then
+        printf '%s\n' "${problems:-$output}" | sed 's|^|ERR: |'
+        for host in $(printf '%s\n' "$problems" | grep -oE 'https?://[^/ ]+' | sort -u); do
+          grep -rlF "$host" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | sed "s|^|SRC: |; s|\$| ($host)|"
+        done
+      fi
+      exit 0
+    executable: /bin/bash
+  environment:
+    LANG: C
+    LC_ALL: C
+  become: true
+  check_mode: false
+  register: check_apt_sources_update
+  changed_when: false
+
+- name: Fail if an apt repository is broken
+  ansible.builtin.fail:
+    msg:
+      - "apt-get update reported errors. Fix them, check that 'sudo apt-get update' is clean, then re-run."
+      - "Errors:"
+      - "{{ check_apt_sources_problems }}"
+      - "Sources files of the failing repositories:"
+      - "{{ check_apt_sources_files if check_apt_sources_files | length > 0 else ['(none found under /etc/apt)'] }}"
+      - "NO_PUBKEY / EXPKEYSIG: the vendor rotated or renewed its signing key. Re-download it from the vendor's
+        install instructions to the keyring named by 'signed-by' in the sources file."
+      - "A repository you no longer use: delete its sources file."
+  vars:
+    check_apt_sources_problems: >-
+      {{ check_apt_sources_update.stdout_lines | select('match', '^ERR: ') | map('regex_replace', '^ERR: ', '') | list }}
+    check_apt_sources_files: >-
+      {{ check_apt_sources_update.stdout_lines | select('match', '^SRC: ') | map('regex_replace', '^SRC: ', '') | list }}
+  when: "check_apt_sources_update.stdout_lines | select('match', '^ERR: ') | list | length > 0"

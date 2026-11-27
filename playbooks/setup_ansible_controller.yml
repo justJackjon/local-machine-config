@@ -20,7 +20,9 @@
       {{ '%Y-%m-%dT%H:%M:%SZ' | strftime(second=(now().timestamp() - (supply_chain_min_release_age_days | int) * 86400) | int, utc=true) }}
 
   environment:
-    PIP_UPLOADED_PRIOR_TO: "P{{ supply_chain_min_release_age_days | int }}D"
+    # NOTE: An absolute timestamp, not a duration (P7D): pip 26.0 reads this variable but rejects durations,
+    #       and a machine set up earlier can still have it (e.g. in pipx's shared venv).
+    PIP_UPLOADED_PRIOR_TO: "{{ supply_chain_release_cutoff }}"
     npm_config_min_release_age: "{{ supply_chain_min_release_age_days | int }}"
     pnpm_config_minimum_release_age: "{{ (supply_chain_min_release_age_days | int) * 1440 }}"
 
