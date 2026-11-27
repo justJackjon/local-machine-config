@@ -22,6 +22,13 @@
       Accept: application/vnd.github+json
     return_content: true
   register: resolve_github_release_list
+  # Retry network errors and GitHub server failures, but fail immediately on client errors.
+  until: >-
+    (resolve_github_release_list.status | default(-1) | int) != -1 and
+    ((resolve_github_release_list.status | default(-1) | int) < 500 or
+     (resolve_github_release_list.status | default(-1) | int) >= 600)
+  retries: 3
+  delay: 5
 
 - name: Select the newest release old enough to install for {{ resolve_github_release_repo }}
   ansible.builtin.set_fact:
