@@ -233,8 +233,10 @@
 
         # NOTE: xrdp only reads `options` from a section matching the client's keyboard type, never from
         #       [default] (see xrdp_load_keyboard_layout in libxrdp/xrdp_sec.c). Windows' Remote Desktop
-        #       client sends type 4, subtype 0, which xrdp treats as subtype 1. The section's items must
-        #       stay in this order: xrdp stops reading a section at an item it doesn't expect.
+        #       client sends type 4, subtype 0, which xrdp treats as subtype 1. A Windows machine without a
+        #       physical keyboard (an Azure Dev Box, itself used over Remote Desktop) sends type 7 instead,
+        #       so there is a section for each. The section's items must stay in this order: xrdp stops
+        #       reading a section at an item it doesn't expect.
         - name: Remove ignored XRDP xkb options from the default section
           community.general.ini_file:
             path: /etc/xrdp/xrdp_keyboard.ini
@@ -250,6 +252,13 @@
             block: |
               [rdp_keyboard_local_machine_config]
               keyboard_type=4
+              keyboard_subtype=1
+              rdp_layouts=default_rdp_layouts
+              layouts_map=default_layouts_map
+              options={{ configure_keyboard_xrdp_xkb_options }}
+
+              [rdp_keyboard_local_machine_config_type7]
+              keyboard_type=7
               keyboard_subtype=1
               rdp_layouts=default_rdp_layouts
               layouts_map=default_layouts_map
